@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.43.0 — 2026-08-19
+
+- Aurora governance now **binds at the capability boundary** instead of being advisory. `AuroraPolicyEngine` joins the layered policy stack, scoring every capability call against the destructive-pattern rules and, for consequential calls, the constitutional checker.
+- The layer is strictly escalation-only and evidence-driven: it escalates only when a destructive pattern actually matches the call's arguments, never on declared risk class alone, so operator intent (`autoApproveWorkspaceWrites`, `allowProcessExecution`, OPA rules) is preserved. It can raise allow to require-approval and require-approval to deny, but can never grant authority another layer withheld.
+- Critical patterns are denied outright, high-risk patterns require confirmation, thresholds are configurable (`confirmAtOrAbove`, `denyAtOrAbove`, `alwaysCheckConstitution`), and the whole layer can be disabled with `auroraGovernance.enabled: false`.
+- Constitutional attributes at the capability boundary are deliberately honest: the destructive/rollback dimension is not asserted there (it belongs to Aurora action records), `humanApproved` reflects whether the call is already gated, and verification is claimed only because capability outcomes are journaled.
+- A failing risk analyzer or constitution service degrades to no escalation rather than opening a gate; the base policy layers still apply.
+- Added a durable enforcement audit trail with a per-tenant summary: escalation rate, denials, distribution by risk level, most-triggered rules and most-violated principles, exposed over REST and in the Canvas operations panel.
+- Closing a session now triggers candidate-only experience distillation automatically, so the learning loop no longer depends on someone remembering to run it. Failures never block session closure and it can be disabled with `experienceDistillation.onSessionClose: false`.
+- Added 9 tests (356 engine tests total) covering non-escalation of ordinary calls, critical denial, high-risk confirmation, configurable thresholds, the audit trail and summary, fail-closed analyzer behaviour, real end-to-end denial through the capability broker, automatic distillation on session close and disabling the layer.
+
 ## 1.42.0 — 2026-08-19
 
 - Added Aurora workspace checkpoints: bounded, content-addressed snapshots of a session workspace that turn the constitution's "recovery path" requirement into a real, executable rollback. Snapshots are limited by file count, per-file size and total size, exclude dependency/build directories, confine every path to the workspace root and reject symlink escapes.

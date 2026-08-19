@@ -436,6 +436,8 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
   const [selfCheck, setSelfCheck] = useState<any>(null);
   const [footprint, setFootprint] = useState<any>(null);
   const [checkpoints, setCheckpoints] = useState<any[]>([]);
+  const [enforcement, setEnforcement] = useState<any>(null);
+  const [enforcementLog, setEnforcementLog] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -497,6 +499,11 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
       ]);
       setAuroraMetrics(metricsResult); setAuroraAlerts(alertsResult.alerts); setSelfCheck(selfCheckResult);
       setFootprint(footprintResult); setCheckpoints(checkpointResult.checkpoints);
+      const [enforcementSummary, enforcementDecisions] = await Promise.all([
+        api<any>("/v1/aurora/enforcement-summary?tenantId=local"),
+        api<any>("/v1/aurora/enforcement?tenantId=local&escalatedOnly=true&limit=15"),
+      ]);
+      setEnforcement(enforcementSummary); setEnforcementLog(enforcementDecisions.decisions);
     } catch (cause) { showError(cause); }
   }, [showError, userId]);
   useEffect(() => { void load(); }, [load]);
@@ -580,6 +587,8 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
         {(selfCheck?.findings ?? []).map((finding:any) => <article className={`task-card ${finding.severity==="critical"?"failed":""}`} key={finding.code}><h3>integrity · {finding.code}</h3><p>{finding.detail}</p><small>{finding.section} · {finding.subjectIds.length} subject(s)</small></article>)}
         {auroraMetrics && <article className="task-card"><h3>telemetry</h3><p>cognitive {auroraMetrics.cognitive.health} · memory {auroraMetrics.memory.health} · trust {auroraMetrics.initiative.trust} · evolution {auroraMetrics.evolution.index}</p><small>focused {auroraMetrics.cognitive.focused} · verification debt {auroraMetrics.environment.verificationDebt} · overconfidence {auroraMetrics.decisions.overconfidence} · compliance {auroraMetrics.constitution.complianceRate}</small></article>}
         {(footprint?.largest ?? []).map((entry:string) => <article className="task-card" key={entry}><h3>footprint</h3><p>{entry}</p></article>)}
+        {enforcement && <article className="task-card"><h3>enforcement</h3><p>{enforcement.escalated} of {enforcement.total} capability calls escalated ({enforcement.denied} denied)</p><small>rate {enforcement.escalationRate} · top rules {(enforcement.topRules ?? []).map((rule:any)=>rule.code).slice(0,3).join(", ")||"none"}</small></article>}
+        {enforcementLog.map(entry => <article className={`task-card ${entry.finalDecision==="deny"?"failed":""}`} key={entry.id}><h3>{entry.finalDecision} · {entry.capabilityId}</h3><p>{entry.reasonCode}</p><small>{entry.riskLevel} · rules {entry.matchedRules.join(", ")||"none"} · {entry.at}</small></article>)}
         {checkpoints.map(checkpoint => <article className="task-card" key={checkpoint.id}><h3>checkpoint · {checkpoint.label}</h3><p>{checkpoint.reason}</p><small>{checkpoint.files.length} file(s) · {checkpoint.totalBytes} bytes · restored {checkpoint.restoreCount} time(s)</small></article>)}
       </div>
     </>}

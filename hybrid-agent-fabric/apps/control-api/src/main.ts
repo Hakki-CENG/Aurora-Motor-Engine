@@ -1142,6 +1142,9 @@ app.post("/v1/aurora/purge-user", async (request) => { const b=auroraTenant.exte
 app.get("/v1/aurora/selfcheck", async (request) => { const q=auroraTenant.parse(request.query); return await engine.dataGovernance.selfCheck(q.tenantId); });
 app.get("/v1/aurora/footprint", async (request) => { const q=auroraTenant.parse(request.query); return await engine.dataGovernance.footprint(q.tenantId); });
 
+app.get("/v1/aurora/enforcement", async (request) => { const q=auroraTenant.extend({escalatedOnly:z.coerce.boolean().optional(),limit:z.coerce.number().int().min(1).max(1000).optional()}).parse(request.query); return { decisions: engine.auroraPolicy ? await engine.auroraPolicy.decisions(q.tenantId, auroraInput({ escalatedOnly: q.escalatedOnly, limit: q.limit })) : [] }; });
+app.get("/v1/aurora/enforcement-summary", async (request) => { const q=auroraTenant.extend({windowDays:z.coerce.number().int().min(1).max(365).optional()}).parse(request.query); return engine.auroraPolicy ? await engine.auroraPolicy.summary(q.tenantId, q.windowDays ?? 7) : { tenantId: q.tenantId, total: 0, escalated: 0, denied: 0, escalationRate: 0, byLevel: {}, topRules: [], topPrinciples: [], generatedAt: new Date().toISOString() }; });
+
 app.get("/v1/media/images/providers", async () => ({ providers: engine.images.list(), upscalers: engine.images.listUpscalers() }));
 app.get("/v1/media/videos/providers", async () => ({ providers: engine.video.list(), queuedProviders: engine.video.listQueued(), upscalers: engine.video.listUpscalers() }));
 app.get("/v1/web-search/providers", async () => ({ providers: engine.webSearch.list() }));

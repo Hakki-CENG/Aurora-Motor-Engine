@@ -31,6 +31,7 @@ export * from "./capabilities/capability-broker.js";
 export * from "./capabilities/schema.js";
 export * from "./policy/policy-engine.js";
 export * from "./policy/opa-policy-engine.js";
+export * from "./policy/aurora-policy-engine.js";
 export * from "./policy/approval-service.js";
 export * from "./sandbox/sandbox.js";
 export * from "./sandbox/cloud-sandbox.js";

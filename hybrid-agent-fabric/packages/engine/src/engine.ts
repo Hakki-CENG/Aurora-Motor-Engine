@@ -13,8 +13,9 @@ import { PostgresCommandJournal } from "./persistence/postgres/command-journal.j
 import { PostgresEffectJournal } from "./persistence/postgres/effect-journal.js";
 import { PostgresSessionLeaseManager } from "./persistence/postgres/session-lease.js";
 import { ApprovalService } from "./policy/approval-service.js";
-import { DefaultPolicyEngine } from "./policy/policy-engine.js";
+import { DefaultPolicyEngine, type PolicyEngine } from "./policy/policy-engine.js";
 import { LayeredPolicyEngine, OpaPolicyEngine, type OpaPolicyOptions } from "./policy/opa-policy-engine.js";
+import { AuroraPolicyEngine, type AuroraPolicyOptions } from "./policy/aurora-policy-engine.js";
 import { CapabilityBroker } from "./capabilities/capability-broker.js";
 import { MemoryStore } from "./memory/memory-store.js";
 import { ExternalMemoryProviderManager } from "./memory/external-memory-provider.js";
@@ -156,6 +157,13 @@ export interface EngineConfig {
   autopilot?: { enabled?: boolean; tenantId?: string; driverIntervalMs?: number };
   /** Workspace checkpoint bounds for the real rollback path. */
   checkpoints?: { maxFiles?: number; maxTotalBytes?: number; maxFileBytes?: number; excludes?: string[] };
+  /**
+   * Aurora governance at the capability boundary. Enabled by default and escalation-only: it can
+   * require approval or deny, but never grants authority another policy layer withheld.
+   */
+  auroraGovernance?: { enabled?: boolean } & AuroraPolicyOptions;
+  /** Automatic candidate-only lesson extraction when a session closes. Enabled by default. */
+  experienceDistillation?: { onSessionClose?: boolean };
   kernelServerScript: string;
   sandboxBackend: SandboxBackendKind;
   sshSandbox?: SshSandboxOptions;
@@ -289,6 +297,7 @@ export class HybridAgentEngine {
   readonly checkpoints: WorkspaceCheckpointService;
   readonly auroraMetrics: AuroraMetricsCollector;
   readonly dataGovernance: AuroraDataGovernanceService;
+  readonly auroraPolicy: AuroraPolicyEngine | undefined;
 
   constructor(readonly config: EngineConfig) {
     const dataRoot = resolve(config.homePath, "data");
@@ -349,9 +358,26 @@ export class HybridAgentEngine {
       autoApproveWorkspaceWrites: config.autoApproveWorkspaceWrites ?? false,
       allowLocalProcess: config.allowProcessExecution ?? false,
     });
-    const policy = config.opa
-      ? new LayeredPolicyEngine([localPolicy, new OpaPolicyEngine(config.opa)])
-      : localPolicy;
+    // Aurora governance binds at the capability boundary. The risk analyzer and constitution must
+    // exist before the broker, and the layer is escalation-only, so it can only add scrutiny.
+    this.riskAnalyzer = new RiskAnalyzerService(dataRoot);
+    this.constitution = new ConstitutionService(dataRoot);
+    this.auroraPolicy = config.auroraGovernance?.enabled === false
+      ? undefined
+      : new AuroraPolicyEngine(
+        { risk: this.riskAnalyzer, constitution: this.constitution },
+        dataRoot,
+        {
+          ...(config.auroraGovernance?.confirmAtOrAbove ? { confirmAtOrAbove: config.auroraGovernance.confirmAtOrAbove } : {}),
+          ...(config.auroraGovernance?.denyAtOrAbove ? { denyAtOrAbove: config.auroraGovernance.denyAtOrAbove } : {}),
+          ...(config.auroraGovernance?.alwaysCheckConstitution !== undefined ? { alwaysCheckConstitution: config.auroraGovernance.alwaysCheckConstitution } : {}),
+          ...(config.auroraGovernance?.recordDecisions !== undefined ? { recordDecisions: config.auroraGovernance.recordDecisions } : {}),
+        },
+      );
+    const policyLayers: PolicyEngine[] = [localPolicy];
+    if (config.opa) policyLayers.push(new OpaPolicyEngine(config.opa));
+    if (this.auroraPolicy) policyLayers.push(this.auroraPolicy);
+    const policy = policyLayers.length > 1 ? new LayeredPolicyEngine(policyLayers) : localPolicy;
     this.capabilities = new CapabilityBroker(policy, this.approvals, effects, this.hooks);
     this.wasiPlugins = config.wasiPlugins
       ? new WasiPluginManager(this.capabilities, this.hooks, { rootPath: dataRoot, ...config.wasiPlugins })
@@ -376,7 +402,6 @@ export class HybridAgentEngine {
       ? undefined
       : new RollingMicroCompactor(dataRoot, config.context?.microCompaction);
     // Aurora services that feed prompt assembly must exist before the context manager is built.
-    this.constitution = new ConstitutionService(dataRoot);
     this.harness = new ContinualHarnessService(dataRoot);
     this.microagents = new MicroagentRegistry(dataRoot);
     // Semantic recall: the memory graph shares the engine's embedding-backed hybrid index.
@@ -503,7 +528,18 @@ export class HybridAgentEngine {
       context,
       ...(modelName ? { modelName } : {}),
       ...(config.modelFallbacks?.length ? { modelFallbacks: config.modelFallbacks } : {}),
-      onSessionClose: async (sessionId) => this.kernels.close(sessionId),
+      onSessionClose: async (sessionId) => {
+        await this.kernels.close(sessionId);
+        // Closed sessions are where lessons are cheapest to extract. Distillation only ever produces
+        // candidates, so this is safe to run unattended; failures must never block session closure.
+        if (this.config.experienceDistillation?.onSessionClose === false) return;
+        try {
+          const snapshot = await this.supervisor.getSession(sessionId);
+          await this.distiller.distill({ tenantId: snapshot.tenantId, sessionId });
+        } catch {
+          // ignored: distillation is an optimization, never a precondition for closing a session
+        }
+      },
     });
     this.society = new AgentSocietyService(dataRoot, this.supervisor, this.agentProfiles, this.events);
     this.cognitive = new CognitiveWorkspaceService(dataRoot);
@@ -512,7 +548,6 @@ export class HybridAgentEngine {
     this.userModel = new UserModelService(dataRoot);
     this.evolution = new SkillEvolutionService(dataRoot);
     this.environment = new EnvironmentAwarenessService(dataRoot);
-    this.riskAnalyzer = new RiskAnalyzerService(dataRoot);
     this.decisions = new DecisionService(dataRoot);
     this.planning = new PlanningService(dataRoot);
     this.checkpoints = new WorkspaceCheckpointService(dataRoot, config.checkpoints ?? {});

@@ -72,6 +72,7 @@ and none of it can widen that runtime's authority.
 | L17 computer control | existing filesystem/process/browser/git/kernel capabilities under policy | `filesystem.*`, `process.run`, `browser.*`, `git.*` | `/v1/sessions/*` | `engine.test.ts`, `browser-manager.test.ts` |
 | L18 environment awareness | `EnvironmentAwarenessService` — inventory, zones, action records, verification, habits, projects | `environment.*` | `/v1/environment/*` | `aurora-evolution-environment.test.ts` |
 | L19 safety | `ConstitutionService` + `RiskAnalyzerService` + existing policy/approvals/effect journal | `constitution.*`, `risk.*` | `/v1/constitution/*`, `/v1/risk/*` | `aurora-core-upstream.test.ts` |
+| L19 enforcement | `AuroraPolicyEngine` in the layered policy stack — evidence-driven, escalation-only | (binds every capability) | `/v1/aurora/enforcement*` | `aurora-policy-enforcement.test.ts` |
 | ACOS orchestration | `CognitiveOrchestrator` + `AuroraAutopilot` | `acos.*`, `autopilot.*` | `/v1/acos/*`, `/v1/autopilot` | `aurora-acos.test.ts`, `aurora-reasoning.test.ts` |
 | Explainability | `ProvenanceService` | `aurora.explain` | `/v1/aurora/explain` | `aurora-reasoning.test.ts`, `aurora-end-to-end.test.ts` |
 | Anomaly detection | `StuckDetectorService` | `session.stuck.analyze` | `/v1/sessions/:id/stuck` | `aurora-acos.test.ts` |
@@ -85,6 +86,7 @@ and none of it can widen that runtime's authority.
 |---|---|
 | C1 no unconstrained super-agent | society role hierarchy; profile-bound child execution cannot exceed the parent allowlist |
 | C2 policy above agents | capability broker + policy engine + approvals; every Aurora service is a capability caller, never a bypass |
+| C7 enforced, not advised | `AuroraPolicyEngine` denies critical destructive patterns and confirms high-risk ones at the capability boundary |
 | C3 sourced claims | memory object standard, world state facts, cognitive objects, constitution check `C3` |
 | C4 typed epistemics | `claimType` on memory/world/cognitive records; constitution check `C4` |
 | C5 bounded proactivity | initiative worthiness, attention budget, quiet hours, duplicate suppression, trust feedback |
@@ -115,6 +117,7 @@ initiative/state.json      watchers, intake, initiatives, budgets, digests
 memory-graph/state.json    memory objects, relations, thought anchors
 microagents/state.json     knowledge documents and screening findings
 planning/state.json        plans, steps, revisions
+policy/aurora-enforcement.json  capability-boundary enforcement audit trail
 risk/state.json            rules, assessments, confirmation policy
 society/state.json         roles, tasks, deliberations, budgets, bus messages
 user-model/state.json      claims, goals, signals, milestones, advice

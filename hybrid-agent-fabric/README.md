@@ -8,7 +8,7 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.42.0
+## Current milestone — 1.43.0
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -78,6 +78,7 @@ Implemented and tested:
 - Aurora workspace checkpoints with reversible restore, giving destructive work a real recovery path
 - Content-free Aurora telemetry, derived operational alerts and a cross-store integrity self-check
 - Whole-tenant and per-user Aurora export plus governed user purge with stated retention
+- Aurora governance enforced at the capability boundary: evidence-driven, escalation-only, audited
 - AES-256-GCM/Vault/KMS credential brokers, scoped leases and pinned 1Password/Bitwarden/command secret sources
 - SSRF-checked bounded public web fetch and normalized Brave/Tavily web search
 - Playwright/CDP browser automation and browser-scoped computer-use
@@ -982,6 +983,29 @@ environment action to its resource, verification and memory updates; an initiati
 that raised it; a memory to its graph neighbourhood; a decision to its constitutional verdict; a plan to
 the decision that justified it. The trace is reconstructed from durable state only — no model is asked
 to narrate causality after the fact — and it reports unresolved references instead of guessing.
+
+## Aurora governance at the capability boundary
+
+Everything above is only real if it binds when a tool actually runs. `AuroraPolicyEngine` sits in the
+layered policy stack next to the default engine and OPA, and it is evidence-driven and
+escalation-only:
+
+- it escalates when a **destructive pattern matches the call's own arguments**, not because a
+  capability belongs to a risky class — so `allowProcessExecution` and `autoApproveWorkspaceWrites`
+  keep meaning exactly what the operator configured;
+- critical matches are denied, high matches require confirmation, and both thresholds are
+  configurable (`confirmAtOrAbove`, `denyAtOrAbove`);
+- consequential calls additionally pass the constitutional checker, which can deny or require review;
+- it can raise `allow` to `require_approval` and `require_approval` to `deny`, but it can never grant
+  authority another layer withheld, and a failing analyzer degrades to no escalation rather than an
+  open gate.
+
+Every decision lands in a durable enforcement trail with the matched rules and violated principles,
+summarized as an escalation rate per tenant. The whole layer is opt-out via
+`auroraGovernance.enabled: false`.
+
+Closing a session automatically runs candidate-only experience distillation, so the learning loop
+happens by default rather than by discipline.
 
 ## Aurora operations: checkpoints, telemetry and governance
 

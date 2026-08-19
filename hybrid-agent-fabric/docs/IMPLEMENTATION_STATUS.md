@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-19 — current milestone 1.42
+Updated: 2026-08-19 — current milestone 1.43
 
 ## Original 1.0 baseline (delivered)
 
@@ -211,6 +211,17 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] Governed user purge with dry run and stated retention of audit-grade records
 - [x] Cross-store integrity self-check with eleven checks
 - [x] ACOS evaluate phase degradation on critical integrity findings
+
+### Aurora enforcement (1.43)
+
+- [x] Aurora policy layer inside the layered policy stack
+- [x] Evidence-driven escalation: patterns must match the call's arguments
+- [x] Critical denial, high-risk confirmation and configurable thresholds
+- [x] Constitutional review of consequential calls at the capability boundary
+- [x] Escalation-only composition that cannot grant withheld authority
+- [x] Fail-closed behaviour when the analyzer or constitution is unavailable
+- [x] Durable enforcement audit trail with per-tenant escalation summary
+- [x] Automatic candidate-only distillation on session close
 
 ## Required for full target parity
 
