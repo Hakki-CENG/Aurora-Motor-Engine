@@ -1,0 +1,183 @@
+# Aurora operator runbook
+
+This is the day-two document for Aurora: what to look at, what the numbers mean, which knob to turn
+and what to do when an alert fires. It assumes the deployment described in `README.md` and the layer
+map in `docs/aurora-architecture.md`.
+
+Every surface below exists in three places: a governed capability (for agents), a Control API route
+(for operators and automation) and a Canvas section (for humans). Nothing in this runbook requires a
+model to be running.
+
+---
+
+## 1. The five-minute health check
+
+| Question | Where | Healthy looks like |
+| --- | --- | --- |
+| Is the organism intact? | `GET /v1/aurora/selfcheck?tenantId=…` | `healthy: true`, score ≥ 0.9, no `critical` findings |
+| Is anything shouting? | `GET /v1/aurora/alerts?tenantId=…` | empty, or only `info` |
+| Is cognition healthy? | `GET /v1/acos/status?tenantId=…` | `healthScore` ≥ 0.6, no degraded phases in the last cycle |
+| Is governance biting too hard? | `GET /v1/aurora/enforcement-summary?tenantId=…` | escalation rate < 0.1, denials explainable |
+| Is unattended work running? | `GET /v1/autopilot?tenantId=…`, `GET /v1/aurora/fleet` | `failureRate` < 0.25, no paused tenants |
+
+From a terminal:
+
+```bash
+HAF_URL=https://haf.example HAF_API_TOKEN=… HAF_TENANT=acme haf-client aurora status
+haf-client aurora alerts
+haf-client aurora selfcheck
+haf-client aurora enforcement-summary
+haf-client aurora fleet
+haf-client aurora help          # lists every allowlisted view and the three bounded actions
+```
+
+Scraping: `GET /metrics?tenant=…` includes the content-free `haf_aurora_*` gauges (cognition,
+memory, world calibration, initiative trust, evolution, environment, decisions, plans, constitution,
+autopilot and fleet). No titles, content or identifiers are ever exported.
+
+---
+
+## 2. Unattended operation
+
+Aurora keeps thinking between conversations through two layers:
+
+- **Autopilot** (`AuroraAutopilot`, per tenant) — runs due cadences: `pulse` (15 min), `maintenance`
+  (hourly), `reflection` (daily), `dream` (off by default), `daily-briefing`, `weekly-review`,
+  `monthly-strategy`. Bounded by a daily run ceiling, quiet hours and exponential failure backoff.
+- **Fleet supervisor** (`AuroraFleetSupervisor`, across tenants) — the driver above the autopilot.
+  It only drives tenants that were explicitly enrolled, sweeps them fairly (priority band first,
+  then least-recently-swept), bounds each sweep, isolates failures per tenant and opens a circuit
+  breaker on a tenant that keeps failing.
+
+### Turning it on
+
+```jsonc
+// EngineConfig
+{
+  "autopilot": { "enabled": true, "tenantId": "acme", "driverIntervalMs": 60000 },
+  "auroraFleet": {
+    "enabled": true,
+    "tenantIds": ["acme", "globex"],
+    "sweepIntervalMs": 60000,
+    "maxTenantsPerSweep": 25,
+    "maxSweepsPerDay": 2000
+  }
+}
+```
+
+Use one or the other in most deployments: the fleet supervisor already calls each enrolled tenant's
+autopilot, so enabling both simply means one tenant is also driven by its own timer.
+
+### Operating the fleet
+
+Fleet routes are **system-admin only**, because they are cross-tenant. A tenant's own agents can
+reach only their own membership, through the tenant-scoped `aurora.fleet.*` capabilities.
+
+```bash
+curl -H "authorization: Bearer $ADMIN" $HAF/v1/aurora/fleet                 # fleet-wide health
+curl -H … $HAF/v1/aurora/fleet/members                                     # enrollment list
+curl -H … -X POST $HAF/v1/aurora/fleet/members \
+  -d '{"tenantId":"acme","priority":5,"maxRunsPerSweep":4,"note":"primary"}'
+curl -H … -X POST $HAF/v1/aurora/fleet/sweep -d '{}'                       # sweep now
+curl -H … -X POST $HAF/v1/aurora/fleet/members/acme/resume                 # clear a breaker
+curl -H … -X DELETE $HAF/v1/aurora/fleet/members/acme                      # stop driving a tenant
+curl -H … $HAF/v1/aurora/fleet/sweeps?limit=20                             # durable sweep ledger
+```
+
+Canvas: **Aurora → fleet** shows membership, pause state, per-tenant counters and the sweep ledger,
+with enroll / enable / resume / withdraw / sweep buttons.
+
+### Tuning
+
+| Knob | Default | Raise when | Lower when |
+| --- | --- | --- | --- |
+| `priority` (1-5) | 3 | a tenant is latency-sensitive | a tenant is background-only |
+| `maxRunsPerSweep` | 4 | cadences are falling behind | one tenant dominates the budget |
+| `maxTenantsPerSweep` | 25 | the fleet grows and sweeps lag | sweeps take too long or cost too much |
+| `maxSweepsPerDay` | 2000 | never, normally | you need a hard spend ceiling |
+| `maxRunsPerDay` (autopilot) | 96 | reflection is being skipped | model spend is too high |
+| `quietHoursUtc` | none | users complain about night activity | you need round-the-clock reaction |
+
+### The circuit breaker
+
+Three consecutive failing sweeps pause a tenant. The pause is exponential
+(15 → 30 → 60 → … minutes, capped at four hours) and shows up as `pausedUntil` / `pauseReason` on the
+member and as the `fleet-tenant-paused` alert. Fix the cause, then `POST …/resume`; resuming clears
+the failure counter. A tenant that sweeps cleanly clears itself.
+
+---
+
+## 3. Alert playbook
+
+| Alert | Meaning | First action |
+| --- | --- | --- |
+| `cognitive-health-low` | Workspace is thrashing or starved | `GET /v1/cognitive/health`; check loop detection and the deferred queue |
+| `attention-budget-exhausted` | Reservations consumed the budget | Raise the budget or release stale reservations |
+| `memory-health-low` | Contradictions or stale memories dominate | Run consolidation, then a contradiction scan |
+| `world-inconsistent` | Conflicting current claims | Inspect `/v1/world/inconsistencies`; supersede the wrong claim |
+| `prediction-miscalibrated` | Brier mean > 0.3 | Resolve open predictions; distrust confident forecasts until it drops |
+| `initiative-trust-low` | Users rate proactivity unhelpful | Tighten worthiness thresholds; reduce the digest cadence |
+| `verification-debt` | Completed actions lack verification | Find them in `/v1/environment/actions`; verify or mark failed |
+| `decision-overconfidence` | Stated confidence beats observed success by > 0.2 | Review the worst decisions in `/v1/decisions-calibration` |
+| `plans-stalled` | Active plans idle for a week | `GET /v1/plans?stalledDays=7`; replan or supersede |
+| `constitution-compliance-low` | > 20% of reviewed decisions denied or sent to review | Read `/v1/constitution/decisions`; the agent is trying the wrong things |
+| `autopilot-failing` | > 25% of unattended runs fail | Read the run ledger; disable the failing cadence while you fix it |
+| `fleet-tenant-paused` | Circuit breaker opened | Read the sweep ledger for that tenant, fix, then resume |
+| `acos-degraded` | Last cycle had degraded phases | The cycle report names the phase and the error |
+
+---
+
+## 4. Governance incidents
+
+Aurora governance binds at the capability boundary and is **escalation-only**: it can turn allow into
+require-approval and require-approval into deny, but it can never grant authority another policy
+layer withheld.
+
+- *"An agent was denied and should not have been."* Read `GET /v1/aurora/enforcement?escalatedOnly=true`.
+  Each entry names the matched rules and principles. If the rule is wrong, tune the thresholds
+  (`confirmAtOrAbove`, `denyAtOrAbove`) or the risk policy mode; if the whole layer is wrong for your
+  deployment, set `auroraGovernance.enabled: false` — the base policy layers still apply.
+- *"Something destructive got through."* It should not have: critical patterns are denied outright.
+  Capture the call from the enforcement log and the session events, add the pattern to
+  `policy/risk-analyzer.ts`, and add a test in `test/aurora-policy-enforcement.test.ts`.
+- *"The analyzer is broken."* The layer fails **closed in the safe direction**: on analyzer or
+  constitution failure it stops escalating rather than opening a gate. Ordinary policy still applies.
+
+---
+
+## 5. Recovery
+
+1. **Workspace damage.** `GET /v1/checkpoints?tenantId=…` lists snapshots. `POST /v1/checkpoints/{id}/diff`
+   before restoring; `POST /v1/checkpoints/{id}/restore` takes an automatic safety checkpoint first,
+   so the rollback is itself reversible.
+2. **A bad self-improvement.** `GET /v1/harness/refinements` then `POST /v1/harness/refinements/{id}/rollback`.
+   Rollback is ordered by application index, so several refinements in the same millisecond still
+   unwind correctly.
+3. **A bad learned lesson.** Distilled proposals are candidates only. Reject them:
+   `POST /v1/experience/proposals/{id}/reject`.
+4. **A tenant misbehaving unattended.** Disable the member (`enabled: false`) or withdraw it. Its
+   autopilot configuration and ledger survive, so re-enrolling resumes exactly where it stopped.
+5. **Whole-tenant panic switch.** `POST /v1/autopilot {"enabled": false}` plus withdrawing the tenant
+   from the fleet stops all unattended activity without touching stored cognition.
+
+---
+
+## 6. Privacy and data requests
+
+- Export: `GET /v1/aurora/export?tenantId=…[&userId=…]` — per-section digests included.
+- Purge a user: `POST /v1/aurora/purge-user` with `dryRun: true` first. The response lists what would
+  be removed *and* what is retained for audit, explicitly, rather than silently keeping it.
+- Retention footprint: `GET /v1/aurora/footprint?tenantId=…`.
+- Telemetry never contains content, so metrics may be shipped to a third party without a DPA change.
+
+---
+
+## 7. Weekly operator ritual
+
+1. `haf-client aurora selfcheck` — integrity score and findings.
+2. `haf-client aurora enforcement-summary` — is governance drifting?
+3. `haf-client aurora fleet` and `fleet-sweeps` — is anything paused or starving?
+4. Review distilled proposals; apply the good ones, reject the rest with a reason.
+5. Review decisions due for review and record outcomes — calibration is only real if outcomes are
+   recorded.
+6. Skim the constitution's amendment log: every change should have a named approver.

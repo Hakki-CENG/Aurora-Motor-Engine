@@ -124,12 +124,13 @@ import { DecisionService } from "./aurora/decision-service.js";
 import { PlanningService } from "./aurora/planning-service.js";
 import { ExperienceDistiller } from "./aurora/experience-distiller.js";
 import { AuroraAutopilot } from "./aurora/autopilot.js";
+import { AuroraFleetSupervisor } from "./aurora/fleet-supervisor.js";
 import { ProvenanceService } from "./aurora/provenance-service.js";
 import { WorkspaceCheckpointService } from "./aurora/workspace-checkpoint-service.js";
 import { AuroraMetricsCollector } from "./aurora/aurora-metrics.js";
 import { AuroraDataGovernanceService } from "./aurora/data-governance-service.js";
 import {
-  auroraMetricsCapabilities, checkpointCapabilities, governanceCapabilities,
+  auroraMetricsCapabilities, checkpointCapabilities, fleetCapabilities, governanceCapabilities,
 } from "./capabilities/aurora-operations.js";
 import {
   autopilotCapabilities, decisionCapabilities, distillerCapabilities, planningCapabilities, provenanceCapabilities,
@@ -155,6 +156,11 @@ export interface EngineConfig {
   auroraContext?: { enabled?: boolean; constitutionChars?: number; harnessChars?: number; knowledgeChars?: number; memoryChars?: number };
   /** Unattended ACOS cadence. Disabled unless explicitly enabled; bounded by the autopilot ledger. */
   autopilot?: { enabled?: boolean; tenantId?: string; driverIntervalMs?: number };
+  /**
+   * Multi-tenant driver above the autopilot. Disabled unless explicitly enabled; every tenant it
+   * drives must be enrolled, and each sweep is bounded and recorded in the durable sweep ledger.
+   */
+  auroraFleet?: { enabled?: boolean; tenantIds?: string[]; sweepIntervalMs?: number; maxTenantsPerSweep?: number; maxSweepsPerDay?: number };
   /** Workspace checkpoint bounds for the real rollback path. */
   checkpoints?: { maxFiles?: number; maxTotalBytes?: number; maxFileBytes?: number; excludes?: string[] };
   /**
@@ -293,6 +299,7 @@ export class HybridAgentEngine {
   readonly planning: PlanningService;
   readonly distiller: ExperienceDistiller;
   readonly autopilot: AuroraAutopilot;
+  readonly auroraFleet: AuroraFleetSupervisor;
   readonly provenance: ProvenanceService;
   readonly checkpoints: WorkspaceCheckpointService;
   readonly auroraMetrics: AuroraMetricsCollector;
@@ -704,6 +711,10 @@ export class HybridAgentEngine {
       evolution: this.evolution,
     });
     this.autopilot = new AuroraAutopilot(dataRoot, { orchestrator: this.acos, initiative: this.initiative });
+    this.auroraFleet = new AuroraFleetSupervisor(dataRoot, { autopilot: this.autopilot }, {
+      ...(config.auroraFleet?.maxTenantsPerSweep !== undefined ? { maxTenantsPerSweep: config.auroraFleet.maxTenantsPerSweep } : {}),
+      ...(config.auroraFleet?.maxSweepsPerDay !== undefined ? { maxSweepsPerDay: config.auroraFleet.maxSweepsPerDay } : {}),
+    });
     this.provenance = new ProvenanceService({
       cognitive: this.cognitive,
       initiative: this.initiative,
@@ -718,11 +729,12 @@ export class HybridAgentEngine {
     for (const capability of planningCapabilities(this.planning)) this.capabilities.register(capability);
     for (const capability of distillerCapabilities(this.distiller)) this.capabilities.register(capability);
     for (const capability of autopilotCapabilities(this.autopilot)) this.capabilities.register(capability);
+    for (const capability of fleetCapabilities(this.auroraFleet)) this.capabilities.register(capability);
     this.auroraMetrics = new AuroraMetricsCollector({
       cognitive: this.cognitive, memoryGraph: this.memoryGraph, worldModel: this.worldModel,
       initiative: this.initiative, society: this.society, evolution: this.evolution,
       environment: this.environment, decisions: this.decisions, planning: this.planning,
-      constitution: this.constitution, autopilot: this.autopilot, acos: this.acos,
+      constitution: this.constitution, autopilot: this.autopilot, fleet: this.auroraFleet, acos: this.acos,
     });
     this.dataGovernance = new AuroraDataGovernanceService({
       cognitive: this.cognitive, memoryGraph: this.memoryGraph, worldModel: this.worldModel,
@@ -735,6 +747,14 @@ export class HybridAgentEngine {
     for (const capability of checkpointCapabilities(this.checkpoints)) this.capabilities.register(capability);
     for (const capability of auroraMetricsCapabilities(this.auroraMetrics)) this.capabilities.register(capability);
     for (const capability of governanceCapabilities(this.dataGovernance)) this.capabilities.register(capability);
+    if (config.auroraFleet?.enabled) {
+      // Multi-tenant unattended operation: enroll the declared tenants, then start the bounded driver.
+      const fleet = this.auroraFleet;
+      void (async () => {
+        for (const tenantId of config.auroraFleet?.tenantIds ?? ["local"]) await fleet.enroll({ tenantId });
+        fleet.start(config.auroraFleet?.sweepIntervalMs ?? 60_000);
+      })().catch(() => undefined);
+    }
     if (config.autopilot?.enabled) {
       // Unattended operation is opt-in; the durable ledger and daily ceiling still bound it.
       void this.autopilot.configure({ tenantId: config.autopilot.tenantId ?? "local", enabled: true })
@@ -900,6 +920,7 @@ export class HybridAgentEngine {
 
   async shutdown(): Promise<void> {
     this.autopilot.stop();
+    this.auroraFleet.stop();
     await this.scheduler.close();
     await this.automationResponders.close();
     await this.outboundChannels.closeAll();

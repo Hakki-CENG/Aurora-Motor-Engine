@@ -61,3 +61,38 @@ describe("HAF REST/SSE client", () => {
     await expect(failure.health()).rejects.toSatisfy((error: unknown) => error instanceof HafApiError && !error.message.includes("stolen-value"));
   });
 });
+
+describe("Aurora CLI surface", () => {
+  it("resolves allowlisted views with the tenant attached and rejects unknown ones", async () => {
+    const urls: string[] = [];
+    const client = new HafApiClient({
+      baseUrl: "http://127.0.0.1:8787",
+      tenantId: "acme",
+      fetch: async (input) => { urls.push(String(input)); return Response.json({ ok: true }); },
+    });
+    expect(await client.auroraView("status")).toEqual({ ok: true });
+    await client.auroraView("fleet-sweeps", { limit: 5 });
+    await client.auroraView("enforcement", { limit: 5000 });
+    expect(urls[0]).toBe("http://127.0.0.1:8787/v1/acos/status?tenantId=acme");
+    expect(urls[1]).toBe("http://127.0.0.1:8787/v1/aurora/fleet/sweeps?tenantId=acme&limit=5");
+    // The limit is clamped client-side, so a bad flag cannot ask the server for an unbounded page.
+    expect(urls[2]).toBe("http://127.0.0.1:8787/v1/aurora/enforcement?tenantId=acme&limit=1000");
+    await expect(client.auroraView("secrets" as never)).rejects.toThrow(/Unknown Aurora view/);
+  });
+
+  it("only exposes the three bounded Aurora actions", async () => {
+    const seen: Array<{ url: string; body: string }> = [];
+    const client = new HafApiClient({
+      baseUrl: "http://127.0.0.1:8787",
+      tenantId: "acme",
+      fetch: async (input, init) => { seen.push({ url: String(input), body: String(init?.body ?? "") }); return Response.json({ ok: true }); },
+    });
+    await client.auroraAction("cycle", { mode: "reflection" });
+    await client.auroraAction("fleet-sweep");
+    expect(seen[0]?.url).toBe("http://127.0.0.1:8787/v1/acos/cycles");
+    expect(seen[0]?.body).toContain("reflection");
+    expect(seen[1]?.url).toBe("http://127.0.0.1:8787/v1/aurora/fleet/sweep");
+    expect(seen[1]?.body).toContain("acme");
+    await expect(client.auroraAction("purge" as never)).rejects.toThrow(/Unknown Aurora action/);
+  });
+});

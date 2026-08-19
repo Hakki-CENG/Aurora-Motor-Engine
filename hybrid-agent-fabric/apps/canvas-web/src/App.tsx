@@ -392,7 +392,7 @@ function TasksPanel({session,command,reload,showError}:{session:Session;command:
  * and environment inventory. Every mutation goes through the audited Control API routes.
  */
 function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
-  const [section, setSection] = useState<"acos"|"memory"|"world"|"initiative"|"user"|"evolution"|"environment"|"constitution"|"harness"|"knowledge"|"risk"|"reasoning"|"autopilot"|"operations">("acos");
+  const [section, setSection] = useState<"acos"|"memory"|"world"|"initiative"|"user"|"evolution"|"environment"|"constitution"|"harness"|"knowledge"|"risk"|"reasoning"|"autopilot"|"fleet"|"operations">("acos");
   const [memoryHealth, setMemoryHealth] = useState<any>(null);
   const [anchors, setAnchors] = useState<any[]>([]);
   const [calibration, setCalibration] = useState<any>(null);
@@ -431,6 +431,9 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
   const [proposals, setProposals] = useState<any[]>([]);
   const [autopilot, setAutopilot] = useState<any>(null);
   const [autopilotRuns, setAutopilotRuns] = useState<any[]>([]);
+  const [fleetStatus, setFleetStatus] = useState<any>(null);
+  const [fleetMembers, setFleetMembers] = useState<any[]>([]);
+  const [fleetSweeps, setFleetSweeps] = useState<any[]>([]);
   const [auroraMetrics, setAuroraMetrics] = useState<any>(null);
   const [auroraAlerts, setAuroraAlerts] = useState<any[]>([]);
   const [selfCheck, setSelfCheck] = useState<any>(null);
@@ -504,6 +507,16 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
         api<any>("/v1/aurora/enforcement?tenantId=local&escalatedOnly=true&limit=15"),
       ]);
       setEnforcement(enforcementSummary); setEnforcementLog(enforcementDecisions.decisions);
+      // Fleet supervision is system-admin only, so a non-admin operator simply sees an empty panel
+      // instead of losing the whole Aurora view to a 403.
+      try {
+        const [fleetResult, membersResult, sweepsResult] = await Promise.all([
+          api<any>("/v1/aurora/fleet"),
+          api<any>("/v1/aurora/fleet/members"),
+          api<any>("/v1/aurora/fleet/sweeps?limit=10"),
+        ]);
+        setFleetStatus(fleetResult); setFleetMembers(membersResult.members); setFleetSweeps(sweepsResult.sweeps);
+      } catch { setFleetStatus(null); setFleetMembers([]); setFleetSweeps([]); }
     } catch (cause) { showError(cause); }
   }, [showError, userId]);
   useEffect(() => { void load(); }, [load]);
@@ -525,12 +538,17 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
   const rejectProposal = async (id: string) => { try { await api(`/v1/experience/proposals/${id}/reject`, { method: "POST", body: JSON.stringify({ tenantId: "local", reason: "Rejected from Canvas." }) }); await load(); } catch (cause) { showError(cause); } };
   const toggleAutopilot = async (enabled: boolean) => { try { await api("/v1/autopilot", { method: "POST", body: JSON.stringify({ tenantId: "local", enabled }) }); await load(); } catch (cause) { showError(cause); } };
   const runAutopilot = async () => { try { await api("/v1/autopilot/run-due", { method: "POST", body: JSON.stringify({ tenantId: "local" }) }); await load(); } catch (cause) { showError(cause); } };
+  const enrollTenant = async () => { const tenantId = window.prompt("Enroll tenant into the Aurora fleet:", "local"); if (!tenantId?.trim()) return; try { await api("/v1/aurora/fleet/members", { method: "POST", body: JSON.stringify({ tenantId: tenantId.trim() }) }); await load(); } catch (cause) { showError(cause); } };
+  const sweepFleet = async () => { try { await api("/v1/aurora/fleet/sweep", { method: "POST", body: JSON.stringify({}) }); await load(); } catch (cause) { showError(cause); } };
+  const setFleetEnabled = async (tenantId: string, enabled: boolean) => { try { await api("/v1/aurora/fleet/members", { method: "POST", body: JSON.stringify({ tenantId, enabled }) }); await load(); } catch (cause) { showError(cause); } };
+  const resumeTenant = async (tenantId: string) => { try { await api(`/v1/aurora/fleet/members/${encodeURIComponent(tenantId)}/resume`, { method: "POST", body: JSON.stringify({}) }); await load(); } catch (cause) { showError(cause); } };
+  const withdrawTenant = async (tenantId: string) => { try { await api(`/v1/aurora/fleet/members/${encodeURIComponent(tenantId)}`, { method: "DELETE" }); await load(); } catch (cause) { showError(cause); } };
   const retirementSweep = async () => { try { await api("/v1/evolution/retirement-sweep", { method: "POST", body: JSON.stringify({ tenantId: "local" }) }); await load(); } catch (cause) { showError(cause); } };
 
   return <div className="panel tasks-panel">
     <div className="task-toolbar">
       <b>Aurora substrate</b>
-      {(["acos","memory","world","initiative","user","evolution","environment","constitution","harness","knowledge","risk","reasoning","autopilot","operations"] as const).map(item => <button key={item} className={section===item?"active":""} onClick={()=>setSection(item)}>{item}</button>)}
+      {(["acos","memory","world","initiative","user","evolution","environment","constitution","harness","knowledge","risk","reasoning","autopilot","fleet","operations"] as const).map(item => <button key={item} className={section===item?"active":""} onClick={()=>setSection(item)}>{item}</button>)}
       <button onClick={()=>void load()}><RefreshCw size={13}/>Refresh</button>
     </div>
     {section === "acos" && <>
@@ -578,6 +596,13 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
       <div className="task-grid">
         {(autopilot?.cadences ?? []).map((cadence:any) => <article className={`task-card ${cadence.enabled?"":"failed"}`} key={cadence.kind}><h3>{cadence.kind}</h3><p>every {cadence.everyMinutes} minute(s)</p><small>{cadence.enabled?"enabled":"disabled"} · runs {cadence.runCount} · failures {cadence.failureCount} · next {cadence.nextRunAt}</small></article>)}
         {autopilotRuns.map(run => <article className={`task-card ${run.status==="failed"?"failed":"done"}`} key={run.id}><h3>{run.kind} · {run.status}</h3><p>{run.detail}</p><small>{run.startedAt} · {run.durationMs}ms</small></article>)}
+      </div>
+    </>}
+    {section === "fleet" && <>
+      <div className="task-toolbar"><small>{fleetStatus ? `${fleetStatus.enabled}/${fleetStatus.enrolled} tenant(s) enabled · ${fleetStatus.paused} paused · driver ${fleetStatus.driverRunning?"running":"stopped"} · sweeps today ${fleetStatus.sweepsToday}/${fleetStatus.maxSweepsPerDay} · failure rate ${fleetStatus.failureRate} · next ${fleetStatus.nextTenant?.tenantId ?? "—"}` : "fleet supervision requires a system administrator"}</small><button onClick={enrollTenant}>Enroll tenant</button><button onClick={sweepFleet}>Sweep now</button></div>
+      <div className="task-grid">
+        {fleetMembers.map(member => <article className={`task-card ${member.pausedUntil?"failed":member.enabled?"":"done"}`} key={member.tenantId}><h3>tenant · {member.tenantId}</h3><p>{member.lastDetail ?? "never swept"}</p><small>{member.enabled?"enabled":"disabled"} · priority {member.priority} · cap {member.maxRunsPerSweep}/sweep · sweeps {member.totalSweeps} · runs {member.totalRuns} · failures {member.totalFailures}{member.pausedUntil?` · paused until ${member.pausedUntil}`:""}</small><div><button onClick={()=>void setFleetEnabled(member.tenantId, !member.enabled)}>{member.enabled?"Disable":"Enable"}</button>{member.pausedUntil&&<button onClick={()=>void resumeTenant(member.tenantId)}>Resume</button>}<button className="danger" onClick={()=>void withdrawTenant(member.tenantId)}>Withdraw</button></div></article>)}
+        {fleetSweeps.map(sweep => <article className={`task-card ${sweep.failedRuns>0?"failed":"done"}`} key={sweep.id}><h3>sweep · {sweep.sweptTenants} tenant(s)</h3><p>{sweep.results.map((item:any)=>`${item.tenantId}:${item.outcome}`).join(", ")||"nothing due"}</p><small>{sweep.startedAt} · {sweep.durationMs}ms · runs {sweep.totalRuns} · failed {sweep.failedRuns}</small></article>)}
       </div>
     </>}
     {section === "operations" && <>

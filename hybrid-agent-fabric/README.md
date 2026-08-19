@@ -8,7 +8,7 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.43.0
+## Current milestone — 1.44.0
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -72,6 +72,8 @@ Implemented and tested:
 - Aurora decision records with weighted criteria, preserved dissent, review scheduling and calibration
 - Aurora dependency-ordered plans with critical path, verification steps and auditable replanning
 - Aurora experience distillation: reusable lessons proposed from real trajectories, never auto-applied
+- Aurora fleet supervision: explicit enrollment, fair bounded sweeps, per-tenant failure isolation and a circuit breaker
+- Aurora terminal operations: an allowlisted read-only CLI surface plus three bounded actions in the headless client
 - Aurora autopilot: bounded unattended cadence with a durable run ledger
 - Aurora provenance explainer reconstructing why any artifact exists
 - Embedding-backed semantic memory recall
@@ -975,6 +977,24 @@ briefing, weekly review and monthly strategy — drive ACOS cycles and digests, 
 ceiling, quiet hours during which only the fast pulse may run, per-cadence enable/disable and
 exponential backoff on failure. Every run lands in a durable ledger with its outcome and duration, so
 what Aurora did while nobody was watching is always reviewable.
+
+## Aurora fleet supervision
+
+The autopilot drives one tenant. The fleet supervisor drives many, and it is the layer that makes
+unattended cognition safe at scale. A tenant is only driven after explicit enrollment; sweeps serve
+the highest priority band first and, within a band, the least recently swept tenant, so a busy tenant
+cannot starve a quiet one. Each sweep is bounded by tenants-per-sweep and runs-per-tenant, and the
+fleet as a whole by a daily sweep ceiling. A tenant whose autopilot throws is contained, not fatal:
+the sweep continues, the failure is recorded, and three consecutive failing sweeps open a circuit
+breaker with an exponential pause that only an operator resume clears. The sweep ledger is durable,
+so cross-tenant background activity is reviewable after the fact.
+
+Because the fleet is cross-tenant, its REST surface is system-admin only. A tenant's own agents can
+see and change only their own membership, through the tenant-scoped `aurora.fleet.*` capabilities.
+
+Day-two operations — health checks, tuning tables, the alert playbook and recovery procedures — are
+documented in [`docs/aurora-operator-runbook.md`](docs/aurora-operator-runbook.md), and the whole
+Aurora surface is reachable from a terminal with `haf-client aurora`.
 
 ## Aurora provenance
 

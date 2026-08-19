@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { AuroraDataGovernanceService } from "../aurora/data-governance-service.js";
+import type { AuroraFleetSupervisor } from "../aurora/fleet-supervisor.js";
 import type { AuroraMetricsCollector } from "../aurora/aurora-metrics.js";
 import type { WorkspaceCheckpointService } from "../aurora/workspace-checkpoint-service.js";
 import { auroraDefined } from "../util/aurora-state.js";
@@ -83,6 +84,41 @@ export function governanceCapabilities(service: AuroraDataGovernanceService) {
       { id: "aurora.footprint", version: "1.0.0", description: "Retention view of how many records each Aurora store holds.", risk: "pure", sideEffect: false, source: "core" },
       z.object({}),
       async (_input, ctx) => await service.footprint(ctx.tenantId),
+    ),
+  ];
+}
+
+/**
+ * Fleet capabilities are deliberately tenant-scoped: an agent may enroll, tune or withdraw its own
+ * tenant and read its own membership, but the cross-tenant fleet view and cross-tenant sweeps stay
+ * with operators over the admin-gated Control API. Multi-tenancy must never leak through a tool.
+ */
+export function fleetCapabilities(service: AuroraFleetSupervisor) {
+  return [
+    defineCapability(
+      { id: "aurora.fleet.status", version: "1.0.0", description: "This tenant's unattended fleet membership joined with its autopilot health.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({}),
+      async (_input, ctx) => await service.tenantStatus(ctx.tenantId),
+    ),
+    defineCapability(
+      { id: "aurora.fleet.enroll", version: "1.0.0", description: "Opt this tenant into the unattended fleet driver with a priority band and a per-sweep run cap.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({ priority: z.number().int().min(1).max(5).optional(), maxRunsPerSweep: z.number().int().min(1).max(50).optional(), note: z.string().max(500).optional(), enabled: z.boolean().optional() }),
+      async (input, ctx) => await service.enroll(auroraDefined({ tenantId: ctx.tenantId, ...input })),
+    ),
+    defineCapability(
+      { id: "aurora.fleet.update", version: "1.0.0", description: "Change this tenant's fleet enrollment: enablement, priority, per-sweep run cap or note.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({ enabled: z.boolean().optional(), priority: z.number().int().min(1).max(5).optional(), maxRunsPerSweep: z.number().int().min(1).max(50).optional(), note: z.string().max(500).optional() }),
+      async (input, ctx) => await service.update(auroraDefined({ tenantId: ctx.tenantId, ...input })),
+    ),
+    defineCapability(
+      { id: "aurora.fleet.withdraw", version: "1.0.0", description: "Remove this tenant from the unattended fleet driver. Its autopilot config and ledger are kept.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({}),
+      async (_input, ctx) => await service.withdraw(ctx.tenantId),
+    ),
+    defineCapability(
+      { id: "aurora.fleet.sweep", version: "1.0.0", description: "Run this tenant's due cadences through the fleet supervisor, honouring the per-sweep cap and circuit breaker.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({}),
+      async (_input, ctx) => await service.sweep({ tenantId: ctx.tenantId, limit: 1 }),
     ),
   ];
 }

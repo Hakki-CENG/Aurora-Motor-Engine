@@ -74,6 +74,7 @@ and none of it can widen that runtime's authority.
 | L19 safety | `ConstitutionService` + `RiskAnalyzerService` + existing policy/approvals/effect journal | `constitution.*`, `risk.*` | `/v1/constitution/*`, `/v1/risk/*` | `aurora-core-upstream.test.ts` |
 | L19 enforcement | `AuroraPolicyEngine` in the layered policy stack — evidence-driven, escalation-only | (binds every capability) | `/v1/aurora/enforcement*` | `aurora-policy-enforcement.test.ts` |
 | ACOS orchestration | `CognitiveOrchestrator` + `AuroraAutopilot` | `acos.*`, `autopilot.*` | `/v1/acos/*`, `/v1/autopilot` | `aurora-acos.test.ts`, `aurora-reasoning.test.ts` |
+| Fleet supervision | `AuroraFleetSupervisor` | `aurora.fleet.*` | `/v1/aurora/fleet/*` (system admin) | `aurora-fleet.test.ts` |
 | Explainability | `ProvenanceService` | `aurora.explain` | `/v1/aurora/explain` | `aurora-reasoning.test.ts`, `aurora-end-to-end.test.ts` |
 | Anomaly detection | `StuckDetectorService` | `session.stuck.analyze` | `/v1/sessions/:id/stuck` | `aurora-acos.test.ts` |
 | Recovery | `WorkspaceCheckpointService` — bounded content-addressed snapshots, reversible restore | `checkpoint.*` | `/v1/checkpoints/*` | `aurora-operations.test.ts` |
@@ -92,10 +93,10 @@ and none of it can widen that runtime's authority.
 | C5 bounded proactivity | initiative worthiness, attention budget, quiet hours, duplicate suppression, trust feedback |
 | C6 staged evolution | skill evolution stage gates with approval and regression baseline; distiller proposals are candidates |
 | C7 critical action discipline | environment zones, approval and rollback requirements, mandatory verification, risk analyzer |
-| C8 explicit budgets | cognitive daily budget and allocation buckets, society budget, initiative budget, autopilot ceiling |
+| C8 explicit budgets | cognitive daily budget and allocation buckets, society budget, initiative budget, autopilot ceiling, fleet sweep ceiling |
 | C9 preserved dissent | society deliberation, multi-world consensus, decision dissent records |
 | C10 governed user model | typed claims with consent, correction, deletion and protected-topic refusal |
-| C11 interruptible cognition | loop detection, focus interruption, preemption, autopilot backoff |
+| C11 interruptible cognition | loop detection, focus interruption, preemption, autopilot backoff, fleet circuit breaker |
 | C12 no exactly-once claims | existing effect journal and uncertain outcomes; nothing added weakens it |
 
 ## Data on disk
@@ -105,6 +106,7 @@ All Aurora state is durable, bounded, atomically written and tenant-scoped, unde
 ```
 acos/state.json            ACOS cycle reports and thought journal
 acos/autopilot.json        cadence config and unattended run ledger
+acos/fleet.json            fleet enrollment, circuit-breaker state and the sweep ledger
 checkpoints/state.json     workspace checkpoint manifests (content blobs live under checkpoints/blobs)
 cognitive/workspace.json   objects, goals, budgets, modes, intake ledger, allocation buckets
 constitution/state.json    principles, amendments, decision verdicts, identity core
@@ -157,4 +159,5 @@ predate newer fields, and writes atomically through a temporary file plus rename
 - explain itself with a story instead of recorded provenance;
 - claim a rollback happened without naming the checkpoint it restored;
 - leak content into telemetry — every exported metric is a count, a rate or a bounded score;
-- keep a user's inferences after a purge, or delete audit-grade records without saying so.
+- keep a user's inferences after a purge, or delete audit-grade records without saying so;
+- drive a tenant unattended that nobody enrolled, or let one tenant's failures stop the rest of the fleet.

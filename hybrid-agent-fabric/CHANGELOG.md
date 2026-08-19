@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.44.0 — 2026-08-20
+
+- Added the **Aurora fleet supervisor**: the multi-tenant driver above the per-tenant autopilot. Unattended cognition now scales past a single tenant without letting one tenant starve or poison the others.
+- Enrollment is explicit, so multi-tenant background compute is never accidental. Each member carries a priority band (1-5), a per-sweep run cap, an optional note and durable counters.
+- Sweeps are fair and bounded: tenants are served by priority band and then least-recently-swept first, a sweep touches at most `maxTenantsPerSweep` tenants, a tenant contributes at most `maxRunsPerSweep` runs, and the whole fleet is capped by `maxSweepsPerDay` (reset at midnight UTC).
+- Failures are contained per tenant — a throwing autopilot never aborts the sweep — and three consecutive failing sweeps open a circuit breaker with an exponential pause (15 minutes to 4 hours) that an operator clears with an explicit resume. A clean sweep clears the counter by itself.
+- Every sweep lands in a durable ledger with per-tenant outcomes, run counts and durations, so cross-tenant unattended activity is always reviewable.
+- Fleet routes (`/v1/aurora/fleet…`) are **system-admin only** because they are cross-tenant; tenant agents reach only their own membership through the tenant-scoped `aurora.fleet.status|enroll|update|withdraw|sweep` capabilities. Multi-tenancy never leaks through a tool.
+- Wired the fleet into engine configuration (`auroraFleet.enabled|tenantIds|sweepIntervalMs|maxTenantsPerSweep|maxSweepsPerDay`), into Aurora telemetry (`haf_aurora_fleet` gauges plus a `fleet-tenant-paused` alert) and into a new Canvas "fleet" section with enroll, enable/disable, resume, withdraw and sweep controls.
+- Added an **Aurora CLI surface** to the headless client: `haf-client aurora VIEW|ACTION`. Views are a fixed allowlist of read-only endpoints (status, journal, metrics, alerts, selfcheck, footprint, enforcement, enforcement-summary, autopilot, autopilot-runs, fleet, fleet-members, fleet-sweeps, compliance, initiatives, checkpoints) with the tenant attached and the page size clamped client-side; only three bounded actions are reachable (`cycle`, `autopilot-run-due`, `fleet-sweep`). Aurora is now operable from a terminal with no browser.
+- Added [`docs/aurora-operator-runbook.md`](docs/aurora-operator-runbook.md): the five-minute health check, unattended-operation configuration and tuning table, the circuit-breaker procedure, an alert-by-alert playbook, governance incident handling, five recovery paths, privacy request handling and a weekly operator ritual.
+- Added 15 tests (369 engine tests, 7 headless-client tests) covering enrollment semantics, priority/round-robin fairness, per-sweep caps, failure isolation, the circuit breaker and resume, the daily ceiling, fleet status and ledger, tenant-scoped status, single-tenant sweeps, invalid settings, and the CLI view allowlist and action allowlist.
+
 ## 1.43.0 — 2026-08-19
 
 - Aurora governance now **binds at the capability boundary** instead of being advisory. `AuroraPolicyEngine` joins the layered policy stack, scoring every capability call against the destructive-pattern rules and, for consequential calls, the constitutional checker.

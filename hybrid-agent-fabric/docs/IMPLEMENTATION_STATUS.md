@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-19 — current milestone 1.43
+Updated: 2026-08-20 — current milestone 1.44
 
 ## Original 1.0 baseline (delivered)
 
@@ -222,6 +222,19 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] Fail-closed behaviour when the analyzer or constitution is unavailable
 - [x] Durable enforcement audit trail with per-tenant escalation summary
 - [x] Automatic candidate-only distillation on session close
+
+### Aurora fleet and terminal operations (1.44)
+
+- [x] Multi-tenant fleet supervisor above the per-tenant autopilot
+- [x] Explicit enrollment with priority bands, per-sweep run caps and durable counters
+- [x] Priority-then-round-robin fairness with per-sweep and per-day bounds
+- [x] Per-tenant failure isolation and an exponential circuit breaker with operator resume
+- [x] Durable cross-tenant sweep ledger and fleet-wide health
+- [x] System-admin-only fleet REST with tenant-scoped `aurora.fleet.*` capabilities
+- [x] Fleet telemetry gauges and a paused-tenant alert
+- [x] Canvas fleet section with enroll/enable/resume/withdraw/sweep controls
+- [x] Allowlisted read-only Aurora CLI views plus three bounded CLI actions
+- [x] Operator runbook: health checks, tuning, alert playbook, recovery and privacy requests
 
 ## Required for full target parity
 

@@ -678,7 +678,7 @@ app.addHook("preHandler", async (request, reply) => {
   const agentProfileMatch = request.url.match(/^\/v1\/agent-profiles\/([^/?]+)/);
   if (agentProfileMatch) tenantId = (await engine.agentProfiles.get(decodeURIComponent(agentProfileMatch[1]!))).tenantId;
   const methodIsSafe = request.method === "GET" || request.method === "HEAD" || request.method === "OPTIONS";
-  const globalAdminPath = /^\/v1\/(?:backends|mcp|plugins|detached-workers|skills\/hub|model-configurations|model-auth|providers\/[^/]+\/credentials|secret-sources)/.test(request.url);
+  const globalAdminPath = /^\/v1\/(?:backends|mcp|plugins|detached-workers|skills\/hub|model-configurations|model-auth|providers\/[^/]+\/credentials|secret-sources|aurora\/fleet)/.test(request.url);
   if (globalAdminPath && !identity.systemAdmin) {
     return await reply.code(403).send({ error: "system_admin_required" });
   }
@@ -1120,6 +1120,17 @@ app.get("/v1/autopilot", async (request) => { const q=auroraTenant.parse(request
 app.post("/v1/autopilot", async (request) => { const b=auroraTenant.extend({enabled:z.boolean().optional(),maxRunsPerDay:z.number().int().min(0).max(5000).optional(),quietHoursUtc:z.object({startHour:z.number().int().min(0).max(23),endHour:z.number().int().min(0).max(23)}).nullable().optional(),cadences:z.array(z.object({kind:z.enum(["pulse","maintenance","reflection","dream","daily-briefing","weekly-review","monthly-strategy"]),enabled:z.boolean().optional(),everyMinutes:z.number().int().min(5).max(129_600).optional()})).max(7).optional()}).parse(request.body); const { tenantId, cadences, ...rest } = b; return await engine.autopilot.configure(auroraInput({ tenantId, ...(cadences ? { cadences: cadences.map((item) => auroraInput(item)) } : {}), ...rest })); });
 app.post("/v1/autopilot/run-due", async (request) => { const b=auroraTenant.parse(request.body ?? {}); return { runs: await engine.autopilot.runDue(b.tenantId) }; });
 app.get("/v1/autopilot/runs", async (request) => { const q=auroraTenant.extend({limit:z.coerce.number().int().min(1).max(1000).optional()}).parse(request.query); return { runs: await engine.autopilot.runs(q.tenantId, q.limit ?? 50) }; });
+
+// Fleet supervision is cross-tenant, so it is system-admin only: tenant agents can only reach their
+// own membership through the tenant-scoped fleet.* capabilities.
+app.get("/v1/aurora/fleet", async () => await engine.auroraFleet.status());
+app.get("/v1/aurora/fleet/members", async () => ({ members: await engine.auroraFleet.members() }));
+app.post("/v1/aurora/fleet/members", async (request, reply) => { const b=z.object({tenantId:z.string().min(1).max(200),enabled:z.boolean().optional(),priority:z.number().int().min(1).max(5).optional(),maxRunsPerSweep:z.number().int().min(1).max(50).optional(),note:z.string().max(500).optional()}).parse(request.body); return await reply.code(201).send(await engine.auroraFleet.enroll(auroraInput(b))); });
+app.post("/v1/aurora/fleet/members/:tenantId/resume", async (request) => { const { tenantId } = z.object({ tenantId: z.string().min(1).max(200) }).parse(request.params); return await engine.auroraFleet.resume(tenantId); });
+app.delete("/v1/aurora/fleet/members/:tenantId", async (request) => { const { tenantId } = z.object({ tenantId: z.string().min(1).max(200) }).parse(request.params); return await engine.auroraFleet.withdraw(tenantId); });
+app.get("/v1/aurora/fleet/members/:tenantId", async (request) => { const { tenantId } = z.object({ tenantId: z.string().min(1).max(200) }).parse(request.params); return await engine.auroraFleet.tenantStatus(tenantId); });
+app.post("/v1/aurora/fleet/sweep", async (request) => { const b=z.object({limit:z.number().int().min(1).max(500).optional(),tenantId:z.string().min(1).max(200).optional()}).parse(request.body ?? {}); return await engine.auroraFleet.sweep(auroraInput(b)); });
+app.get("/v1/aurora/fleet/sweeps", async (request) => { const q=z.object({limit:z.coerce.number().int().min(1).max(500).optional()}).parse(request.query); return { sweeps: await engine.auroraFleet.sweeps(q.limit ?? 20) }; });
 
 app.get("/v1/aurora/explain", async (request) => { const q=auroraTenant.extend({kind:z.enum(["cognitive-object","initiative","intake","memory","world-entity","world-event","environment-action","environment-resource","decision","plan","constitution-verdict"]),id:z.string().min(1).max(300),depth:z.coerce.number().int().min(1).max(6).optional()}).parse(request.query); return await engine.provenance.explain(auroraInput({ tenantId: q.tenantId, kind: q.kind, id: q.id, depth: q.depth })); });
 

@@ -9,6 +9,7 @@ import type { ConstitutionService } from "./constitution-service.js";
 import type { DecisionService } from "./decision-service.js";
 import type { PlanningService } from "./planning-service.js";
 import type { AuroraAutopilot } from "./autopilot.js";
+import type { AuroraFleetSupervisor } from "./fleet-supervisor.js";
 import type { CognitiveOrchestrator } from "./cognitive-orchestrator.js";
 import { auroraRound } from "../util/aurora-state.js";
 
@@ -25,6 +26,7 @@ export interface AuroraMetricsSnapshot {
   plans: { active: number; blocked: number; averageProgress: number; stalled: number };
   constitution: { complianceRate: number; denied: number; review: number; identityVersion: number };
   autopilot: { enabled: boolean; runsToday: number; failureRate: number };
+  fleet: { enrolled: boolean; enabled: boolean; paused: boolean; priority: number; sweeps: number; runs: number; failures: number };
   acos: { cycles: number; lastDegradedPhases: number };
   generatedAt: string;
 }
@@ -51,6 +53,7 @@ export class AuroraMetricsCollector {
       planning: PlanningService;
       constitution: ConstitutionService;
       autopilot: AuroraAutopilot;
+      fleet?: AuroraFleetSupervisor;
       acos: CognitiveOrchestrator;
     },
     private readonly now: () => number = Date.now,
@@ -60,7 +63,7 @@ export class AuroraMetricsCollector {
     const [
       cognitiveHealth, cognitiveBudget, memoryHealth, entities, predictions, calibration, inconsistencies,
       initiativeBudget, initiatives, meta, evolutionIndex, gaps, inventory, decisionCalibration, decisionBacklog,
-      plans, stalledPlans, compliance, identity, autopilotHealth, cycles,
+      plans, stalledPlans, compliance, identity, autopilotHealth, cycles, fleetMember,
     ] = await Promise.all([
       this.deps.cognitive.health(tenantId),
       this.deps.cognitive.budget(tenantId),
@@ -83,6 +86,7 @@ export class AuroraMetricsCollector {
       this.deps.constitution.identity(tenantId),
       this.deps.autopilot.health(tenantId),
       this.deps.acos.cycles(tenantId, 1),
+      this.deps.fleet ? this.deps.fleet.member(tenantId) : Promise.resolve(undefined),
     ]);
     const activePlans = plans.filter((item) => item.status === "active");
     return {
@@ -164,6 +168,15 @@ export class AuroraMetricsCollector {
         runsToday: autopilotHealth.runsToday,
         failureRate: autopilotHealth.failureRate,
       },
+      fleet: {
+        enrolled: fleetMember !== undefined,
+        enabled: fleetMember?.enabled ?? false,
+        paused: fleetMember?.pausedUntil !== undefined && Date.parse(fleetMember.pausedUntil) > this.now(),
+        priority: fleetMember?.priority ?? 0,
+        sweeps: fleetMember?.totalSweeps ?? 0,
+        runs: fleetMember?.totalRuns ?? 0,
+        failures: fleetMember?.totalFailures ?? 0,
+      },
       acos: {
         cycles: cycles[0]?.sequence ?? 0,
         lastDegradedPhases: cycles[0]?.degraded.length ?? 0,
@@ -234,6 +247,12 @@ export class AuroraMetricsCollector {
       `haf_aurora_autopilot{tenant="${label}",kind="enabled"} ${snapshot.autopilot.enabled ? 1 : 0}`,
       `haf_aurora_autopilot{tenant="${label}",kind="runs_today"} ${snapshot.autopilot.runsToday}`,
       `haf_aurora_autopilot{tenant="${label}",kind="failure_rate"} ${snapshot.autopilot.failureRate}`,
+      "# TYPE haf_aurora_fleet gauge",
+      `haf_aurora_fleet{tenant="${label}",kind="enrolled"} ${snapshot.fleet.enrolled ? 1 : 0}`,
+      `haf_aurora_fleet{tenant="${label}",kind="paused"} ${snapshot.fleet.paused ? 1 : 0}`,
+      `haf_aurora_fleet{tenant="${label}",kind="sweeps"} ${snapshot.fleet.sweeps}`,
+      `haf_aurora_fleet{tenant="${label}",kind="runs"} ${snapshot.fleet.runs}`,
+      `haf_aurora_fleet{tenant="${label}",kind="failures"} ${snapshot.fleet.failures}`,
       "# TYPE haf_aurora_acos gauge",
       `haf_aurora_acos{tenant="${label}",kind="cycles"} ${snapshot.acos.cycles}`,
       `haf_aurora_acos{tenant="${label}",kind="degraded_phases"} ${snapshot.acos.lastDegradedPhases}`,
@@ -262,6 +281,7 @@ export class AuroraMetricsCollector {
     if (snapshot.plans.stalled > 0) add("plans-stalled", "info", "Active plans have not moved in over a week.", snapshot.plans.stalled);
     if (snapshot.constitution.complianceRate < 0.8) add("constitution-compliance-low", "critical", "More than a fifth of reviewed decisions were denied or sent to review.", snapshot.constitution.complianceRate);
     if (snapshot.autopilot.enabled && snapshot.autopilot.failureRate > 0.25) add("autopilot-failing", "warning", "Unattended cadences are failing more than a quarter of the time.", snapshot.autopilot.failureRate);
+    if (snapshot.fleet.paused) add("fleet-tenant-paused", "warning", "The fleet circuit breaker paused unattended operation for this tenant.", 1);
     if (snapshot.acos.lastDegradedPhases > 0) add("acos-degraded", "warning", "The last cognitive cycle had degraded phases.", snapshot.acos.lastDegradedPhases);
     return alerts;
   }
