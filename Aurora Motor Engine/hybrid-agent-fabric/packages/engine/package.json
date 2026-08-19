@@ -1,0 +1,42 @@
+{
+  "name": "@haf/engine",
+  "version": "1.36.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.json --force",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1112.0",
+    "@honcho-ai/sdk": "^2.3.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "cron-parser": "^5.2.0",
+    "imapflow": "^1.7.1",
+    "jose": "^6.2.9",
+    "nats": "^2.29.3",
+    "nodemailer": "^9.0.5",
+    "pg": "^8.23.0",
+    "playwright-core": "^1.62.1",
+    "tar": "^7.5.22",
+    "undici": "^6.28.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "^8.0.1",
+    "@types/pg": "^8.23.1",
+    "@types/smtp-server": "^3.5.12",
+    "@types/tar": "^6.1.13",
+    "pg-mem": "^3.0.14",
+    "smtp-server": "^3.19.3",
+    "wabt": "^1.0.39"
+  }
+}

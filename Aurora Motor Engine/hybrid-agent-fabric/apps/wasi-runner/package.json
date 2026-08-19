@@ -1,0 +1,11 @@
+{
+  "name": "@haf/wasi-runner",
+  "version": "1.36.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node dist/main.js",
+    "build": "tsc -b tsconfig.json --force",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

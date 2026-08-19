@@ -1,0 +1,34 @@
+name: CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  build-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: npm ci
+      - run: npm audit --omit=dev
+      - run: npm run check
+      - name: Adversarial security suite
+        run: npm run test:adversarial
+      - name: Worker and persistence chaos suite
+        run: npm run test:chaos
+      - run: npm run build
+      - name: Kernel protocol smoke
+        run: |
+          python3 python/kernel_server.py <<'EOF2' | tee /tmp/kernel.jsonl
+          {"type":"execute","id":"1","code":"x=40\nx+2"}
+          {"type":"shutdown","id":"2"}
+          EOF2
+          grep -q '"result": "42"' /tmp/kernel.jsonl

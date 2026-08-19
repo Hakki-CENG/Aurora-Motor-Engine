@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+.env
+var/data/*
+!var/data/.gitkeep
+var/workspaces/*
+!var/workspaces/.gitkeep
+var/logs/*
+!var/logs/.gitkeep
+
+*.tsbuildinfo

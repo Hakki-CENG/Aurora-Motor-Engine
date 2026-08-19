@@ -1,0 +1,20 @@
+[
+  {
+    "key": "local:mattermost:default:chat:a4aa02efdd355541014e879b",
+    "tenantId": "local",
+    "platform": "mattermost",
+    "chatIdHash": "a4aa02efdd355541014e879b",
+    "sessionId": "9db90df1-475a-4f1b-87fa-5615738b06b1",
+    "createdAt": "2026-08-18T22:47:01.149Z",
+    "updatedAt": "2026-08-18T22:47:01.161Z"
+  },
+  {
+    "key": "local:line:default:user:33111f699c53b54a349f6689",
+    "tenantId": "local",
+    "platform": "line",
+    "chatIdHash": "33111f699c53b54a349f6689",
+    "sessionId": "19200025-06fb-4ccb-8273-c5d78ef87875",
+    "createdAt": "2026-08-18T22:47:01.184Z",
+    "updatedAt": "2026-08-18T22:47:01.194Z"
+  }
+]

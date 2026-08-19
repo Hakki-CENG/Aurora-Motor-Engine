@@ -1,0 +1,18 @@
+[
+  {
+    "sessionId": "9db90df1-475a-4f1b-87fa-5615738b06b1",
+    "tenantId": "local",
+    "familyId": "9db90df1-475a-4f1b-87fa-5615738b06b1",
+    "name": "mattermost-channel-a4aa02ef",
+    "workspacePath": "/home/user/hybrid-agent-fabric/var-inbound-smoke/workspaces/9db90df1-475a-4f1b-87fa-5615738b06b1",
+    "createdAt": "2026-08-18T22:47:01.141Z"
+  },
+  {
+    "sessionId": "19200025-06fb-4ccb-8273-c5d78ef87875",
+    "tenantId": "local",
+    "familyId": "19200025-06fb-4ccb-8273-c5d78ef87875",
+    "name": "line-dm-33111f69",
+    "workspacePath": "/home/user/hybrid-agent-fabric/var-inbound-smoke/workspaces/19200025-06fb-4ccb-8273-c5d78ef87875",
+    "createdAt": "2026-08-18T22:47:01.182Z"
+  }
+]

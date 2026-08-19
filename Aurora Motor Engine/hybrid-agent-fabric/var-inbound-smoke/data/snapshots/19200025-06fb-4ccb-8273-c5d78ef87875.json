@@ -1,0 +1,97 @@
+{
+  "sessionId": "19200025-06fb-4ccb-8273-c5d78ef87875",
+  "familyId": "19200025-06fb-4ccb-8273-c5d78ef87875",
+  "tenantId": "local",
+  "generation": 1,
+  "lastSequence": 13,
+  "status": "idle",
+  "name": "line-dm-33111f69",
+  "workspacePath": "/home/user/hybrid-agent-fabric/var-inbound-smoke/workspaces/19200025-06fb-4ccb-8273-c5d78ef87875",
+  "createdAt": "2026-08-18T22:47:01.182Z",
+  "updatedAt": "2026-08-18T22:47:01.191Z",
+  "messages": [
+    {
+      "id": "8b571365-ad3c-4a98-9a52-4ea07d1040bb",
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "hello line"
+        }
+      ],
+      "timestamp": "2026-08-18T22:47:01.185Z",
+      "source": "webhook"
+    },
+    {
+      "id": "cf807cee-4cab-4694-a70d-3b6ca5992c6e",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "HAF mock response: hello line"
+        }
+      ],
+      "timestamp": "2026-08-18T22:47:01.189Z",
+      "usage": {
+        "inputTokens": 3,
+        "outputTokens": 8,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0
+      }
+    }
+  ],
+  "childSessionIds": [],
+  "tasks": [],
+  "totalUsage": {
+    "inputTokens": 3,
+    "outputTokens": 8,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0,
+    "costUsd": 0
+  },
+  "tree": {
+    "entries": [
+      {
+        "id": "8b571365-ad3c-4a98-9a52-4ea07d1040bb",
+        "message": {
+          "id": "8b571365-ad3c-4a98-9a52-4ea07d1040bb",
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "hello line"
+            }
+          ],
+          "timestamp": "2026-08-18T22:47:01.185Z",
+          "source": "webhook"
+        },
+        "labels": [],
+        "createdAt": "2026-08-18T22:47:01.185Z"
+      },
+      {
+        "id": "cf807cee-4cab-4694-a70d-3b6ca5992c6e",
+        "parentId": "8b571365-ad3c-4a98-9a52-4ea07d1040bb",
+        "message": {
+          "id": "cf807cee-4cab-4694-a70d-3b6ca5992c6e",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "HAF mock response: hello line"
+            }
+          ],
+          "timestamp": "2026-08-18T22:47:01.189Z",
+          "usage": {
+            "inputTokens": 3,
+            "outputTokens": 8,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0
+          }
+        },
+        "labels": [],
+        "createdAt": "2026-08-18T22:47:01.189Z"
+      }
+    ],
+    "activeLeafId": "cf807cee-4cab-4694-a70d-3b6ca5992c6e"
+  }
+}

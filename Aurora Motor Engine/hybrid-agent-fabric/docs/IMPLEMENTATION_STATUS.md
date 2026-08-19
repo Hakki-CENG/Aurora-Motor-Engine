@@ -1,0 +1,460 @@
+# Implementation status
+
+Updated: 2026-08-19 — current milestone 1.36
+
+## Original 1.0 baseline (delivered)
+
+### Runtime and durability
+
+- [x] Session actor with serialized mutations
+- [x] Supervisor and session catalog
+- [x] Session leases with stale-process recovery
+- [x] Stable family/session identities
+- [x] Generation and monotonic sequence metadata
+- [x] JSONL event persistence and SSE replay
+- [x] Atomic snapshots
+- [x] Command idempotency journal
+- [x] Effect journal and uncertain outcome protection
+- [x] Cancel, pause, resume, close and deterministic compaction
+- [x] Persistent goals with token/continuation budgets
+- [x] Bounded autonomous continuation and quality gates
+- [x] Isolated session fork with optional abandoned-branch summary
+- [x] Per-session provider:model selection
+
+### Models and execution
+
+- [x] Mock provider
+- [x] OpenAI-compatible Chat Completions provider
+- [x] Native Anthropic Messages provider
+- [x] Nine-profile provider registry
+- [x] Capability catalog and dynamic registration
+- [x] Policy decisions and human approval promises
+- [x] Confined filesystem read/write/list
+- [x] Bounded local process execution
+- [x] Hardened Docker execution adapter
+- [x] Persistent Python kernel and host bridge
+- [x] MCP stdio tool projection
+
+### Multi-agent and automation
+
+- [x] Child admission and family linking
+- [x] Git worktree/copy isolation fallback
+- [x] Direct agent messaging capability
+- [x] Once, interval and cron schedules
+- [x] Durable pre-dispatch schedule advancement
+- [x] Declarative manual/schedule/webhook automations
+- [x] Automation run ledger, timeout/cancel and enable/disable
+
+### Knowledge and extension
+
+- [x] Candidate/active memory lifecycle
+- [x] Cross-session tenant-scoped ranked search
+- [x] Evidence/provenance fields
+- [x] Injection screening
+- [x] Skill quarantine, scan, hash and promotion
+- [x] Learning Governor: evidence, scan, evaluation, review, promotion and rollback
+- [x] Observer/guard/transform hook failure semantics
+
+### Surfaces
+
+- [x] REST control API
+- [x] Embedded dependency-free developer console
+- [x] Server-Sent Event stream
+- [x] ACP stdio adapter
+- [x] Detached worker create/adopt/command/event/approval Control API
+- [x] Normalized authorized webhook/channel ingress
+- [x] Telegram, Discord, Slack and signed-webhook outbound adapters
+- [x] AES-GCM local credential broker and scoped leases
+- [x] SSRF-checked bounded web fetch
+- [x] Content-free Prometheus operational metrics
+- [x] Fail-open OTLP/HTTP JSON metrics exporter
+- [x] WhatsApp Cloud, Matrix and Signal outbound adapters
+- [x] SSH sandbox with rsync workspace synchronization
+- [x] Browser/CDP automation and browser computer-use controls
+- [x] Workspace-confined STT and TTS
+
+## Required for full target parity
+
+These were the explicitly tracked engineering items for the original 1.0 target; every checked item below has implementation and test/build evidence:
+
+### OpenHands-derived experience plane
+
+- [x] Server-side multi-backend registry with credential references and health checks
+- [x] Embedded control center for sessions/chat/tree/events/goals/autonomy/children/approvals/automations/schedules/providers/backends/search/metrics
+- [x] React/Vite Canvas application integrated against HAF BFF contracts
+- [x] Conversation, terminal, files/editor, browser/computer-use, tree, changes and automations panels
+- [x] Multi-backend registry stored server-side
+- [x] Secure Electron shell and electron-builder packaging targets
+- [x] Declarative automation manifests (plugin setup manifests remain)
+- [x] Browser CSP and no persistent browser token storage
+- [x] Encrypted HttpOnly web session, CSRF and OIDC/PKCE SSO flow
+
+### Prime-derived runtime depth
+
+- [x] Detached resident worker processes that survive control-plane shutdown
+- [x] Descriptor/socket-based supervisor adoption with per-worker authentication
+- [x] Private binary worker transport and attachment-local backpressure/resync
+- [x] Generation/sequence replay with chunked snapshot fallback
+- [x] Launch-manifest worker respawn with same worker ID/home and snapshot rehydration
+- [x] Retained child registry and child transcript rehydration after worker-process death
+- [x] Full in-file session tree navigation, labels, active leaf and context-reset compaction
+- [x] Kernel process hosted in hardened Docker when Docker sandbox profile is selected
+- [x] PostgreSQL events/snapshots/journals/distributed leases and NATS event/command transport
+
+### Hermes-derived capability breadth
+
+- [x] Signature/secret and allowlist-protected inbound Telegram/Discord/Slack/WhatsApp/Signal/Matrix adapters
+- [x] Browser/CDP automation and browser-scoped computer-use workers
+- [x] OpenAI-compatible voice STT/TTS
+- [x] Provider profile catalog beyond OpenAI-compatible
+- [x] Modal, Daytona, Vercel and Kubernetes serverless sandbox gateway adapters
+- [x] Vault KV v2 and KMS envelope credential backends; network policy carried to cloud sandbox gateway
+- [x] Persistent BM25-style full-text plus vector hybrid retrieval
+- [x] Remote Skills Hub catalog, hash verification, safe tar extraction, quarantine, scan and audit
+- [x] Content-free fleet status/alert API and Control Center alert counters
+- [x] Hosted scale-to-zero scheduler relay with JWT fire verification and at-most-once ledger
+
+### Production governance
+
+- [x] OPA/Rego policy service with layered decisions, redaction and fail-closed transport
+- [x] Vault KV v2 and pluggable KMS envelope integration
+- [x] Application tenant RBAC with resource-derived tenant checks
+- [x] Optional PostgreSQL RLS policies and tenant-scoped transaction helper
+- [x] Signed out-of-process WASI plugin runner with capability/hook registration
+- [x] Automatic command eval, signed release, canary promotion and rollback
+- [x] Separate adversarial security and worker/persistence chaos CI suites
+
+## Current-upstream delta audit (2026-08-18)
+
+The original 1.0 target matrix above is complete, but all three upstreams continued to evolve. The stricter current-upstream audit is in [`upstream-gap-audit-2026-08-18.md`](upstream-gap-audit-2026-08-18.md).
+
+Delivered in 1.1:
+
+- [x] Native Gemini GenerateContent provider with tool/usage normalization
+- [x] Explicit per-session provider fallback chains with no replay after partial output
+- [x] Same-provider credential rotation, cooldown/disable classification and secret-free status
+- [x] Intent-preserving, non-destructive context projection
+- [x] Durable dependency-aware task board and Canvas Tasks panel
+- [x] Versioned JSON/Markdown transcript export
+- [x] Bounded raster image generation and workspace artifact materialization
+- [x] Digest-pinned Singularity/Apptainer sandbox adapter
+
+Delivered in 1.2:
+
+- [x] Durable PostgreSQL/file agent inbox with LISTEN/NOTIFY wake-up, `auto`/`steer`/`follow_up`, family reach, receipts, rate/pending limits and explicit uncertain claims
+- [x] Generation-fenced, request-deduplicated and cancellation-aware Python host protocol v2
+- [x] Same-origin SSRF-guarded Streamable HTTP MCP, timeouts, circuit breaker and dynamic tool refresh
+- [x] Native OpenAI Responses API provider mode with server-side storage disabled
+- [x] Confined single-source image editing
+- [x] Normalized Brave/Tavily web-search providers and `web.search`
+- [x] Canvas family roster, inbox warning and family message composer
+- [x] Privacy-preserving `haf.trajectory.v1` training export with structured tool records
+- [x] Bounded SHA-256-verifiable binary attachments and Canvas upload workflow
+- [x] Evidence-validated continual-harness refinement batches with governed candidates, history, promotion tracking and batch rollback
+
+Delivered in 1.3:
+
+- [x] Typed sandbox-aware Git status/diff/branch/create/switch/commit capabilities and Canvas controls
+- [x] Forced composite TypeScript builds that always re-emit excluded distribution directories
+- [x] Environment-referenced MCP mutual TLS with bounded PEM validation and strict certificate verification
+- [x] Persistent content-only MCP schema cache and administrative inspection API
+- [x] Persistent audience-bound server-side model configurations and Canvas Models manager
+
+Delivered in 1.4:
+
+- [x] Tenant-scoped persistent agent profiles with immutable per-session versions and Canvas management
+- [x] Supplemental profile instructions plus default model/fallback routes
+- [x] Capability allowlists enforced across model tools, normal broker execution and nested Python host calls
+- [x] Profile inheritance across child agents and forks
+
+Delivered in 1.5:
+
+- [x] Broker-encrypted MCP OAuth state/tokens, Authorization Code + PKCE and dynamic client registration persistence
+- [x] Short-lived state-validated OAuth callback coordination and pending-flow cleanup
+- [x] Environment-referenced OAuth client credentials and Canvas MCP manager
+
+Delivered in 1.6:
+
+- [x] Human-gated MCP form/URL elicitation with tenant isolation and bounded schema validation
+- [x] Elicitation list/resolve APIs, restart/timeout expiration and Canvas response cards
+- [x] No-content persistence for elicited values
+- [x] Native Azure OpenAI deployment provider with API-key audience isolation
+- [x] Native Vertex AI Gemini provider with OAuth bearer authentication
+
+Delivered in 1.7:
+
+- [x] Native AWS Bedrock Converse provider with standard AWS credential chain
+- [x] Workspace-confined multimodal image message parts with MIME/hash validation
+- [x] Native image projection for OpenAI/Azure/Anthropic/Gemini/Vertex/Bedrock
+- [x] Canvas image chips and privacy-preserving image trajectory metadata
+
+Delivered in 1.8:
+
+- [x] Pluggable FAL text-to-video and confined image-to-video generation
+- [x] Bounded MP4/WebM materialization with remote URL opt-in and SSRF revalidation
+- [x] `video.generate`, media BFF endpoints and Canvas Media panel
+
+Delivered in 1.9:
+
+- [x] Model-planned evidence-bound continual-harness review with strict JSON contracts
+- [x] Optional single-flight turn-interval review cadence and durable review history
+- [x] Manual planning APIs and Canvas Learning governance workflows
+- [x] Candidate-only output with no self-promotion or immutable prompt mutation
+
+Delivered in 1.10:
+
+- [x] Bounded HTTPS repository bootstrap with SSRF/redirect/size/timeout controls
+- [x] Exact-origin credential leases and ephemeral askpass with no token URL/argument disclosure
+- [x] Verified HEAD, failure cleanup, optional branch/profile selection and Canvas import UX
+
+Delivered in 1.11:
+
+- [x] Signed-plugin `context_projection` contract with immutable system/user intent boundaries
+- [x] Fail-safe fallback for invalid/timed-out context engines
+- [x] Additive bounded `memory_context` provider contract preserving local memory
+
+Delivered in 1.12:
+
+- [x] SHA-256-pinned command/1Password/Bitwarden secret-source registry
+- [x] Clean environment, bounded execution and metadata/reference/value redaction
+- [x] Credential Broker import, CRUD/refresh APIs and Canvas Secrets manager
+
+Delivered in 1.13:
+
+- [x] Workspace-confined bounded native channel media loading
+- [x] Telegram/Discord/Slack/WhatsApp/Matrix/Signal media delivery and signed webhook envelopes
+- [x] Media upload/ID flows, captions/thread routing and no-secret result projection
+
+Delivered in 1.14:
+
+- [x] Tenant-scoped priority channel routing rules with hashed identifiers
+- [x] Per-chat/per-user/per-thread lanes and immutable agent-profile assignment
+- [x] Routing CRUD, outbound media BFF and Canvas Channels management
+
+Delivered in 1.15:
+
+- [x] Restart-resumable in-flight MCP OAuth using expiring Credential Broker-encrypted transport descriptors
+- [x] State-derived callback lookup without plaintext callback maps, plus duplicate callback serialization
+- [x] Success/denial/expiry cleanup and graceful process-replacement suspension
+- [x] Exact authorization-server origin allowlists with SSRF checks and redirect denial
+
+Delivered in 1.16:
+
+- [x] Packaged deterministic rolling micro-compaction ahead of intent-preserving projection
+- [x] Exact user/system preservation, recent-tail protection and hash-bound untrusted derived summaries
+- [x] Atomic bounded tenant/session observer cache with cache-hit telemetry and corruption fallback
+- [x] Hash/shape-only tool-result summaries without copied tool values
+
+Delivered in 1.17:
+
+- [x] One-external-provider memory orchestration while local governed memory remains active
+- [x] Native Honcho cross-session summaries, user representations, peer cards and post-turn synchronization
+- [x] Transcript-free per-turn untrusted context injection with exact original user-message preservation
+- [x] Governed Honcho profile/search/context/reason/conclusion capabilities
+- [x] Content-free delivered/uncertain write journal with no automatic uncertain replay
+- [x] Exact-origin SSRF/redirect-hardened SDK transport and content-free status API
+
+Delivered in 1.18:
+
+- [x] Native ChatGPT Codex subscription provider using device OAuth and rotating refresh tokens
+- [x] Restart-persistent encrypted pending/auth/cooldown state with content-free status/logout APIs
+- [x] Account-specific live model catalog and hot `openai-codex:model` route activation
+- [x] First-party headers, Harmony-token neutralization, SSE text/reasoning/tool/usage projection
+- [x] Exact-origin/manual-redirect transport and no retry/fallback after partial output
+- [x] Canvas device login, authorization polling and account-model picker
+
+Delivered in 1.19:
+
+- [x] Dedicated remote `haf-client` application with TUI, one-shot and JSON-RPC stdio modes
+- [x] Environment-only bearer auth, exact-origin REST, redirect denial and bounded JSON/error transport
+- [x] Reconnecting SSE with monotonic cursor, duplicate suppression, backoff and abortable unsubscribe
+- [x] JSON-RPC session/command/event/approval surface with standard error contracts
+- [x] Live TUI text/tool/status events, multiline input, session/model/control and approval commands
+- [x] Bounded stdin prompts with no prompt or credential command-line flags
+
+Delivered in 1.20:
+
+- [x] Native Mattermost, LINE Messaging, Google Chat, Microsoft Teams and Feishu/Lark outbound adapters
+- [x] Mattermost and Feishu bounded native media upload/message flows
+- [x] Mattermost/Google thread, Teams chat/channel and Feishu reply routing contracts
+- [x] Explicit media rejection where a platform lacks safe direct binary upload
+- [x] Manual redirect handling, bounded responses and credential-shaped error redaction across channel HTTP
+- [x] Environment registration and Canvas adapter auto-discovery
+
+Delivered in 1.21:
+
+- [x] Tenant-scoped hosted GitHub/GitLab account records with Credential Broker secret references
+- [x] GitHub user/installation and GitLab membership repository discovery
+- [x] Normalized pull-request/merge-request metadata
+- [x] Exact-provider-metadata hosted import through the existing bounded askpass clone path
+- [x] Persistent session/repository links and read-only local/imported/remote HEAD sync status
+- [x] Exact API/clone origin, SSRF/redirect/response bounds and no-token registry/list surfaces
+- [x] Canvas hosted account/repository bootstrap controls
+
+Delivered in 1.22:
+
+- [x] Up to eight confined image and four video reference images with aggregate bounds
+- [x] Multi-reference feature negotiation and native OpenAI multipart/FAL data-URI projection
+- [x] Native FAL image generation/edit and 2x/4x upscale providers
+- [x] Standalone `image.upscale` and optional generate→upscale provenance chains
+- [x] PNG/JPEG/GIF/WebP dimension parsing and requested-scale enforcement
+- [x] Multi-reference/upscale REST, capabilities and Canvas Media controls
+
+Delivered in 1.23:
+
+- [x] Restart-persistent asynchronous video job manager and native FAL Queue provider
+- [x] Explicit lifecycle including `uncertain` submission/cancellation outcomes
+- [x] Hashed idempotency keys and no automatic uncertain-effect replay
+- [x] Content-free registry with no prompt/workspace/input bytes/credentials/provider URLs
+- [x] Exact queue URL construction, bounded status/result parsing and validated MP4/WebM materialization
+- [x] Job capabilities, REST list/submit/poll/cancel and Canvas controls
+
+Delivered in 1.24:
+
+- [x] Inbound Mattermost, LINE, Google Chat, Teams and Feishu/Lark routing endpoints
+- [x] LINE raw-body HMAC and Feishu replay-bounded signature verification
+- [x] Exact-origin bounded cached JWKS verification for Google Chat/Teams
+- [x] Issuer/audience validation plus platform sender/conversation allowlists
+- [x] Event-ID command idempotency and asynchronous outbound response delivery
+- [x] Challenge/ignored event handling and content-free error logging
+
+Delivered in 1.25:
+
+- [x] Dedicated `haf-release` prepare/verify application
+- [x] Deterministic source manifest with generated/runtime/secret/private-key exclusions
+- [x] CycloneDX 1.5 and SPDX 2.3 SBOM generation from package-lock
+- [x] in-toto Statement with SLSA provenance v1 and exact upstream materials
+- [x] SHA-256 release metadata/artifact bundle and traversal-safe verification
+- [x] Optional environment-only Ed25519 attestations with no private-key persistence
+- [x] SOURCE_DATE_EPOCH reproducibility and tamper/signature/escape tests
+
+Delivered in 1.26:
+
+- [x] Hash-bound, workspace-confined HTML artifact registry and exact action allowlists
+- [x] Opaque-origin script-only frames with network/form/object/base-denying CSP
+- [x] Short-lived frame channels and frozen postMessage request/result bridge
+- [x] Hidden artifact model turns omitted from public events/snapshots/exports/search/ACP/memory
+- [x] Content-free interaction hashes/status journal and duplicate IDs
+- [x] Canvas artifact manager and Electron subframe navigation restrictions
+
+Delivered in 1.27:
+
+- [x] Native FAL 2x/4x video upscaler and `video.upscale`
+- [x] Workspace-confined bounded MP4/WebM source loading
+- [x] MP4 tkhd and bounded WebM dimension extraction
+- [x] Requested-factor verification with undersized/unverifiable output rejection
+- [x] REST/capability/Canvas controls and verified width/height result metadata
+
+Delivered in 1.28:
+
+- [x] Governed GitHub PR / GitLab MR create, comment, close and merge operations
+- [x] Session-bound capability/policy/approval/effect-journal routing for REST writes
+- [x] Mandatory idempotency keys and content-free input/key hash journal
+- [x] Explicit pending/succeeded/failed/uncertain external outcomes with no uncertain replay
+- [x] Expected remote HEAD SHA required for merge with no deferred merge/branch deletion
+- [x] Canvas hosted review controls and operation metadata APIs
+
+Delivered in 1.29:
+
+- [x] Restart-persistent GitHub App installation/setup state with app-authenticated installation verification
+- [x] RS256 app JWT minting using current claim constraints and client-ID/app-ID issuer support
+- [x] Credential-Broker-only private keys, raw installation IDs and expiring installation access tokens
+- [x] Up to 25 private-key references with primary rotation, 401/403 failover and last-key disable guard
+- [x] On-demand installation-token mint/refresh integrated into hosted catalogs/import/review operations
+- [x] Raw-body SHA-256 webhook verification, multi-secret rotation and delivery deduplication
+- [x] Installation/suspend/delete/repository/pull-request event lifecycle projections without payload persistence
+- [x] GitHub App REST and Canvas registration/install/bind surfaces plus RSA/restart/rotation/webhook tests
+
+Delivered in 1.30:
+
+- [x] Native long-lived IRC/IRCv3 transport integrated with Channel Gateway and outbound capabilities
+- [x] Public DNS and verified TLS defaults with bounded custom CA plus explicit private/plaintext switches
+- [x] CAP 302, message-tags, server-time, account-tag, PING/PONG and TLS-only SASL PLAIN
+- [x] Exact channel/nickname/account allowlists and confined authorized direct-message replies
+- [x] Bounded protocol parser, CTCP/control stripping and 512-byte UTF-8-safe outbound splitting
+- [x] Registration timeout, bounded in-flight turns and exponential jittered generation reconnect
+- [x] Content-free long-lived status in REST/Canvas with no host/account/password projection
+- [x] Real local TCP/TLS server tests for ingress/reply, SASL, reconnect and security guards
+
+Delivered in 1.31:
+
+- [x] TLS-first SMTP outbound with fixed from-address and exact destination confinement
+- [x] Implicit TLS or mandatory STARTTLS, public DNS checks and bounded custom CA support
+- [x] Persistent read-only IMAP polling with UIDVALIDITY and restart-safe UID cursor
+- [x] Mandatory sender/recipient allowlists plus constant-time `X-HAF-Email-Token`
+- [x] Bounded MIME header/encoded-word/multipart/base64/quoted-printable parser
+- [x] Attachment omission, email loop suppression and explicit untrusted-data fencing
+- [x] Content-free inbound/reply journal with no replay after uncertain SMTP outcomes
+- [x] Reply threading, engine lifecycle, REST/Canvas status and SMTP/IMAP/MIME/security tests
+
+Delivered in 1.32:
+
+- [x] Native outbound and signed asynchronous inbound Twilio SMS
+- [x] Exact E.164 sender/recipient allowlists, fixed from number and AccountSid binding
+- [x] Exact public URL plus sorted-form HMAC-SHA1 `X-Twilio-Signature` verification
+- [x] Immediate TwiML acknowledgment and MessageSid command idempotency
+- [x] Content-free processing/responding/done/failed/uncertain SMS journal
+- [x] Duplicate suppression and no reply replay after ambiguous REST outcomes or restart
+- [x] Exact Twilio API boundary, redirect denial, response caps and header-only Basic auth
+- [x] REST/Canvas lifecycle status and signed/tamper/dedupe/uncertainty/redaction tests
+
+Delivered in 1.33:
+
+- [x] Bounded authenticated GitHub/GitLab file reads for automation manifests
+- [x] Explicit 15-minute plan followed by exact content-SHA apply
+- [x] Create/update/unchanged/disable reconciliation with managed provenance
+- [x] Fixed tenant session, admin webhook-secret reference and exact model allowlist authority
+- [x] Strict 100-entry JSON schema with schedule/cron/ref/path/traversal validation
+- [x] Branch-movement rejection between plan and apply
+- [x] Content-free source state and explicit succeeded/failed/partial restart semantics
+- [x] REST/Canvas source/plan/apply controls and full reconciliation/security tests
+
+Delivered in 1.34:
+
+- [x] Generic tenant-scoped OIDC Authorization Code + PKCE model credential sources
+- [x] Operator-registered public/confidential clients without third-party client impersonation
+- [x] Exact issuer/discovery/authorization/token/JWKS origin and SSRF boundaries
+- [x] Verified ID-token signature, issuer, audience, expiry, nonce and subject projection
+- [x] Broker-encrypted PKCE/pending/access/rotating-refresh/discovery state
+- [x] Exact model resource-origin audience binding and tenant-aware model configurations
+- [x] Dynamic bearer provider materialization with one pre-output-only 401/403 refresh
+- [x] REST/Canvas source login/logout/lifecycle and route binding plus OAuth security tests
+
+Delivered in 1.35:
+
+- [x] Restart-persistent same-provider cooldown, disable, failure and last-use state
+- [x] Content-free pool files keyed by runtime and opaque credential IDs only
+- [x] Removed-entry ignore and clean state for newly configured credential IDs
+- [x] Explicit one/all credential reset through system-admin REST and Canvas
+- [x] No implicit bypass of active provider retry windows after restart
+- [x] Custom-origin `provider`/`aggregator`/`local` data-policy labels
+- [x] Tenant-aware configuration inventory with visible data-policy metadata
+- [x] Cooldown/disable/reset/redaction/stale-entry/data-policy tests
+
+Delivered in 1.36:
+
+- [x] Tenant automation responder deployments bound to exact webhook automations
+- [x] Broker-referenced responder secrets with rotation and no list disclosure
+- [x] Raw-body timestamp/nonce HMAC-SHA256 and persistent replay prevention
+- [x] Content-free heartbeat health, version, capability and instance projection
+- [x] Immediate event admission plus asynchronous automation dispatch
+- [x] Event-ID duplicate suppression and processing/delivered/failed/uncertain journal
+- [x] Restart/unknown-outcome no-replay semantics and exact event-type authority
+- [x] Public responder routes, admin REST/Canvas lifecycle and security tests
+
+Open current-upstream deltas:
+
+- [ ] Provider-specific OAuth wire/conformance modes beyond delivered generic OIDC/PKCE and Codex/MCP lifecycles
+- [ ] Additional media providers beyond OpenAI/FAL and provider-specific quality/conformance environments
+- [ ] Additional packaged memory providers beyond Honcho and optional auxiliary-model summaries
+- [ ] Broader OpenHands plugin settings and hosted responder provisioning beyond delivered signed responder health/events
+- [ ] Rich desktop profile/window management beyond delivered isolated artifact frames
+- [ ] Advanced TUI widget parity plus reusable/i18n Canvas package
+- [ ] Additional stateful transports/providers beyond delivered IRC/IRCv3, SMTP/IMAP email and Twilio SMS
+- [ ] External-infrastructure conformance matrix and signed native installers
+
+## Definition of “complete”
+
+The target is complete only when the acceptance criteria from
+[`reference-analysis.md`](reference-analysis.md) are automated and green. Feature
+names or empty adapters do not count as delivery.

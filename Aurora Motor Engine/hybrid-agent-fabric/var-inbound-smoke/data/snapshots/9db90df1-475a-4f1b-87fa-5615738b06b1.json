@@ -1,0 +1,97 @@
+{
+  "sessionId": "9db90df1-475a-4f1b-87fa-5615738b06b1",
+  "familyId": "9db90df1-475a-4f1b-87fa-5615738b06b1",
+  "tenantId": "local",
+  "generation": 1,
+  "lastSequence": 13,
+  "status": "idle",
+  "name": "mattermost-channel-a4aa02ef",
+  "workspacePath": "/home/user/hybrid-agent-fabric/var-inbound-smoke/workspaces/9db90df1-475a-4f1b-87fa-5615738b06b1",
+  "createdAt": "2026-08-18T22:47:01.145Z",
+  "updatedAt": "2026-08-18T22:47:01.160Z",
+  "messages": [
+    {
+      "id": "f3f89f84-73cc-4f35-b2f1-e1f3cc7283fb",
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "hello mattermost"
+        }
+      ],
+      "timestamp": "2026-08-18T22:47:01.151Z",
+      "source": "webhook"
+    },
+    {
+      "id": "621fe6cf-9a65-4cfa-921a-25e96c12a488",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "HAF mock response: hello mattermost"
+        }
+      ],
+      "timestamp": "2026-08-18T22:47:01.157Z",
+      "usage": {
+        "inputTokens": 4,
+        "outputTokens": 9,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0
+      }
+    }
+  ],
+  "childSessionIds": [],
+  "tasks": [],
+  "totalUsage": {
+    "inputTokens": 4,
+    "outputTokens": 9,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0,
+    "costUsd": 0
+  },
+  "tree": {
+    "entries": [
+      {
+        "id": "f3f89f84-73cc-4f35-b2f1-e1f3cc7283fb",
+        "message": {
+          "id": "f3f89f84-73cc-4f35-b2f1-e1f3cc7283fb",
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "hello mattermost"
+            }
+          ],
+          "timestamp": "2026-08-18T22:47:01.151Z",
+          "source": "webhook"
+        },
+        "labels": [],
+        "createdAt": "2026-08-18T22:47:01.151Z"
+      },
+      {
+        "id": "621fe6cf-9a65-4cfa-921a-25e96c12a488",
+        "parentId": "f3f89f84-73cc-4f35-b2f1-e1f3cc7283fb",
+        "message": {
+          "id": "621fe6cf-9a65-4cfa-921a-25e96c12a488",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "HAF mock response: hello mattermost"
+            }
+          ],
+          "timestamp": "2026-08-18T22:47:01.157Z",
+          "usage": {
+            "inputTokens": 4,
+            "outputTokens": 9,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0
+          }
+        },
+        "labels": [],
+        "createdAt": "2026-08-18T22:47:01.157Z"
+      }
+    ],
+    "activeLeafId": "621fe6cf-9a65-4cfa-921a-25e96c12a488"
+  }
+}
