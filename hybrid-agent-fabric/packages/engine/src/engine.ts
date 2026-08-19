@@ -119,6 +119,14 @@ import { EnvironmentAwarenessService } from "./environment/environment-awareness
 import { ConstitutionService } from "./aurora/constitution-service.js";
 import { CognitiveOrchestrator } from "./aurora/cognitive-orchestrator.js";
 import { AuroraContextComposer } from "./aurora/aurora-context-composer.js";
+import { DecisionService } from "./aurora/decision-service.js";
+import { PlanningService } from "./aurora/planning-service.js";
+import { ExperienceDistiller } from "./aurora/experience-distiller.js";
+import { AuroraAutopilot } from "./aurora/autopilot.js";
+import { ProvenanceService } from "./aurora/provenance-service.js";
+import {
+  autopilotCapabilities, decisionCapabilities, distillerCapabilities, planningCapabilities, provenanceCapabilities,
+} from "./capabilities/aurora-reasoning.js";
 import { ContinualHarnessService } from "./harness/continual-harness-service.js";
 import { MicroagentRegistry } from "./knowledge/microagent-registry.js";
 import { RiskAnalyzerService } from "./policy/risk-analyzer.js";
@@ -138,6 +146,8 @@ export interface EngineConfig {
   homePath: string;
   /** Aurora prompt context block: constitution, harness, microagent knowledge and memory recall. */
   auroraContext?: { enabled?: boolean; constitutionChars?: number; harnessChars?: number; knowledgeChars?: number; memoryChars?: number };
+  /** Unattended ACOS cadence. Disabled unless explicitly enabled; bounded by the autopilot ledger. */
+  autopilot?: { enabled?: boolean; tenantId?: string; driverIntervalMs?: number };
   kernelServerScript: string;
   sandboxBackend: SandboxBackendKind;
   sshSandbox?: SshSandboxOptions;
@@ -263,6 +273,11 @@ export class HybridAgentEngine {
   readonly stuckDetector: StuckDetectorService;
   readonly acos: CognitiveOrchestrator;
   readonly auroraContextComposer: AuroraContextComposer | undefined;
+  readonly decisions: DecisionService;
+  readonly planning: PlanningService;
+  readonly distiller: ExperienceDistiller;
+  readonly autopilot: AuroraAutopilot;
+  readonly provenance: ProvenanceService;
 
   constructor(readonly config: EngineConfig) {
     const dataRoot = resolve(config.homePath, "data");
@@ -353,7 +368,12 @@ export class HybridAgentEngine {
     this.constitution = new ConstitutionService(dataRoot);
     this.harness = new ContinualHarnessService(dataRoot);
     this.microagents = new MicroagentRegistry(dataRoot);
-    this.memoryGraph = new MemoryGraphService(dataRoot);
+    // Semantic recall: the memory graph shares the engine's embedding-backed hybrid index.
+    this.memoryGraph = new MemoryGraphService(dataRoot, Date.now, {
+      upsert: async (input) => await this.knowledgeIndex.upsert({ id: input.id, tenantId: input.tenantId, kind: input.kind, text: input.text, metadata: input.metadata }),
+      remove: async (tenantId, id) => await this.knowledgeIndex.remove(tenantId, id),
+      search: async (input) => (await this.knowledgeIndex.search(input)).map((hit) => ({ id: hit.id, score: hit.score, vectorScore: hit.vectorScore, lexicalScore: hit.lexicalScore })),
+    });
     this.auroraContextComposer = config.auroraContext?.enabled === false
       ? undefined
       : new AuroraContextComposer(
@@ -482,6 +502,8 @@ export class HybridAgentEngine {
     this.evolution = new SkillEvolutionService(dataRoot);
     this.environment = new EnvironmentAwarenessService(dataRoot);
     this.riskAnalyzer = new RiskAnalyzerService(dataRoot);
+    this.decisions = new DecisionService(dataRoot);
+    this.planning = new PlanningService(dataRoot);
     this.stuckDetector = new StuckDetectorService(this.events);
     // Queued initiatives are mirrored into the Global Workspace so proactive signals compete for
     // attention under the same constitutional budget as every other cognitive object.
@@ -594,6 +616,8 @@ export class HybridAgentEngine {
       society: this.society,
       constitution: this.constitution,
       harness: this.harness,
+      decisions: this.decisions,
+      planning: this.planning,
     }, Date.now, {
       stuckSessions: async (tenantId) => {
         const sessions = (await this.supervisor.listSessions()).filter((item) => item.tenantId === tenantId && item.status !== "closed").slice(0, 20);
@@ -617,6 +641,34 @@ export class HybridAgentEngine {
     for (const capability of stuckCapabilities(this.stuckDetector)) this.capabilities.register(capability);
     for (const capability of orchestratorCapabilities(this.acos)) this.capabilities.register(capability);
     for (const capability of insightCapabilities(this.memoryGraph)) this.capabilities.register(capability);
+    this.distiller = new ExperienceDistiller(dataRoot, {
+      events: this.events,
+      harness: this.harness,
+      microagents: this.microagents,
+      evolution: this.evolution,
+    });
+    this.autopilot = new AuroraAutopilot(dataRoot, { orchestrator: this.acos, initiative: this.initiative });
+    this.provenance = new ProvenanceService({
+      cognitive: this.cognitive,
+      initiative: this.initiative,
+      memoryGraph: this.memoryGraph,
+      worldModel: this.worldModel,
+      environment: this.environment,
+      decisions: this.decisions,
+      planning: this.planning,
+      constitution: this.constitution,
+    });
+    for (const capability of decisionCapabilities(this.decisions)) this.capabilities.register(capability);
+    for (const capability of planningCapabilities(this.planning)) this.capabilities.register(capability);
+    for (const capability of distillerCapabilities(this.distiller)) this.capabilities.register(capability);
+    for (const capability of autopilotCapabilities(this.autopilot)) this.capabilities.register(capability);
+    for (const capability of provenanceCapabilities(this.provenance)) this.capabilities.register(capability);
+    if (config.autopilot?.enabled) {
+      // Unattended operation is opt-in; the durable ledger and daily ceiling still bound it.
+      void this.autopilot.configure({ tenantId: config.autopilot.tenantId ?? "local", enabled: true })
+        .then(() => this.autopilot.start(config.autopilot?.tenantId ?? "local", config.autopilot?.driverIntervalMs ?? 60_000))
+        .catch(() => undefined);
+    }
   }
 
   registerModelProvider(provider: ModelProvider, makeDefault = false): void {
@@ -775,6 +827,7 @@ export class HybridAgentEngine {
   }
 
   async shutdown(): Promise<void> {
+    this.autopilot.stop();
     await this.scheduler.close();
     await this.automationResponders.close();
     await this.outboundChannels.closeAll();

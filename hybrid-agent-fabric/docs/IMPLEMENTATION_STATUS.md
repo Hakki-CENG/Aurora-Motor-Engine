@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-19 — current milestone 1.40
+Updated: 2026-08-19 — current milestone 1.41
 
 ## Original 1.0 baseline (delivered)
 
@@ -181,6 +181,23 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] Aurora context composition into the session system prompt with per-section budgets and trust markers
 - [x] Fail-open composition, audit digest and context-projection telemetry
 - [x] Cognitive economy: named attention-allocation buckets with enforced caps and daily rollover
+
+### Aurora reasoning and autonomy (1.41)
+
+- [x] Decision records with normalized weighted criteria and deterministic ranking
+- [x] Preserved dissent, computed confidence/margin and mandatory override reasons
+- [x] Constitution-denial refusal and review scheduling by reversibility
+- [x] Outcome capture with surprise, Brier score and overconfidence calibration
+- [x] Dependency-ordered plans with cycle rejection, critical path and risk buffer
+- [x] Dependency-enforced step transitions and ready/blocked derivation
+- [x] Versioned replanning with mandatory trigger/reason and plan supersession
+- [x] Estimate-accuracy measurement and stalled-plan detection
+- [x] Experience distillation of procedures, pitfalls and capability gaps from real trajectories
+- [x] Governed application of distilled proposals through harness/knowledge/evolution services
+- [x] Opt-in autopilot cadences with daily ceiling, quiet hours, backoff and run ledger
+- [x] Provenance explainer across intake, cognition, memory, world, decisions, plans and actions
+- [x] Embedding-backed semantic memory recall with lexical fallback
+- [x] ACOS integration of stalled plans, decision-review backlog and overconfidence
 
 ## Required for full target parity
 

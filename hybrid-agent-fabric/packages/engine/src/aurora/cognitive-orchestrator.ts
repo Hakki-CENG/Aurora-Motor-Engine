@@ -9,6 +9,8 @@ import type { AgentSocietyService } from "../society/agent-society-service.js";
 import type { UserModelService } from "../user/user-model-service.js";
 import type { WorldModelService } from "../world/world-model-service.js";
 import type { ConstitutionService } from "./constitution-service.js";
+import type { DecisionService } from "./decision-service.js";
+import type { PlanningService } from "./planning-service.js";
 import type { ContinualHarnessService } from "../harness/continual-harness-service.js";
 import { auroraDigest, auroraInteger, auroraRound, auroraText, DurableJsonState } from "../util/aurora-state.js";
 
@@ -38,7 +40,7 @@ export interface CognitiveCycleReport {
   phases: CyclePhaseResult[];
   attention: { focused: number; deferred: number; preempted: number; budgetSaturation: number };
   health: { cognitive: number; memory: number; constitutionCompliance: number };
-  signals: { intake: number; initiativesQueued: number; advisories: number; gaps: number; stuckSessions: number };
+  signals: { intake: number; initiativesQueued: number; advisories: number; gaps: number; stuckSessions: number; decisionsDue: number; stalledPlans: number };
   recommendations: string[];
   constitutionVerdict: "allow" | "review" | "deny";
   degraded: string[];
@@ -76,6 +78,8 @@ export interface CognitiveOrchestratorDependencies {
   society: AgentSocietyService;
   constitution: ConstitutionService;
   harness: ContinualHarnessService;
+  decisions?: DecisionService;
+  planning?: PlanningService;
 }
 
 export interface CycleOptions {
@@ -137,7 +141,7 @@ export class CognitiveOrchestrator {
     const results: CyclePhaseResult[] = [];
     const degraded: string[] = [];
     const recommendations: string[] = [];
-    const signals = { intake: 0, initiativesQueued: 0, advisories: 0, gaps: 0, stuckSessions: 0 };
+    const signals = { intake: 0, initiativesQueued: 0, advisories: 0, gaps: 0, stuckSessions: 0, decisionsDue: 0, stalledPlans: 0 };
     const attention = { focused: 0, deferred: 0, preempted: 0, budgetSaturation: 0 };
     const health = { cognitive: 1, memory: 1, constitutionCompliance: 1 };
 
@@ -279,6 +283,8 @@ export class CognitiveOrchestrator {
       evolution: { index: evolutionIndex.index, production: evolutionIndex.productionSkills, delta: evolutionIndex.delta },
       environment: { resources: inventory.totals.resources, degraded: inventory.totals.degraded, verificationDebt: inventory.unverifiedActions },
       society: { advisories: meta.advisories.length, running: meta.utilization.runningTasks, quality: meta.utilization.averageQuality },
+      ...(this.deps.decisions ? { decisions: await this.deps.decisions.calibration(tenantId).then((item) => ({ reviewed: item.reviewed, successRate: item.successRate, overconfidence: item.overconfidence })) } : {}),
+      ...(this.deps.planning ? { plans: await this.deps.planning.list(tenantId, { status: "active", limit: 100 }).then((items) => ({ active: items.length, averageProgress: items.length ? Number((items.reduce((sum, plan) => sum + plan.progress, 0) / items.length).toFixed(4)) : 0 })) } : {}),
       constitution: { complianceRate: compliance.complianceRate, denied: compliance.denied, review: compliance.review },
       ...(userId ? { user: await this.deps.userModel.estimateState(tenantId, userId) } : {}),
       lastCycle: lastCycle ? { sequence: lastCycle.sequence, mode: lastCycle.mode, degraded: lastCycle.degraded, finishedAt: lastCycle.finishedAt } : null,
@@ -351,7 +357,18 @@ export class CognitiveOrchestrator {
         const meta = await this.deps.society.metaMonitor(tenantId);
         accumulator.signals.advisories = meta.advisories.length;
         for (const advisory of meta.advisories.filter((item) => item.severity === "critical").slice(0, 5)) accumulator.recommendations.push(advisory.recommendation);
-        return { status: "ok", summary: `Ranked ${arbitration.rankedGoalIds.length} goal(s); ${meta.advisories.length} society advisory(ies).`, detail: { goals: arbitration.rankedGoalIds.length, conflicts: arbitration.conflictGoalIds.length, advisories: meta.advisories.length } };
+        let stalledPlans = 0;
+        if (this.deps.planning) {
+          const stalled = await this.deps.planning.stalled(tenantId, 7);
+          stalledPlans = stalled.length;
+          accumulator.signals.stalledPlans = stalledPlans;
+          for (const item of stalled.slice(0, 3)) {
+            accumulator.recommendations.push(item.readySteps.length
+              ? `Plan "${item.plan.title}" idle ${item.idleDays} day(s) with ready step(s): ${item.readySteps.slice(0, 3).join(", ")}.`
+              : `Plan "${item.plan.title}" idle ${item.idleDays} day(s) with no ready step; replan or abandon it.`);
+          }
+        }
+        return { status: "ok", summary: `Ranked ${arbitration.rankedGoalIds.length} goal(s); ${meta.advisories.length} society advisory(ies); ${stalledPlans} stalled plan(s).`, detail: { goals: arbitration.rankedGoalIds.length, conflicts: arbitration.conflictGoalIds.length, advisories: meta.advisories.length, stalledPlans } };
       }
       case "allocate": {
         const allocation = await this.deps.cognitive.allocateAttention(tenantId, { preempt: options.preempt ?? options.mode === "emergency" });
@@ -375,8 +392,21 @@ export class CognitiveOrchestrator {
         accumulator.health.cognitive = cognitiveHealth.healthScore;
         accumulator.health.constitutionCompliance = compliance.complianceRate;
         for (const violation of cognitiveHealth.constitutionalViolations.slice(0, 5)) accumulator.recommendations.push(`${violation.code}: ${violation.detail}`);
+        let decisionsDue = 0;
+        let overconfidence = 0;
+        if (this.deps.decisions) {
+          const due = await this.deps.decisions.dueForReview(tenantId);
+          decisionsDue = due.length;
+          accumulator.signals.decisionsDue = decisionsDue;
+          for (const decision of due.slice(0, 3)) accumulator.recommendations.push(`Decision "${decision.title}" is past its review date; record the actual outcome.`);
+          const calibration = await this.deps.decisions.calibration(tenantId);
+          overconfidence = calibration.overconfidence;
+          if (calibration.reviewed >= 5 && calibration.overconfidence > 0.2) {
+            accumulator.recommendations.push(`Decision confidence runs ${calibration.overconfidence} above the observed success rate; state lower confidence or gather more evidence.`);
+          }
+        }
         const status = cognitiveHealth.healthScore < 0.5 ? "degraded" : "ok";
-        return { status, summary: `Cognitive health ${cognitiveHealth.healthScore}, compliance ${compliance.complianceRate}.`, detail: { health: cognitiveHealth.healthScore, blocked: cognitiveHealth.totals.blocked, violations: cognitiveHealth.constitutionalViolations.length, compliance: compliance.complianceRate } };
+        return { status, summary: `Cognitive health ${cognitiveHealth.healthScore}, compliance ${compliance.complianceRate}, ${decisionsDue} decision review(s) due.`, detail: { health: cognitiveHealth.healthScore, blocked: cognitiveHealth.totals.blocked, violations: cognitiveHealth.constitutionalViolations.length, compliance: compliance.complianceRate, decisionsDue, overconfidence } };
       }
       case "learn": {
         // Friction observed by the cognitive layer becomes an evidence-backed capability-gap signal.

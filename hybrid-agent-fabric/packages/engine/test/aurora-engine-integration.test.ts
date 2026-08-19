@@ -29,6 +29,9 @@ describe("Aurora substrate engine integration", () => {
       "microagents.register", "microagents.recall",
       "risk.assess", "risk.policy.set", "session.stuck.analyze",
       "acos.cycle.run", "acos.status", "acos.journal", "memory.insights.propose",
+      "decision.open", "decision.decide", "decision.calibration",
+      "plan.create", "plan.step.update", "plan.progress",
+      "experience.distill", "experience.apply", "autopilot.status", "autopilot.configure", "aurora.explain",
     ]) {
       expect(ids.has(id), `missing capability ${id}`).toBe(true);
     }

@@ -8,7 +8,7 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.40.0
+## Current milestone — 1.41.0
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -69,6 +69,12 @@ Implemented and tested:
 - Aurora escalation-only risk analyzer with destructive-pattern rules, confirmation policy and safe-zone hints
 - Aurora model-free stuck detection over the event log, feeding cognitive intake and capability-gap learning
 - Aurora ACOS control loop with cycle reports, thought journal and whole-organism status
+- Aurora decision records with weighted criteria, preserved dissent, review scheduling and calibration
+- Aurora dependency-ordered plans with critical path, verification steps and auditable replanning
+- Aurora experience distillation: reusable lessons proposed from real trajectories, never auto-applied
+- Aurora autopilot: bounded unattended cadence with a durable run ledger
+- Aurora provenance explainer reconstructing why any artifact exists
+- Embedding-backed semantic memory recall
 - AES-256-GCM/Vault/KMS credential brokers, scoped leases and pinned 1Password/Bitwarden/command secret sources
 - SSRF-checked bounded public web fetch and normalized Brave/Tavily web search
 - Playwright/CDP browser automation and browser-scoped computer-use
@@ -863,7 +869,8 @@ bounded block that is appended to the session system prompt on every turn:
   override policy, approvals or the constitution;
 - `<AURORA_KNOWLEDGE untrusted="true">` — trigger-activated microagent documents, marked as data;
 - `<AURORA_MEMORY untrusted="true">` — recalled memory-graph claims with their layer, type and
-  confidence.
+  confidence. Recall is embedding-backed: semantic similarity is blended with lexical overlap,
+  importance, confidence and recency, and falls back to lexical scoring if the index is unavailable.
 
 Each section has its own character budget, so a growing knowledge base can never crowd out the user's
 own instructions; overflow is reported rather than silently dropped. Composition is fail-open (a
@@ -917,6 +924,54 @@ Stuck detection is model-free analysis over the durable event log: repeated acti
 classes, two-capability oscillation, monologue, byte-identical output, approval starvation and fired
 runtime guardrails, each with evidence event IDs. ACOS turns those findings into cognitive objects and
 capability-gap observations, so being stuck becomes a learning signal instead of a silent stall.
+
+## Aurora reasoning: decisions and plans
+
+A decision record holds the options, the weighted criteria they were judged against, the dissent that
+was raised, the option that was chosen, the expected outcome and — after the review window — what
+actually happened. Ranking is computed, never asserted: choosing a lower-ranked option requires an
+explicit override reason, a decision denied by the constitution cannot be recorded as decided, and a
+"decision" with one option is rejected as a formality. Unscored criteria count as unknown rather than
+zero, so a thin analysis cannot masquerade as a thorough one.
+
+Calibration closes the loop. Every reviewed decision yields a surprise (expected value versus observed
+value) and a Brier score for the stated confidence, and the tenant report exposes success rate, mean
+surprise and **overconfidence** — how far Aurora's confidence runs ahead of its results, broken down by
+reversibility class.
+
+Plans are dependency graphs with per-step verification, estimates and risk. Cycles and unknown
+dependencies are rejected at write time, the critical path and a risk-weighted buffer are computed,
+steps cannot start before their dependencies are satisfied, and every change is a versioned revision
+with a mandatory trigger and reason. Completed work survives replanning, estimate accuracy is measured
+from actuals, and stalled plans with ready work become a proactive signal.
+
+## Aurora experience distillation
+
+After a substantial session, `experience.distill` reads the durable event log, measures complexity from
+tool-call volume, capability diversity and duration, and proposes: the effective capability sequence as
+a reusable procedure, recurring failure classes as pitfalls, and structural friction as capability
+gaps. Every proposal carries evidence event IDs, a confidence and a dedupe signature, and repeats
+strengthen the existing proposal instead of creating noise.
+
+Nothing is applied automatically. Applying a proposal routes it through the service that owns that kind
+of state: harness memories become a snapshotted, rollback-capable refinement; knowledge goes through
+injection screening; capability gaps become evolution observations that still need the staged pipeline.
+
+## Aurora autopilot
+
+Unattended operation is opt-in and bounded. Cadences — pulse, maintenance, reflection, dream, daily
+briefing, weekly review and monthly strategy — drive ACOS cycles and digests, subject to a daily run
+ceiling, quiet hours during which only the fast pulse may run, per-cadence enable/disable and
+exponential backoff on failure. Every run lands in a durable ledger with its outcome and duration, so
+what Aurora did while nobody was watching is always reviewable.
+
+## Aurora provenance
+
+`aurora.explain` answers "why does this exist?" by walking recorded provenance across subsystems: an
+environment action to its resource, verification and memory updates; an initiative to the intake signal
+that raised it; a memory to its graph neighbourhood; a decision to its constitutional verdict; a plan to
+the decision that justified it. The trace is reconstructed from durable state only — no model is asked
+to narrate causality after the fact — and it reports unresolved references instead of guessing.
 
 ## Repository bootstrap
 

@@ -392,7 +392,7 @@ function TasksPanel({session,command,reload,showError}:{session:Session;command:
  * and environment inventory. Every mutation goes through the audited Control API routes.
  */
 function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
-  const [section, setSection] = useState<"acos"|"memory"|"world"|"initiative"|"user"|"evolution"|"environment"|"constitution"|"harness"|"knowledge"|"risk">("acos");
+  const [section, setSection] = useState<"acos"|"memory"|"world"|"initiative"|"user"|"evolution"|"environment"|"constitution"|"harness"|"knowledge"|"risk"|"reasoning"|"autopilot">("acos");
   const [memoryHealth, setMemoryHealth] = useState<any>(null);
   const [anchors, setAnchors] = useState<any[]>([]);
   const [calibration, setCalibration] = useState<any>(null);
@@ -424,6 +424,13 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
   const [riskPolicy, setRiskPolicy] = useState<any>(null);
   const [riskPosture, setRiskPosture] = useState<any>(null);
   const [insights, setInsights] = useState<any[]>([]);
+  const [decisionList, setDecisionList] = useState<any[]>([]);
+  const [decisionCalibration, setDecisionCalibration] = useState<any>(null);
+  const [planList, setPlanList] = useState<any[]>([]);
+  const [stalledPlans, setStalledPlans] = useState<any[]>([]);
+  const [proposals, setProposals] = useState<any[]>([]);
+  const [autopilot, setAutopilot] = useState<any>(null);
+  const [autopilotRuns, setAutopilotRuns] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -465,6 +472,17 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
       setAcosStatus(status); setCycles(cycleList.cycles); setJournal(journalList.entries); setPrinciples(principleList.principles);
       setIdentity(identityCore); setCompliance(complianceReport); setHarnessEntries(harnessList.entries); setRefinements(refinementList.refinements);
       setMicroagents(microagentList.microagents); setRiskPolicy(policy); setRiskPosture(posture);
+      const [decisionsResult, calibrationResult, plansResult, stalledResult, proposalsResult, autopilotResult, runsResult] = await Promise.all([
+        api<any>("/v1/decisions?tenantId=local&limit=25"),
+        api<any>("/v1/decisions-calibration?tenantId=local"),
+        api<any>("/v1/plans?tenantId=local&limit=25"),
+        api<any>("/v1/plans?tenantId=local&stalledDays=7"),
+        api<any>("/v1/experience/proposals?tenantId=local&limit=25"),
+        api<any>("/v1/autopilot?tenantId=local"),
+        api<any>("/v1/autopilot/runs?tenantId=local&limit=20"),
+      ]);
+      setDecisionList(decisionsResult.decisions); setDecisionCalibration(calibrationResult); setPlanList(plansResult.plans);
+      setStalledPlans(stalledResult.stalled); setProposals(proposalsResult.proposals); setAutopilot(autopilotResult); setAutopilotRuns(runsResult.runs);
     } catch (cause) { showError(cause); }
   }, [showError, userId]);
   useEffect(() => { void load(); }, [load]);
@@ -482,12 +500,16 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
   const approveMicroagent = async (id: string) => { try { await api(`/v1/microagents/${id}/approve`, { method: "POST", body: JSON.stringify({ tenantId: "local", reviewer: "canvas-operator" }) }); await load(); } catch (cause) { showError(cause); } };
   const setRiskMode = async (mode: string) => { try { await api("/v1/risk/policy", { method: "POST", body: JSON.stringify({ tenantId: "local", mode }) }); await load(); } catch (cause) { showError(cause); } };
   const proposeInsights = async () => { try { const result = await api<any>("/v1/memory-graph/insights", { method: "POST", body: JSON.stringify({ tenantId: "local", limit: 5 }) }); setInsights(result.candidates); } catch (cause) { showError(cause); } };
+  const applyProposal = async (id: string) => { try { await api(`/v1/experience/proposals/${id}/apply`, { method: "POST", body: JSON.stringify({ tenantId: "local", actor: "canvas-operator" }) }); await load(); } catch (cause) { showError(cause); } };
+  const rejectProposal = async (id: string) => { try { await api(`/v1/experience/proposals/${id}/reject`, { method: "POST", body: JSON.stringify({ tenantId: "local", reason: "Rejected from Canvas." }) }); await load(); } catch (cause) { showError(cause); } };
+  const toggleAutopilot = async (enabled: boolean) => { try { await api("/v1/autopilot", { method: "POST", body: JSON.stringify({ tenantId: "local", enabled }) }); await load(); } catch (cause) { showError(cause); } };
+  const runAutopilot = async () => { try { await api("/v1/autopilot/run-due", { method: "POST", body: JSON.stringify({ tenantId: "local" }) }); await load(); } catch (cause) { showError(cause); } };
   const retirementSweep = async () => { try { await api("/v1/evolution/retirement-sweep", { method: "POST", body: JSON.stringify({ tenantId: "local" }) }); await load(); } catch (cause) { showError(cause); } };
 
   return <div className="panel tasks-panel">
     <div className="task-toolbar">
       <b>Aurora substrate</b>
-      {(["acos","memory","world","initiative","user","evolution","environment","constitution","harness","knowledge","risk"] as const).map(item => <button key={item} className={section===item?"active":""} onClick={()=>setSection(item)}>{item}</button>)}
+      {(["acos","memory","world","initiative","user","evolution","environment","constitution","harness","knowledge","risk","reasoning","autopilot"] as const).map(item => <button key={item} className={section===item?"active":""} onClick={()=>setSection(item)}>{item}</button>)}
       <button onClick={()=>void load()}><RefreshCw size={13}/>Refresh</button>
     </div>
     {section === "acos" && <>
@@ -521,6 +543,21 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
     {section === "risk" && <>
       <div className="task-toolbar"><small>confirmation mode {riskPolicy?.mode ?? "—"} · {riskPosture?.total ?? 0} assessment(s) · confirmation rate {riskPosture?.confirmationRate ?? "—"}</small><select value={riskPolicy?.mode ?? "high"} onChange={e=>void setRiskMode(e.target.value)}><option value="never">never</option><option value="critical">critical</option><option value="high">high</option><option value="medium">medium</option><option value="all">all</option></select></div>
       <div className="task-grid">{(riskPosture?.topRules ?? []).map((rule:any) => <article className="task-card" key={rule.code}><h3>{rule.code}</h3><p>Triggered {rule.count} time(s) in the window.</p></article>)}{Object.entries(riskPosture?.byLevel ?? {}).map(([level,count]) => <article className={`task-card ${level==="critical"?"failed":""}`} key={level}><h3>{level}</h3><p>{String(count)} assessment(s)</p></article>)}</div>
+    </>}
+    {section === "reasoning" && <>
+      <div className="task-toolbar"><small>decisions reviewed {decisionCalibration?.reviewed ?? 0} · success {decisionCalibration?.successRate ?? "—"} · overconfidence {decisionCalibration?.overconfidence ?? "—"} · plans {planList.length} · stalled {stalledPlans.length} · proposals {proposals.filter(item=>item.status==="proposed").length}</small></div>
+      <div className="task-grid">
+        {decisionList.map(decision => <article className={`task-card ${decision.status==="reviewed"?"done":""}`} key={decision.id}><h3>decision · {decision.title}</h3><p>{decision.question}</p><small>{decision.status} · confidence {decision.confidence} · margin {decision.margin} · {decision.options.length} option(s) · {decision.dissent.length} dissent{decision.outcome?` · surprise ${decision.outcome.surprise}`:""}</small>{decision.dissent.length>0&&<code>{decision.dissent.map((item:any)=>`${item.source}: ${item.concern}`).join(" | ").slice(0,200)}</code>}</article>)}
+        {planList.map(plan => <article className={`task-card ${plan.status==="blocked"?"failed":plan.status==="completed"?"done":""}`} key={plan.id}><h3>plan v{plan.version} · {plan.title}</h3><p>{plan.objective.slice(0,200)}</p><small>{plan.status} · {Math.round(plan.progress*100)}% · {plan.steps.length} step(s) · critical path {plan.criticalPath.join(" -> ")||"n/a"} · buffer {plan.riskBufferMinutes}m</small></article>)}
+        {proposals.map(proposal => <article className="task-card" key={proposal.id}><h3>{proposal.kind} · {proposal.title}</h3><p>{proposal.body.slice(0,300)}</p><small>{proposal.status} · confidence {proposal.confidence} · {proposal.evidenceEventIds.length} evidence event(s)</small>{proposal.status==="proposed"&&<div><button onClick={()=>void applyProposal(proposal.id)}><CheckCircle2 size={13}/>Apply</button><button className="danger" onClick={()=>void rejectProposal(proposal.id)}><XCircle size={13}/>Reject</button></div>}</article>)}
+      </div>
+    </>}
+    {section === "autopilot" && <>
+      <div className="task-toolbar"><small>{autopilot?.enabled?"enabled":"disabled"} · runs today {autopilot?.runsToday ?? 0}/{autopilot?.maxRunsPerDay ?? 0} · failure rate {autopilot?.failureRate ?? 0} · next {autopilot?.nextRun?.kind ?? "—"} at {autopilot?.nextRun?.at?.slice(11,16) ?? "—"}</small><button onClick={()=>void toggleAutopilot(!(autopilot?.enabled))}>{autopilot?.enabled?"Disable":"Enable"} autopilot</button><button onClick={runAutopilot}>Run due now</button></div>
+      <div className="task-grid">
+        {(autopilot?.cadences ?? []).map((cadence:any) => <article className={`task-card ${cadence.enabled?"":"failed"}`} key={cadence.kind}><h3>{cadence.kind}</h3><p>every {cadence.everyMinutes} minute(s)</p><small>{cadence.enabled?"enabled":"disabled"} · runs {cadence.runCount} · failures {cadence.failureCount} · next {cadence.nextRunAt}</small></article>)}
+        {autopilotRuns.map(run => <article className={`task-card ${run.status==="failed"?"failed":"done"}`} key={run.id}><h3>{run.kind} · {run.status}</h3><p>{run.detail}</p><small>{run.startedAt} · {run.durationMs}ms</small></article>)}
+      </div>
     </>}
     {section === "memory" && <>
       <div className="task-toolbar"><small>health {memoryHealth ? memoryHealth.healthScore.toFixed(3) : "—"} · {memoryHealth?.total ?? 0} objects · {memoryHealth?.contradicted?.length ?? 0} contradicted · {memoryHealth?.stale?.length ?? 0} stale</small><button onClick={consolidate}>Consolidate episodes</button><button onClick={scanContradictions}>Scan contradictions</button></div>

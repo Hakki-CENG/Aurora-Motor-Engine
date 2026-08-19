@@ -136,6 +136,16 @@ interface MemoryGraphStateShape {
 }
 
 /**
+ * Optional semantic index used to upgrade recall from lexical overlap to embedding similarity.
+ * Kept as a narrow interface so the memory graph never depends on a specific embedding provider.
+ */
+export interface MemorySemanticIndex {
+  upsert(input: { id: string; tenantId: string; kind: "memory"; text: string; metadata: Record<string, string | number | boolean> }): Promise<unknown>;
+  remove(tenantId: string, id: string): Promise<boolean>;
+  search(input: { tenantId: string; query: string; kinds?: Array<"memory">; limit?: number }): Promise<Array<{ id: string; score: number; vectorScore: number; lexicalScore: number }>>;
+}
+
+/**
  * Aurora Phase C — typed memory pyramid, relation graph with temporal validity, consolidation,
  * contradiction/staleness health and long-term thought anchors.
  *
@@ -145,7 +155,11 @@ interface MemoryGraphStateShape {
 export class MemoryGraphService {
   private readonly store: DurableJsonState<MemoryGraphStateShape>;
 
-  constructor(rootPath: string, private readonly now: () => number = Date.now) {
+  constructor(
+    rootPath: string,
+    private readonly now: () => number = Date.now,
+    private readonly semanticIndex?: MemorySemanticIndex,
+  ) {
     this.store = new DurableJsonState<MemoryGraphStateShape>(
       join(rootPath, "memory-graph", "state.json"),
       () => ({ schemaVersion: 1, memories: [], relations: [], anchors: [] }),
@@ -178,7 +192,8 @@ export class MemoryGraphService {
     evidenceRefs?: string[];
     relatedMemoryIds?: string[];
   }): Promise<MemoryObjectRecord> {
-    return await this.store.mutate((state) => {
+    let indexed: MemoryObjectRecord | undefined;
+    const result = await this.store.mutate((state) => {
       if (state.memories.length >= MAX_MEMORIES) throw new Error("Aurora memory limit reached.");
       const timestamp = this.now();
       const nowIso = new Date(timestamp).toISOString();
@@ -226,6 +241,7 @@ export class MemoryGraphService {
         updatedAt: nowIso,
       };
       state.memories.push(record);
+      indexed = record;
       for (const relatedId of auroraIds(input.relatedMemoryIds, 50, "Related memory IDs")) {
         const target = state.memories.find((item) => item.tenantId === input.tenantId && item.id === relatedId);
         if (!target) continue;
@@ -233,6 +249,21 @@ export class MemoryGraphService {
       }
       return structuredClone(record);
     });
+    if (indexed && this.semanticIndex) {
+      // Indexing is an optimization: a failing embedding provider must not lose the memory.
+      try {
+        await this.semanticIndex.upsert({
+          id: indexed.id,
+          tenantId: indexed.tenantId,
+          kind: "memory",
+          text: `${indexed.title}\n${indexed.content}\n${indexed.tags.join(" ")}`,
+          metadata: { layer: indexed.layer, claimType: indexed.claimType, confidence: indexed.confidence, importance: indexed.importance },
+        });
+      } catch {
+        // ignored: recall falls back to lexical scoring
+      }
+    }
+    return result;
   }
 
   async get(tenantId: string, id: string): Promise<MemoryObjectRecord> {
@@ -343,6 +374,16 @@ export class MemoryGraphService {
       ? new Set((await this.neighborhood(tenantId, options.seedMemoryId, 2, 200)).memories.map((item) => item.id))
       : undefined;
     const accessed: string[] = [];
+    const semantic = new Map<string, number>();
+    if (this.semanticIndex && (strategy === "semantic" || strategy === "goal" || strategy === "user")) {
+      try {
+        for (const hit of await this.semanticIndex.search({ tenantId, query: text, kinds: ["memory"], limit: Math.max(limit * 4, 20) })) {
+          semantic.set(hit.id, Math.max(0, Math.min(1, hit.score)));
+        }
+      } catch {
+        // ignored: lexical scoring remains authoritative
+      }
+    }
     const state = await this.store.read();
     const scored = state.memories
       .filter((item) => item.tenantId === tenantId && item.state === "active"
@@ -361,11 +402,15 @@ export class MemoryGraphService {
         const goalBoost = options?.goalId && memory.goalIds.includes(options.goalId) ? 0.2 : 0;
         const userBoost = options?.userId && memory.userId === options.userId ? 0.2 : 0;
         const temporalBoost = strategy === "temporal" ? 0.2 : 0;
-        const base = lexical * 0.55 + memory.importance * 0.2 + memory.confidence * 0.15 + recency * 0.1;
+        const vector = semantic.get(memory.id);
+        // With a semantic index the lexical weight is shared with embedding similarity, so a
+        // paraphrase can be recalled; without one the original lexical behaviour is preserved.
+        const relevance = vector === undefined ? lexical : lexical * 0.5 + vector * 0.5;
+        const base = relevance * 0.55 + memory.importance * 0.2 + memory.confidence * 0.15 + recency * 0.1;
         return {
           memory,
           score: auroraRound(base + graphBoost + goalBoost + userBoost + temporalBoost),
-          reason: `${strategy} recall: lexical=${lexical.toFixed(3)} importance=${memory.importance} confidence=${memory.confidence} recency=${recency.toFixed(3)}`,
+          reason: `${strategy} recall: lexical=${lexical.toFixed(3)}${vector === undefined ? "" : ` semantic=${vector.toFixed(3)}`} importance=${memory.importance} confidence=${memory.confidence} recency=${recency.toFixed(3)}`,
         };
       })
       .filter((item) => item.score > 0 || strategy !== "semantic")
@@ -442,6 +487,11 @@ export class MemoryGraphService {
         for (const finding of anchor.findings) finding.memoryIds = finding.memoryIds.filter((item) => item !== id);
       }
       return { removedMemoryId: id, removedRelations: before - state.relations.length };
+    }).then(async (outcome) => {
+      if (this.semanticIndex) {
+        try { await this.semanticIndex.remove(tenantId, id); } catch { /* ignored */ }
+      }
+      return outcome;
     });
   }
 

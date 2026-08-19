@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.41.0 — 2026-08-19
+
+- Added the Aurora reasoning layer (ACOS L6): durable decision records with normalized weighted criteria, deterministic option ranking, preserved dissent, computed confidence and margin, mandatory override reasons for lower-ranked choices, constitution-denial refusal, review scheduling, outcome capture and calibration (success rate, mean surprise, Brier score, overconfidence, worst decisions).
+- Added the Aurora planning layer: dependency-ordered plans with per-step verification, estimates and risk, cycle-rejecting graph validation, computed critical path and risk buffer, ready/blocked derivation, dependency-enforced step transitions, versioned revisions with a mandatory trigger and reason, plan supersession, estimate-accuracy measurement and stalled-plan detection.
+- Added the experience distiller: a closed learning loop that reads a finished session trajectory, measures complexity, and proposes reusable procedures, recurring-failure pitfalls and capability gaps as deduplicated, evidence-bound candidates. Nothing is auto-applied; applying routes through the governed harness, microagent or skill-evolution service.
+- Added the Aurora autopilot: an opt-in unattended cadence (pulse, maintenance, reflection, dream, daily briefing, weekly review, monthly strategy) that drives ACOS cycles and digests, bounded by a daily run ceiling, quiet hours, per-cadence enable/disable, exponential failure backoff and a durable run ledger with outcomes.
+- Added the provenance explainer: `aurora.explain` reconstructs the chain from intake signal to initiative, cognitive object, memory, world state, decision, plan, environment action, verification and constitutional review — from durable state only, never narrated by a model.
+- Upgraded memory recall to semantic search: the memory graph now shares the engine's embedding-backed hybrid index, blending embedding similarity with lexical overlap, importance, confidence and recency so paraphrased questions recall the right memory. Indexing is fail-open and falls back to the previous lexical behaviour.
+- Wired the new layers into ACOS: the prioritize phase surfaces stalled plans with their ready steps, and the evaluate phase surfaces the decision-review backlog and flags systematic overconfidence; whole-organism status now reports decision calibration and active-plan progress.
+- Added governed `decision.*`, `plan.*`, `experience.*`, `autopilot.*` and `aurora.explain` capabilities, tenant-admin REST for all of them, and Canvas Aurora sections for reasoning (decisions, plans, distilled proposals with apply/reject) and autopilot (cadences and run ledger).
+- Added 16 tests (334 engine tests total) covering decision ranking/override/calibration, plan cycles/critical path/revision/supersession/stall detection, distillation thresholds and governed application, autopilot bounds, provenance tracing and semantic recall.
+
 ## 1.40.0 — 2026-08-19
 
 - Re-read the Aurora architecture source in full and re-audited OpenHands, Prime Agent and Hermes Agent, then adopted their strongest ideas into Aurora under explicit governance. Adoption rationale and refusals are recorded in `docs/aurora-upstream-adoption-2026-08-19.md`.
