@@ -8,7 +8,7 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.38.0
+## Current milestone — 1.39.0
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -54,6 +54,15 @@ Implemented and tested:
 - signed external automation responder heartbeats/events with health, dedupe and uncertain no-replay journals
 - Aurora Society roles, task marketplace, reputation/resource budgets and dissent-preserving council consensus
 - Aurora Global Workspace cognitive objects, P0-P4 goal arbitration, attention budgets, modes and loop detection
+- Aurora automatic workspace intake, preemptive attention, reflection/Dream scheduling, curiosity queue and cognitive health checks
+- Aurora Agent Communication Bus and meta-agent monitoring with evidence-bound role retirement
+- Aurora memory pyramid, typed relation graph, consolidation, contradiction/staleness health and long-term thought anchors
+- Aurora world model entities/states/relations/events, causality, temporal windows, Brier-scored prediction calibration and bounded simulation
+- Aurora twelve-perspective Multi-World Model with debate, scenario future trees, reality alignment and dissent-preserving consensus
+- Aurora Proactive Initiative Engine with worthiness scoring, P0-P4 attention budget, silence rules, digests and trust feedback
+- Aurora governed user cognitive model with consent, correction, deletion, advice effectiveness and protected-topic refusal
+- Aurora staged skill/workflow evolution with gap detection, evidence gates, regression protection, retirement and evolution index
+- Aurora environment inventory, zone 0-4 action records with mandatory verification/rollback and tool execution reputation
 - AES-256-GCM/Vault/KMS credential brokers, scoped leases and pinned 1Password/Bitwarden/command secret sources
 - SSRF-checked bounded public web fetch and normalized Brave/Tavily web search
 - Playwright/CDP browser automation and browser-scoped computer-use
@@ -639,6 +648,16 @@ privileged capability and crosses normal policy/approval/effect-journal paths.
 Canvas includes a Society panel for tasks, bids, awards, execution, reputation,
 budget and council outcomes.
 
+The Phase A extension adds the Agent Communication Bus: an active role publishes
+a bounded topic/body message to named roles or to the whole society, recipients
+read their own inbox and acknowledge, and retention is capped per tenant.
+Meta-agent monitoring reports stalled or past-deadline work, duplicate
+objectives, unbid tasks, failing or never-used roles, budget saturation and
+concurrency starvation, each with a concrete recommendation. Role lifecycle
+governance can retire non-builtin roles whose evidence-bound failure rate crosses
+a policy threshold, but never Prime, never a builtin director and never a role
+with running work.
+
 ## Aurora Global Workspace and cognitive control
 
 Aurora PDF Phase B introduces first-class cognitive objects rather than treating
@@ -672,6 +691,137 @@ objects, attention, modes, arbitration and loop records. Privileged goal,
 attention and mode changes still cross policy/approval. Canvas's Cognitive panel
 shows the Global Workspace, priorities, confidence, horizons, focused/deferred
 state, daily budget and operating mode.
+
+The Phase B extension closes the loop between the environment and the workspace.
+`cognitive.intake` accepts automatic signals from memory, the world model, the
+society, the environment or the initiative engine, deduplicates them for six
+hours, enforces a daily intake quota and records only a SHA-256 digest of each
+signal. Preemptive allocation lets a constitutionally higher-ranked object
+reclaim a focused slot; the preempted thought returns to the queue with its
+reservation released rather than lost. Focus can be interrupted explicitly,
+mini/deep/meta/Dream-Mode reflections can be scheduled but only in a compatible
+cognitive mode, the curiosity queue ranks low-confidence high-impact questions,
+and `cognitive.health` reports repeated loops, focus overruns, stale strategic
+work, unsourced high-confidence claims, budget saturation and constitutional
+violations.
+
+## Aurora memory pyramid and temporal knowledge graph
+
+Aurora PDF Phase C adds the Memory Object standard above the existing candidate/
+active `MemoryStore`: every object carries ID, timestamps, pyramid layer
+(working, session, episodic, semantic, procedural, user, palace), claim type
+(observation, inference, hypothesis, prediction), source type/ID, confidence,
+importance, tags, evidence references and a temporal validity window. Identical
+content reinforces the existing object instead of duplicating it.
+
+Typed relations (`relates`, `causes`, `supports`, `contradicts`, `part-of`,
+`derived-from`, `precedes`) form the knowledge graph, strengthen with repetition
+and support bounded traversal. Recall is multi-strategy — semantic, graph,
+temporal, goal-scoped and user-scoped — and records usage so memory health can
+detect unused knowledge.
+
+Consolidation compresses near-duplicate episodes into one summary object,
+archives (never silently deletes) the sources, links them with `derived-from`
+edges and strengthens surrounding relations. Contradiction detection flags
+overlapping claims with opposite polarity, supersession preserves history, and
+`memory.graph.health` reports staleness, contradictions, low usage, low
+confidence, expiry and duplicate clusters. Long-term thought anchors keep an open
+problem alive for months with findings, next steps and scheduled reviews.
+Privacy deletion (`forget`) removes the object and every edge that referenced it.
+
+## Aurora world model and Multi-World Model
+
+Phase D represents reality as Entity → State → Relation → Event → Outcome. State
+facts are temporal: a new value closes the previous validity window instead of
+overwriting it, so `world.state.at` answers "what did Aurora believe at that
+time" and `world.temporal.view` returns past, present and open predictions.
+Entities carry a scope so the personal, environment, digital, project, human and
+goal sub-models from the PDF are queryable views rather than separate stores.
+
+Causal links are assertions, not truths: every confirmation or refutation
+recomputes their confidence. Predictions are falsifiable, are scored with Brier
+loss when resolved, expire when their horizon passes unanswered and feed a
+calibration report with probability buckets. The consistency engine surfaces
+conflicting current claims, and simulation/counterfactual branches project
+bounded causal chains with explicit terminal probability and uncertainty without
+writing any state.
+
+The Multi-World Model seeds the twelve PDF perspectives (technical, economic,
+risk, opportunity, human, strategic, security, scientific, creativity,
+user-centric, time, complexity). A meta layer weights them by problem type and by
+each perspective's own prediction reputation. Perspectives submit stance,
+confidence, rationale, risks and opportunities, may formally challenge each other,
+and can attach scenarios whose sibling probabilities cannot exceed 1, forming a
+future tree with cumulative probabilities. Recording a scenario outcome scores
+its endorsing perspectives with Brier loss. Consensus reports support/oppose/
+neutral weight, agreement, uncertainty, dissenting and missing perspectives and
+unresolved conflicts; close or contested calls resolve to `hold` or `uncertain`
+rather than manufacturing agreement.
+
+## Aurora proactive initiative and user model
+
+Phase E treats silence as a feature. Intake events (memory, world model, git,
+calendar, filesystem, weather, research, location, notifications, cognitive,
+society, skill) are stored as summaries plus payload digests. Watchers convert
+matching intake into initiative candidates. Each initiative is scored
+`importance × urgency × impact × confidence × user relevance`, classified P0–P4
+and routed to immediate, message, daily digest, weekly digest or archive.
+
+Delivery is bounded by a daily attention budget, quiet hours, 24-hour duplicate
+suppression and trust: unhelpful notifications lower the trust score, which
+raises every threshold until Aurora earns the bandwidth back. Escalation is
+explicit and audited, and daily briefings, weekly reviews and monthly strategic
+reviews are built from digested initiatives. Queued initiatives are also mirrored
+into the Global Workspace, so proactive work competes for the same attention
+budget as every other cognitive object instead of bypassing it.
+
+The user cognitive model is a behavioural twin, not surveillance. Claims are
+typed, evidence-backed and confidence-scored; inferred claims stay `proposed`
+until confirmed or consented; users can correct (with auditable history),
+retract, deny consent or delete everything, per category or entirely. Protected
+topics — health, belief, politics, ethnicity, sexuality and credentials — are
+rejected at write time. The model also tracks long/medium/short goals with
+progress and stall detection, behavioural signals, an explicitly
+uncertainty-labelled state estimate, frustration risk, a growth timeline, advice
+effectiveness and guardian alignment checks against the user's own goals.
+
+## Aurora skill and workflow evolution
+
+Phase F makes capability growth measurable and refuses self-promotion. Repeated
+friction, capability gaps, bottlenecks and error patterns are deduplicated by
+signature and recommend a candidate only after recurrence or high severity.
+Skills then walk a strictly staged path: blueprint → sandbox → test → beta →
+production. Each gate needs evidence — declared tests and risks, recorded
+evaluations, accuracy and safety floors, real beta usage, a regression baseline
+and an explicit production approval actor and reason. Safety is remediable but
+only through consecutive finding-free evaluations.
+
+Scores are recomputed from evidence (accuracy, reliability, speed, utility,
+safety and a composite), usage tracking reflects production behaviour, and the
+composition graph prevents retiring a skill that active composites depend on.
+Regression protection blocks promotion when any baseline suite loses ground.
+Workflow versions record steps, duration, success rate and bottleneck, and the
+Cognitive Evolution Index summarizes capability growth, quality, success rate,
+gap closure and workflow improvement with a delta against the previous
+measurement. Every change lands in the evolution journal.
+
+## Aurora environment awareness and embodiment
+
+Phase G inventories the digital body: filesystem, terminal, IDE, browser, Git,
+databases, APIs, devices, cloud, calendar, channels, kernels, sandboxes and MCP
+servers, each with a safe execution zone 0–4, capability IDs, approval
+requirement and execution reputation. Repeated failures degrade a resource
+automatically.
+
+Every action is a standard record: goal, plan, action, parameter digest,
+expected outcome, result, verification and the memory updates it produced. Zone
+3+ actions require a rollback plan and approval before they can start;
+verification is mandatory and tracked as debt when missing; unexpected outcomes
+are flagged for the cognitive layer. Workspace habits are learned with observed
+success rates, and continuous project awareness records open tasks, risks,
+progress and stale projects for the project watcher. This layer records and
+governs — execution itself still goes through the capability broker, policy
+engine, sandboxes, credential broker and approval service.
 
 ## Repository bootstrap
 

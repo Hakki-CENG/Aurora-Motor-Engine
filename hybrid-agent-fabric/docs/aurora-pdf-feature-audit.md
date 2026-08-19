@@ -319,6 +319,15 @@ Events, tasks, sessions, memory and knowledge retrieval exist. Missing: typed en
 
 - Phase A core delivered in HAF 1.37: role hierarchy, task marketplace, reputation, resource budgets, profile-bound execution and dissent-preserving consensus.
 - Phase B core delivered in HAF 1.38: typed cognitive objects, Global Workspace, P0-P4 goal arbitration, attention reservations, cognitive modes and repeated-loop blocking.
-- Next: Phase B automatic event intake/preemption/constitution-health extensions, followed by Phase C typed memory pyramid and temporal relation graph.
+- HAF 1.39 completes the ordered roadmap:
+  - Phase A extension: Agent Communication Bus, meta-agent monitoring and evidence-bound role retirement.
+  - Phase B extension: automatic deduplicated intake with a hash-only ledger, preemptive attention, focus interruption, mini/deep/meta/Dream reflection scheduling, curiosity queue and cognitive health/constitution checks.
+  - Phase C: memory pyramid, Memory Object standard, typed relation graph, multi-strategy recall, consolidation, contradiction/staleness health, supersession, deletion and long-term thought anchors.
+  - Phase D: entity/state/relation/event world model with temporal windows, causality feedback, Brier-scored prediction calibration, consistency checks, bounded simulation/counterfactuals and the twelve-perspective Multi-World Model with debate, scenarios, future trees, reality alignment and dissent-preserving consensus.
+  - Phase E: Proactive Initiative Engine (intake, watchers, worthiness, P0-P4, attention budget, quiet hours, suppression, escalation, digests, trust feedback) and the governed user cognitive model (typed claims, consent, correction, deletion, goals, signals, state estimate, frustration, timeline, advice effectiveness, guardian alignment, protected-topic refusal).
+  - Phase F: gap/friction detection, staged skill evolution with evidence gates and production approval, multidimensional scores, regression protection, composition, retirement, workflow evolution and the Cognitive Evolution Index.
+  - Phase G: environment inventory with zones 0-4, action objects with mandatory verification and rollback, tool execution reputation, workspace habits and project awareness.
+- Constitutional cross-cutting rules 1-12 are enforced in code and covered by tests: no unconstrained super-agent, claim typing with source/confidence/importance/time, bounded proactivity, candidate-only evolution, approval/verification/rollback for critical actions, explicit multi-horizon budgets, preserved dissent, governed and deletable user models, interruptible loop-protected background work and no exactly-once external effect claims.
+- Remaining follow-up (not required by the PDF order): richer device/cloud connectors for Phase G and optional embedding-backed recall for Phase C; both plug into the interfaces delivered here.
 
 Existing HAF supervisor/profile/policy primitives remain authoritative and are reused rather than replaced.

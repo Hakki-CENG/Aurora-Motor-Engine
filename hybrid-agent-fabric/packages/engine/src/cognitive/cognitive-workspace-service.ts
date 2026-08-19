@@ -82,6 +82,36 @@ export interface CognitiveArbitration {
   reason: string;
   createdAt: string;
 }
+export type CognitiveIntakeSource = "user" | "agent" | "event" | "memory" | "system" | "world-model" | "initiative" | "society" | "environment";
+export type CognitiveReflectionKind = "mini" | "deep" | "meta" | "dream";
+
+/** Bounded, hash-only intake ledger: the Global Workspace records that it saw something, not the payload. */
+export interface CognitiveIntakeRecord {
+  id: string;
+  tenantId: string;
+  source: CognitiveIntakeSource;
+  digest: string;
+  objectId?: string;
+  accepted: boolean;
+  reason: string;
+  at: string;
+}
+
+export interface CognitiveHealthReport {
+  tenantId: string;
+  mode: CognitiveMode;
+  totals: { objects: number; focused: number; queued: number; deferred: number; blocked: number };
+  loopBlocked: string[];
+  focusOverruns: string[];
+  staleStrategic: string[];
+  unsourcedHighConfidence: string[];
+  budgetSaturation: number;
+  intakeToday: number;
+  constitutionalViolations: Array<{ code: string; objectId?: string; detail: string }>;
+  healthScore: number;
+  generatedAt: string;
+}
+
 interface CognitiveState {
   schemaVersion: 1;
   objects: CognitiveObject[];
@@ -89,6 +119,7 @@ interface CognitiveState {
   budgets: CognitiveBudget[];
   modes: CognitiveModeState[];
   arbitrations: CognitiveArbitration[];
+  intake: CognitiveIntakeRecord[];
 }
 
 const GOAL_WEIGHT: Record<CognitiveGoalClass, number> = { P0: 2, P1: 1.6, P2: 1.25, P3: 1, P4: 0.6 };
@@ -104,7 +135,7 @@ const MODE_TRANSITIONS: Record<CognitiveMode, CognitiveMode[]> = {
 
 /** Durable Global Workspace, attention budget, cognitive modes, loop detection and goal arbitration. */
 export class CognitiveWorkspaceService {
-  private state: CognitiveState = { schemaVersion: 1, objects: [], goals: [], budgets: [], modes: [], arbitrations: [] };
+  private state: CognitiveState = { schemaVersion: 1, objects: [], goals: [], budgets: [], modes: [], arbitrations: [], intake: [] };
   private loaded = false;
   private readonly mutex = new AsyncMutex();
   constructor(private readonly rootPath: string, private readonly now: () => number = Date.now) {}
@@ -134,15 +165,223 @@ export class CognitiveWorkspaceService {
   async configureBudget(tenantId: string, dailyTokenBudget: number, maxFocusedObjects: number): Promise<CognitiveBudget> { return await this.mutex.runExclusive(async () => { await this.load(); let budget=this.state.budgets.find((item)=>item.tenantId===tenantId); if(!budget){budget={tenantId,date:day(this.now()),dailyTokenBudget:0,usedTokens:0,reservedTokens:0,maxFocusedObjects:1};this.state.budgets.push(budget);} this.rollBudget(budget); budget.dailyTokenBudget=integer(dailyTokenBudget,1000,100_000_000,"Cognitive daily token budget"); budget.maxFocusedObjects=integer(maxFocusedObjects,1,100,"Focused object limit"); await this.save(); return structuredClone(budget); }); }
   async budget(tenantId: string): Promise<CognitiveBudget> { await this.load(); let b=this.state.budgets.find((item)=>item.tenantId===tenantId); if(!b) return await this.configureBudget(tenantId,500_000,8); if(this.rollBudget(b)) await this.save(); return structuredClone(b); }
 
-  async allocateAttention(tenantId: string): Promise<{ focused: CognitiveObject[]; deferred: string[]; budget: CognitiveBudget }> {
+  /**
+   * Allocate Global Workspace focus. Ordering is constitutional first (goal class), then priority score.
+   * With `preempt`, a strictly higher-ranked candidate may reclaim a focused slot from a lower-ranked
+   * object; the preempted object returns to the queue with its reservation released (never lost).
+   */
+  async allocateAttention(tenantId: string, options?: { preempt?: boolean }): Promise<{ focused: CognitiveObject[]; deferred: string[]; preempted: string[]; budget: CognitiveBudget }> {
     return await this.mutex.runExclusive(async () => {
-      await this.load(); const budget=await this.mutableBudget(tenantId); const activeGoals=new Map(this.state.goals.filter(g=>g.tenantId===tenantId&&g.state==="active").map(g=>[g.id,g]));
-      const focused=this.state.objects.filter(o=>o.tenantId===tenantId&&o.attentionState==="focused"); let slots=Math.max(0,budget.maxFocusedObjects-focused.length); const candidates=this.state.objects.filter(o=>o.tenantId===tenantId&&["new","active","researching","waiting"].includes(o.state)&&o.attentionState!=="focused"&&(!o.goalId||activeGoals.has(o.goalId))).sort((a,b)=>{const ga=a.goalId?activeGoals.get(a.goalId)?.class:"P3",gb=b.goalId?activeGoals.get(b.goalId)?.class:"P3";return GOAL_ORDER[ga??"P3"]-GOAL_ORDER[gb??"P3"]||b.priorityScore-a.priorityScore||a.createdAt.localeCompare(b.createdAt);});
-      const allocated:CognitiveObject[]=[]; const deferred:string[]=[];
-      for(const object of candidates){if(slots<=0||budget.usedTokens+budget.reservedTokens+object.requestedTokens>budget.dailyTokenBudget){object.attentionState="deferred";deferred.push(object.id);continue;} object.attentionState="focused";object.state=object.state==="new"?"active":object.state;object.reservedTokens=object.requestedTokens;object.updatedAt=new Date(this.now()).toISOString();budget.reservedTokens+=object.requestedTokens;slots--;allocated.push(structuredClone(object));}
-      await this.save(); return {focused:allocated,deferred,budget:structuredClone(budget)};
+      await this.load();
+      const budget = await this.mutableBudget(tenantId);
+      const activeGoals = new Map(this.state.goals.filter((g) => g.tenantId === tenantId && g.state === "active").map((g) => [g.id, g]));
+      const rank = (object: CognitiveObject): number => {
+        const goalClass = object.goalId ? activeGoals.get(object.goalId)?.class ?? "P3" : "P3";
+        return GOAL_ORDER[goalClass] * 1000 - object.priorityScore;
+      };
+      const focused = this.state.objects.filter((o) => o.tenantId === tenantId && o.attentionState === "focused");
+      let slots = Math.max(0, budget.maxFocusedObjects - focused.length);
+      const candidates = this.state.objects
+        .filter((o) => o.tenantId === tenantId && ["new", "active", "researching", "waiting"].includes(o.state) && o.attentionState !== "focused" && (!o.goalId || activeGoals.has(o.goalId)))
+        .sort((a, b) => rank(a) - rank(b) || a.createdAt.localeCompare(b.createdAt));
+      const allocated: CognitiveObject[] = [];
+      const deferred: string[] = [];
+      const preempted: string[] = [];
+      for (const object of candidates) {
+        if (slots <= 0 && options?.preempt) {
+          const victim = this.state.objects
+            .filter((o) => o.tenantId === tenantId && o.attentionState === "focused" && rank(o) > rank(object) + 1e-9)
+            .sort((a, b) => rank(b) - rank(a))[0];
+          if (victim) {
+            await this.releaseReservation(victim, "queued", 0);
+            victim.state = victim.state === "active" ? "waiting" : victim.state;
+            victim.updatedAt = new Date(this.now()).toISOString();
+            preempted.push(victim.id);
+            slots++;
+          }
+        }
+        if (slots <= 0 || budget.usedTokens + budget.reservedTokens + object.requestedTokens > budget.dailyTokenBudget) {
+          object.attentionState = "deferred";
+          deferred.push(object.id);
+          continue;
+        }
+        object.attentionState = "focused";
+        object.state = object.state === "new" ? "active" : object.state;
+        object.reservedTokens = object.requestedTokens;
+        object.updatedAt = new Date(this.now()).toISOString();
+        budget.reservedTokens += object.requestedTokens;
+        slots--;
+        allocated.push(structuredClone(object));
+      }
+      await this.save();
+      return { focused: allocated, deferred, preempted, budget: structuredClone(budget) };
     });
   }
+
+  /**
+   * Automatic event intake. Duplicate signals inside the intake window are recorded and dropped,
+   * and a bounded daily intake quota keeps a noisy environment from flooding the workspace.
+   */
+  async intake(input: { tenantId: string; source: CognitiveIntakeSource; title: string; content: string; sourceId?: string; sessionId?: string; goalId?: string; confidence?: number; importance?: number; urgency?: number; impact?: number; userRelevance?: number; horizon?: CognitiveHorizon; kind?: CognitiveObjectKind; tags?: string[]; dailyLimit?: number }): Promise<{ accepted: boolean; reason: string; object?: CognitiveObject; record: CognitiveIntakeRecord }> {
+    const digest = createHash("sha256").update(`${input.source}:${input.title.trim().toLowerCase()}:${input.content.trim()}`).digest("hex");
+    const dailyLimit = integer(input.dailyLimit ?? 500, 1, 100_000, "Cognitive intake daily limit");
+    const pending = await this.mutex.runExclusive(async () => {
+      await this.load();
+      const timestamp = this.now();
+      const nowIso = new Date(timestamp).toISOString();
+      const today = day(timestamp);
+      const todayRecords = this.state.intake.filter((item) => item.tenantId === input.tenantId && item.at.slice(0, 10) === today);
+      const duplicate = this.state.intake.find((item) => item.tenantId === input.tenantId && item.digest === digest && timestamp - Date.parse(item.at) < 6 * 60 * 60_000);
+      const reason = duplicate ? "duplicate-intake-signal" : todayRecords.filter((item) => item.accepted).length >= dailyLimit ? "intake-quota-exhausted" : "accepted";
+      const record: CognitiveIntakeRecord = { id: randomUUID(), tenantId: input.tenantId, source: input.source, digest, accepted: reason === "accepted", reason, at: nowIso };
+      this.state.intake.push(record);
+      if (this.state.intake.length > 50_000) this.state.intake.splice(0, this.state.intake.length - 50_000);
+      await this.save();
+      return { record, accepted: reason === "accepted", reason };
+    });
+    if (!pending.accepted) return { accepted: false, reason: pending.reason, record: pending.record };
+    const sourceType: CognitiveObject["sourceType"] = input.source === "user" || input.source === "agent" || input.source === "memory" || input.source === "event" ? input.source : "system";
+    const object = await this.createObject({
+      tenantId: input.tenantId,
+      kind: input.kind ?? "observation",
+      title: input.title,
+      content: input.content,
+      sourceType,
+      confidence: input.confidence ?? 0.6,
+      importance: input.importance ?? 0.5,
+      urgency: input.urgency ?? 0.4,
+      impact: input.impact ?? 0.4,
+      userRelevance: input.userRelevance ?? 0.5,
+      horizon: input.horizon ?? "tactical",
+      ...(input.sourceId ? { sourceId: input.sourceId } : {}),
+      ...(input.sessionId ? { sessionId: input.sessionId } : {}),
+      ...(input.goalId ? { goalId: input.goalId } : {}),
+      ...(input.tags ? { tags: input.tags } : {}),
+    });
+    const record = await this.mutex.runExclusive(async () => {
+      await this.load();
+      const stored = this.state.intake.find((item) => item.id === pending.record.id);
+      if (stored) stored.objectId = object.id;
+      await this.save();
+      return structuredClone(stored ?? pending.record);
+    });
+    return { accepted: true, reason: "accepted", object, record };
+  }
+
+  async intakeLog(tenantId: string, limit = 200): Promise<CognitiveIntakeRecord[]> {
+    await this.load();
+    return this.state.intake.filter((item) => item.tenantId === tenantId).slice(-integer(limit, 1, 5000, "Intake log limit")).reverse().map((item) => structuredClone(item));
+  }
+
+  /** Interrupt a focused thought without losing its reservation accounting (interruptible background work). */
+  async interruptFocus(tenantId: string, id: string, reason: string): Promise<CognitiveObject> {
+    return await this.mutex.runExclusive(async () => {
+      const object = await this.object(tenantId, id);
+      if (object.attentionState !== "focused") throw new Error("Cognitive object is not focused.");
+      await this.releaseReservation(object, "queued", 0);
+      object.state = "waiting";
+      object.updatedAt = new Date(this.now()).toISOString();
+      const tag = bounded(reason, 200, "Interrupt reason").toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 90);
+      if (tag && !object.tags.includes(`interrupted:${tag}`) && object.tags.length < 100) object.tags.push(`interrupted:${tag}`);
+      await this.save();
+      return structuredClone(object);
+    });
+  }
+
+  /**
+   * Scheduled reflection: mini/deep/meta reviews and Dream Mode low-priority synthesis.
+   * Dream and meta reflection require the matching cognitive mode, so background creativity
+   * cannot silently consume reactive-mode budget.
+   */
+  async scheduleReflection(input: { tenantId: string; kind: CognitiveReflectionKind; focusObjectIds?: string[]; note?: string }): Promise<CognitiveObject> {
+    const mode = await this.mode(input.tenantId);
+    if (input.kind === "dream" && mode.mode !== "dream") throw new Error("Dream Mode synthesis requires the dream cognitive mode.");
+    if (input.kind === "meta" && !["reflection", "dream"].includes(mode.mode)) throw new Error("Meta reflection requires reflection or dream mode.");
+    const focusIds = [...new Set(input.focusObjectIds ?? [])].slice(0, 50);
+    for (const id of focusIds) await this.object(input.tenantId, id);
+    const profile = {
+      mini: { importance: 0.4, urgency: 0.4, impact: 0.35, tokens: 4_000, horizon: "reactive" as CognitiveHorizon },
+      deep: { importance: 0.7, urgency: 0.35, impact: 0.7, tokens: 25_000, horizon: "tactical" as CognitiveHorizon },
+      meta: { importance: 0.8, urgency: 0.3, impact: 0.8, tokens: 40_000, horizon: "strategic" as CognitiveHorizon },
+      dream: { importance: 0.3, urgency: 0.05, impact: 0.5, tokens: 8_000, horizon: "strategic" as CognitiveHorizon },
+    }[input.kind];
+    return await this.createObject({
+      tenantId: input.tenantId,
+      kind: input.kind === "dream" ? "insight" : "problem",
+      title: `${input.kind} reflection`,
+      content: `${input.note ?? `Scheduled ${input.kind} reflection.`}\nFocus objects: ${focusIds.length ? focusIds.join(", ") : "workspace-wide"}`,
+      sourceType: "system",
+      confidence: 0.5,
+      importance: profile.importance,
+      urgency: profile.urgency,
+      impact: profile.impact,
+      userRelevance: input.kind === "dream" ? 0.2 : 0.6,
+      horizon: profile.horizon,
+      requestedTokens: profile.tokens,
+      tags: ["reflection", input.kind],
+      relations: focusIds,
+    });
+  }
+
+  /**
+   * Curiosity queue: low-confidence, high-impact hypotheses and opportunities that deserve
+   * investigation when spare attention exists. Blocked and solved objects are never returned.
+   */
+  async curiosityQueue(tenantId: string, limit = 20): Promise<Array<{ object: CognitiveObject; curiosity: number }>> {
+    await this.load();
+    return this.state.objects
+      .filter((item) => item.tenantId === tenantId && ["hypothesis", "opportunity", "problem"].includes(item.kind) && !["blocked", "archived", "solved"].includes(item.state))
+      .map((item) => ({ object: structuredClone(item), curiosity: Number(((1 - item.confidence) * item.impact * item.importance).toFixed(6)) }))
+      .filter((item) => item.curiosity > 0)
+      .sort((a, b) => b.curiosity - a.curiosity)
+      .slice(0, integer(limit, 1, 200, "Curiosity limit"));
+  }
+
+  /**
+   * Cognitive health and constitution check: loop-blocked thoughts, focus overruns, stale strategic
+   * work, unsourced high-confidence claims and budget saturation.
+   */
+  async health(tenantId: string): Promise<CognitiveHealthReport> {
+    await this.load();
+    const timestamp = this.now();
+    const objects = this.state.objects.filter((item) => item.tenantId === tenantId);
+    const budget = await this.budget(tenantId);
+    const mode = await this.mode(tenantId);
+    const focused = objects.filter((item) => item.attentionState === "focused");
+    const loopBlocked = objects.filter((item) => item.state === "blocked" && item.repeatedIterationCount >= 3).map((item) => item.id);
+    const focusOverruns = focused.filter((item) => timestamp - Date.parse(item.updatedAt) > item.requestedTimeMs).map((item) => item.id);
+    const staleStrategic = objects.filter((item) => item.horizon === "strategic" && !["solved", "archived"].includes(item.state) && timestamp - Date.parse(item.updatedAt) > 30 * 86_400_000).map((item) => item.id);
+    const unsourced = objects.filter((item) => item.confidence >= 0.9 && item.sourceType === "system" && !item.sourceId).map((item) => item.id);
+    const violations: CognitiveHealthReport["constitutionalViolations"] = [];
+    for (const id of loopBlocked) violations.push({ code: "repeated-loop", objectId: id, detail: "Identical outcome repeated at least three times; the object was blocked." });
+    for (const id of focusOverruns) violations.push({ code: "focus-overrun", objectId: id, detail: "Focused longer than its requested time budget without completion." });
+    for (const id of unsourced) violations.push({ code: "unsourced-high-confidence", objectId: id, detail: "Confidence >= 0.9 without a source reference." });
+    const saturation = budget.dailyTokenBudget ? Number(((budget.usedTokens + budget.reservedTokens) / budget.dailyTokenBudget).toFixed(6)) : 0;
+    if (saturation >= 0.95) violations.push({ code: "budget-saturated", detail: "Daily attention token budget is effectively exhausted." });
+    if (mode.mode === "emergency" && focused.length > 1) violations.push({ code: "emergency-focus-spread", detail: "Emergency mode should concentrate on a single focus." });
+    const penalty = objects.length ? (loopBlocked.length * 0.3 + focusOverruns.length * 0.25 + staleStrategic.length * 0.1 + unsourced.length * 0.2) / objects.length : 0;
+    return {
+      tenantId,
+      mode: mode.mode,
+      totals: {
+        objects: objects.length,
+        focused: focused.length,
+        queued: objects.filter((item) => item.attentionState === "queued").length,
+        deferred: objects.filter((item) => item.attentionState === "deferred").length,
+        blocked: objects.filter((item) => item.state === "blocked").length,
+      },
+      loopBlocked,
+      focusOverruns,
+      staleStrategic,
+      unsourcedHighConfidence: unsourced,
+      budgetSaturation: saturation,
+      intakeToday: this.state.intake.filter((item) => item.tenantId === tenantId && item.at.slice(0, 10) === day(timestamp) && item.accepted).length,
+      constitutionalViolations: violations,
+      healthScore: Number(Math.max(0, Math.min(1, 1 - penalty - saturation * 0.15)).toFixed(6)),
+      generatedAt: new Date(timestamp).toISOString(),
+    };
+  }
+
   async completeFocus(tenantId:string,id:string,outcome:"active"|"solved"|"blocked",actualTokens:number):Promise<CognitiveObject>{return await this.mutex.runExclusive(async()=>{const object=await this.object(tenantId,id);if(object.attentionState!=="focused")throw new Error("Cognitive object is not focused.");const actual=integer(actualTokens,0,object.requestedTokens*2,"Actual cognitive tokens");await this.releaseReservation(object,outcome==="blocked"?"deferred":"queued",actual);object.state=outcome;object.updatedAt=new Date(this.now()).toISOString();await this.save();return structuredClone(object);});}
 
   async recordIteration(tenantId:string,id:string,result:string):Promise<{object:CognitiveObject;loopDetected:boolean;repeatCount:number}>{return await this.mutex.runExclusive(async()=>{const object=await this.object(tenantId,id);const hash=createHash("sha256").update(result).digest("hex");const previous=object.iterationHashes.at(-1);object.repeatedIterationCount=previous===hash?object.repeatedIterationCount+1:1;object.iterationHashes.push(hash);if(object.iterationHashes.length>LOOP_HISTORY)object.iterationHashes.splice(0,object.iterationHashes.length-LOOP_HISTORY);object.lastIterationAt=new Date(this.now()).toISOString();const loop=object.repeatedIterationCount>=3;if(loop){object.state="blocked";if(object.attentionState==="focused")await this.releaseReservation(object,"deferred",0);}object.updatedAt=new Date(this.now()).toISOString();await this.save();return{object:structuredClone(object),loopDetected:loop,repeatCount:object.repeatedIterationCount};});}
@@ -159,7 +398,7 @@ export class CognitiveWorkspaceService {
   private async mutableBudget(tenantId:string):Promise<CognitiveBudget>{await this.load();let b=this.state.budgets.find(x=>x.tenantId===tenantId);if(!b){b={tenantId,date:day(this.now()),dailyTokenBudget:500_000,usedTokens:0,reservedTokens:0,maxFocusedObjects:8};this.state.budgets.push(b);}this.rollBudget(b);return b;}
   private rollBudget(b:CognitiveBudget):boolean{const current=day(this.now());if(b.date!==current){b.date=current;b.usedTokens=0;b.reservedTokens=0;for(const o of this.state.objects.filter(x=>x.tenantId===b.tenantId&&x.attentionState==="focused")){o.attentionState="queued";o.reservedTokens=0;}return true;}return false;}
   private get path():string{return join(this.rootPath,"cognitive","workspace.json");}
-  private async load():Promise<void>{if(this.loaded)return;try{const raw=await readFile(this.path,"utf8");if(Buffer.byteLength(raw)>MAX_STATE_BYTES)throw new Error("Cognitive workspace exceeds its safety bound.");const parsed=JSON.parse(raw) as CognitiveState;if(parsed.schemaVersion!==1||!Array.isArray(parsed.objects)||!Array.isArray(parsed.goals)||!Array.isArray(parsed.budgets)||!Array.isArray(parsed.modes)||!Array.isArray(parsed.arbitrations))throw new Error("Cognitive workspace is malformed.");this.state=parsed;}catch(error){if((error as NodeJS.ErrnoException).code!=="ENOENT")throw error;}this.loaded=true;}
+  private async load():Promise<void>{if(this.loaded)return;try{const raw=await readFile(this.path,"utf8");if(Buffer.byteLength(raw)>MAX_STATE_BYTES)throw new Error("Cognitive workspace exceeds its safety bound.");const parsed=JSON.parse(raw) as CognitiveState;if(parsed.schemaVersion!==1||!Array.isArray(parsed.objects)||!Array.isArray(parsed.goals)||!Array.isArray(parsed.budgets)||!Array.isArray(parsed.modes)||!Array.isArray(parsed.arbitrations))throw new Error("Cognitive workspace is malformed.");if(!Array.isArray(parsed.intake))parsed.intake=[];this.state=parsed;}catch(error){if((error as NodeJS.ErrnoException).code!=="ENOENT")throw error;}this.loaded=true;}
   private async save():Promise<void>{const encoded=`${JSON.stringify(this.state,null,2)}\n`;if(Buffer.byteLength(encoded)>MAX_STATE_BYTES)throw new Error("Cognitive workspace exceeds its safety bound.");await atomicWrite(this.path,encoded);}
 }
 

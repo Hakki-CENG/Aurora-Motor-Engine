@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-19 — current milestone 1.38
+Updated: 2026-08-19 — current milestone 1.39
 
 ## Original 1.0 baseline (delivered)
 
@@ -72,6 +72,89 @@ Updated: 2026-08-19 — current milestone 1.38
 - [x] SSH sandbox with rsync workspace synchronization
 - [x] Browser/CDP automation and browser computer-use controls
 - [x] Workspace-confined STT and TTS
+
+## Aurora architecture integration (PDF phases)
+
+Source audit: [`aurora-pdf-feature-audit.md`](aurora-pdf-feature-audit.md). Each item below has durable state, runtime integration, authority boundaries, capability/REST surface and automated tests.
+
+### Phase A — society and constitutional substrate
+
+- [x] Prime/council/specialist/micro role registry with capability tags and profile binding
+- [x] Task marketplace with bids, deterministic awarding, reservations and concurrency limits
+- [x] Evidence-bound reputation from child-session events
+- [x] Dissent-preserving weighted council consensus with explicit uncertainty
+- [x] Agent Communication Bus with addressed/broadcast messages, acknowledgement and retention bounds
+- [x] Meta-agent monitoring for stalled, duplicated, unbid, failing, idle, saturated and starved conditions
+- [x] Evidence-bound retirement of underperforming non-builtin roles
+
+### Phase B — cognitive objects, Global Workspace and attention
+
+- [x] Typed cognitive objects with source, confidence, importance, urgency, impact, relevance and horizon
+- [x] Constitutional P0–P4 goals and class-first arbitration with preserved conflicts
+- [x] Attention reservations, focus slots, deferral and daily rollover
+- [x] Reactive/research/development/reflection/dream/emergency mode machine
+- [x] Hash-only iteration tracking and repeated-loop blocking
+- [x] Automatic deduplicated, quota-bounded intake with a hash-only ledger
+- [x] Preemptive attention allocation and explicit focus interruption
+- [x] Mini/deep/meta/Dream-Mode reflection scheduling gated by cognitive mode
+- [x] Curiosity queue and cognitive health/constitution checks
+
+### Phase C — memory object standard and temporal knowledge graph
+
+- [x] Memory pyramid layers (working, session, episodic, semantic, procedural, user, palace)
+- [x] Memory Object standard with claim typing, provenance, confidence, importance, tags and validity windows
+- [x] Typed relation graph with strengthening and bounded traversal
+- [x] Semantic, graph, temporal, goal and user retrieval with usage accounting
+- [x] Consolidation/compression into provenance-linked summaries
+- [x] Contradiction detection, supersession and staleness/usage/duplicate health
+- [x] Long-term thought anchors with findings, next steps and review scheduling
+- [x] Hard deletion for privacy requests
+
+### Phase D — world model and Multi-World Model
+
+- [x] Entity/state/relation/event representation with temporal validity
+- [x] Causality assertions updated by confirmations and refutations
+- [x] Falsifiable predictions with Brier scoring, expiry and calibration buckets
+- [x] Consistency engine for conflicting current claims
+- [x] Bounded simulation and counterfactual branches with explicit uncertainty
+- [x] Personal/environment/digital/project/human/goal scope views and assumption reassessment
+- [x] Twelve-perspective registry with meta weighting by problem type
+- [x] Debate/conflict records and dissent-preserving weighted consensus
+- [x] Scenario probabilities, future tree and reality-alignment perspective reputation
+
+### Phase E — proactive initiative and user model
+
+- [x] Intake events with payload digests and watcher registry
+- [x] Worthiness scoring, P0–P4 classes and channel selection
+- [x] Daily attention budget, quiet hours, duplicate suppression and silence rules
+- [x] Escalation with audit trail and daily/weekly/monthly digests
+- [x] Trust-adaptive thresholds driven by delivery feedback
+- [x] Governed typed user claims with evidence, consent, correction, retraction and deletion
+- [x] Long/medium/short goal model with stall detection
+- [x] Uncertainty-labelled state estimation, frustration risk and growth timeline
+- [x] Advice effectiveness feedback and guardian alignment checks
+- [x] Protected-topic refusal (health, belief, politics, ethnicity, sexuality, credentials)
+
+### Phase F — skill and workflow evolution
+
+- [x] Capability-gap, friction, bottleneck and error-pattern detection with signature deduplication
+- [x] Skill blueprints with purpose, inputs, outputs, tools, risks and tests
+- [x] Strict blueprint → sandbox → test → beta → production staging with evidence gates and production approval
+- [x] Multidimensional accuracy/reliability/speed/utility/safety scores recomputed from evidence
+- [x] Regression baselines and promotion-blocking regression checks
+- [x] Composition graph with dependent protection and retirement policy sweeps
+- [x] Workflow versioning, bottleneck detection and evolution journal
+- [x] Cognitive Evolution Index with deltas
+
+### Phase G — environment awareness and embodiment
+
+- [x] Environment inventory with safe execution zones 0–4 and capability mapping
+- [x] Standard action records: goal → plan → action → result → verification → memory update
+- [x] Approval and rollback requirements for high-zone actions
+- [x] Mandatory verification with evidence and verification-debt reporting
+- [x] Unexpected-outcome flagging and tool execution reputation with automatic degradation
+- [x] Workspace habit learning and continuous project awareness with stale-project detection
+
 
 ## Required for full target parity
 

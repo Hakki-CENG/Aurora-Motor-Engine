@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
-  Bot, Boxes, CheckCircle2, ChevronRight, Code2, Download, FileCode2, Files, GitBranch,
+  Bot, Boxes, Brain, CheckCircle2, ChevronRight, Code2, Download, FileCode2, Files, GitBranch,
   Globe2, ImageIcon, KeyRound, ListTodo, Loader2, MessageSquare, Paperclip, Play, Plus, RefreshCw, Save, Video,
   Send, ShieldCheck, SquareTerminal, Workflow, XCircle,
 } from "lucide-react";
@@ -14,7 +14,7 @@ type Session = {
   tree?: { activeLeafId?: string; entries: Array<{ id: string; parentId?: string; message: Message; labels: string[]; contextReset?: boolean }> };
   totalUsage: { inputTokens: number; outputTokens: number };
 };
-type Tab = "chat" | "terminal" | "files" | "changes" | "browser" | "media" | "artifacts" | "tree" | "tasks" | "society" | "cognitive" | "models" | "profiles" | "mcp" | "secrets" | "channels" | "learning" | "automations";
+type Tab = "chat" | "terminal" | "files" | "changes" | "browser" | "media" | "artifacts" | "tree" | "tasks" | "society" | "cognitive" | "aurora" | "models" | "profiles" | "mcp" | "secrets" | "channels" | "learning" | "automations";
 
 let csrfToken: string | null = null;
 async function api<T = any>(path: string, options: RequestInit = {}): Promise<T> {
@@ -248,7 +248,7 @@ export function App() {
 
   const tabs: Array<[Tab, any, string]> = [
     ["chat", MessageSquare, "Conversation"], ["terminal", SquareTerminal, "Terminal"], ["files", Files, "Files"],
-    ["changes", GitBranch, "Changes"], ["browser", Globe2, "Browser"], ["media", Video, "Media"], ["artifacts", Boxes, "Artifacts"], ["tree", Workflow, "Tree"], ["tasks", ListTodo, "Tasks"], ["society", Boxes, "Society"], ["cognitive", Workflow, "Cognitive"], ["models", Code2, "Models"], ["profiles", Bot, "Profiles"], ["mcp", Workflow, "MCP"], ["secrets", KeyRound, "Secrets"], ["channels", Send, "Channels"], ["learning", RefreshCw, "Learning"], ["automations", Boxes, "Automations"],
+    ["changes", GitBranch, "Changes"], ["browser", Globe2, "Browser"], ["media", Video, "Media"], ["artifacts", Boxes, "Artifacts"], ["tree", Workflow, "Tree"], ["tasks", ListTodo, "Tasks"], ["society", Boxes, "Society"], ["cognitive", Workflow, "Cognitive"], ["aurora", Brain, "Aurora"], ["models", Code2, "Models"], ["profiles", Bot, "Profiles"], ["mcp", Workflow, "MCP"], ["secrets", KeyRound, "Secrets"], ["channels", Send, "Channels"], ["learning", RefreshCw, "Learning"], ["automations", Boxes, "Automations"],
   ];
 
   return <div className="canvas">
@@ -283,6 +283,7 @@ export function App() {
         {tab === "tasks" && <TasksPanel session={session} command={command} reload={loadSession} showError={showError}/>} 
         {tab === "society" && <SocietyPanel sessionId={session.sessionId} showError={showError}/>} 
         {tab === "cognitive" && <CognitivePanel sessionId={session.sessionId} showError={showError}/>} 
+        {tab === "aurora" && <AuroraPanel showError={showError}/>} 
         {tab === "models" && <ModelsPanel session={session} command={command} reload={loadSession} showError={showError}/>} 
         {tab === "profiles" && <AgentProfilesPanel reloadGlobal={loadAgentProfiles} showError={showError}/>} 
         {tab === "mcp" && <McpPanel showError={showError}/>} 
@@ -383,6 +384,117 @@ function TasksPanel({session,command,reload,showError}:{session:Session;command:
   const update=async(id:string,status:string)=>{try{await command("task.update",{id,status});await reload()}catch(e){showError(e)}};
   const tasks=(session.tasks??[]).filter(task=>filter==="all"||(filter==="open"?!["done","cancelled"].includes(task.status):task.status===filter));
   return <div className="panel tasks-panel"><div className="task-toolbar"><input value={title} onChange={e=>setTitle(e.target.value)} onKeyDown={e=>e.key==="Enter"&&void create()} placeholder="Add a durable task…"/><select value={priority} onChange={e=>setPriority(e.target.value)}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="critical">Critical</option></select><button onClick={create}><Plus size={14}/>Add</button><select value={filter} onChange={e=>setFilter(e.target.value)}><option value="open">Open</option><option value="all">All</option><option value="backlog">Backlog</option><option value="ready">Ready</option><option value="in_progress">In progress</option><option value="blocked">Blocked</option><option value="review">Review</option><option value="done">Done</option></select></div><div className="task-grid">{tasks.map(task=><article className={`task-card ${task.status}`} key={task.id}><div className="task-meta"><span className={`task-priority ${task.priority}`}>{task.priority}</span><code>{task.id.slice(0,8)}</code></div><h3>{task.title}</h3>{task.description&&<p>{task.description}</p>}<small>{task.status}{task.dependsOn.length?` · ${task.dependsOn.length} dependencies`:""}{task.assigneeSessionId?` · ${task.assigneeSessionId.slice(0,8)}`:""}</small><div className="task-actions">{task.status!=="in_progress"&&!["done","cancelled"].includes(task.status)&&<button onClick={()=>update(task.id,"in_progress")}>Start</button>}{task.status==="in_progress"&&<button onClick={()=>update(task.id,"review")}>Review</button>}{!["done","cancelled"].includes(task.status)&&<button onClick={()=>update(task.id,"done")}><CheckCircle2 size={13}/>Done</button>}{task.status!=="cancelled"&&task.status!=="done"&&<button className="danger" onClick={()=>update(task.id,"cancelled")}>Cancel</button>}</div></article>)}</div>{!tasks.length&&<div className="welcome"><ListTodo size={38}/><p>No tasks in this view.</p></div>}</div>
+}
+
+/**
+ * Aurora substrate console: memory pyramid health, world-model calibration, multi-perspective
+ * consensus, proactive initiative queue with trust feedback, governed user model, evolution index
+ * and environment inventory. Every mutation goes through the audited Control API routes.
+ */
+function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
+  const [section, setSection] = useState<"memory"|"world"|"initiative"|"user"|"evolution"|"environment">("memory");
+  const [memoryHealth, setMemoryHealth] = useState<any>(null);
+  const [anchors, setAnchors] = useState<any[]>([]);
+  const [calibration, setCalibration] = useState<any>(null);
+  const [inconsistencies, setInconsistencies] = useState<any[]>([]);
+  const [analyses, setAnalyses] = useState<any[]>([]);
+  const [perspectives, setPerspectives] = useState<any[]>([]);
+  const [initiatives, setInitiatives] = useState<any[]>([]);
+  const [initiativeBudget, setInitiativeBudget] = useState<any>(null);
+  const [digest, setDigest] = useState<any>(null);
+  const [userId, setUserId] = useState("primary");
+  const [userSummary, setUserSummary] = useState<any>(null);
+  const [userState, setUserState] = useState<any>(null);
+  const [gaps, setGaps] = useState<any[]>([]);
+  const [candidates, setCandidates] = useState<any[]>([]);
+  const [evolutionIndex, setEvolutionIndex] = useState<any>(null);
+  const [inventory, setInventory] = useState<any>(null);
+  const [resources, setResources] = useState<any[]>([]);
+  const [unverified, setUnverified] = useState<any[]>([]);
+  const [question, setQuestion] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      const [health, anchorList, calib, consistency, analysisList, perspectiveList, initiativeList, budget, summary, estimate, gapList, candidateList, index, inv, resourceList, unverifiedList] = await Promise.all([
+        api<any>("/v1/memory-graph/health?tenantId=local"),
+        api<any>("/v1/memory-graph/anchors?tenantId=local"),
+        api<any>("/v1/world/calibration?tenantId=local"),
+        api<any>("/v1/world/consistency?tenantId=local"),
+        api<any>("/v1/multiworld/analyses?tenantId=local"),
+        api<any>("/v1/multiworld/perspectives?tenantId=local"),
+        api<any>("/v1/initiative/initiatives?tenantId=local&limit=50"),
+        api<any>("/v1/initiative/budget?tenantId=local"),
+        api<any>(`/v1/user-model/${encodeURIComponent(userId)}?tenantId=local`),
+        api<any>(`/v1/user-model/${encodeURIComponent(userId)}/state?tenantId=local`),
+        api<any>("/v1/evolution/gaps?tenantId=local"),
+        api<any>("/v1/evolution/candidates?tenantId=local"),
+        api<any>("/v1/evolution/index?tenantId=local"),
+        api<any>("/v1/environment/inventory?tenantId=local"),
+        api<any>("/v1/environment/resources?tenantId=local"),
+        api<any>("/v1/environment/actions?tenantId=local&unverified=true"),
+      ]);
+      setMemoryHealth(health); setAnchors(anchorList.anchors); setCalibration(calib); setInconsistencies(consistency.inconsistencies);
+      setAnalyses(analysisList.analyses); setPerspectives(perspectiveList.perspectives); setInitiatives(initiativeList.initiatives);
+      setInitiativeBudget(budget); setUserSummary(summary); setUserState(estimate); setGaps(gapList.gaps); setCandidates(candidateList.candidates);
+      setEvolutionIndex(index); setInventory(inv); setResources(resourceList.resources); setUnverified(unverifiedList.actions);
+    } catch (cause) { showError(cause); }
+  }, [showError, userId]);
+  useEffect(() => { void load(); }, [load]);
+
+  const consolidate = async () => { try { await api("/v1/memory-graph/consolidate", { method: "POST", body: JSON.stringify({ tenantId: "local" }) }); await load(); } catch (cause) { showError(cause); } };
+  const scanContradictions = async () => { try { await api("/v1/memory-graph/contradictions", { method: "POST", body: JSON.stringify({ tenantId: "local" }) }); await load(); } catch (cause) { showError(cause); } };
+  const evaluateInitiatives = async () => { try { await api("/v1/initiative/evaluate", { method: "POST", body: JSON.stringify({ tenantId: "local" }) }); await load(); } catch (cause) { showError(cause); } };
+  const buildDigest = async (period: string) => { try { setDigest(await api("/v1/initiative/digests", { method: "POST", body: JSON.stringify({ tenantId: "local", period }) })); await load(); } catch (cause) { showError(cause); } };
+  const feedback = async (id: string, useful: boolean) => { try { await api(`/v1/initiative/initiatives/${id}/feedback`, { method: "POST", body: JSON.stringify({ tenantId: "local", useful, actedOn: useful }) }); await load(); } catch (cause) { showError(cause); } };
+  const deliver = async (id: string) => { try { await api(`/v1/initiative/initiatives/${id}/delivered`, { method: "POST", body: JSON.stringify({ tenantId: "local", channel: "canvas" }) }); await load(); } catch (cause) { showError(cause); } };
+  const forgetUser = async () => { try { await api(`/v1/user-model/${encodeURIComponent(userId)}?tenantId=local`, { method: "DELETE" }); await load(); } catch (cause) { showError(cause); } };
+  const openAnalysis = async () => { if (!question.trim()) return; try { await api("/v1/multiworld/analyses", { method: "POST", body: JSON.stringify({ tenantId: "local", question: question.trim(), problemType: "general" }) }); setQuestion(""); await load(); } catch (cause) { showError(cause); } };
+  const retirementSweep = async () => { try { await api("/v1/evolution/retirement-sweep", { method: "POST", body: JSON.stringify({ tenantId: "local" }) }); await load(); } catch (cause) { showError(cause); } };
+
+  return <div className="panel tasks-panel">
+    <div className="task-toolbar">
+      <b>Aurora substrate</b>
+      {(["memory","world","initiative","user","evolution","environment"] as const).map(item => <button key={item} className={section===item?"active":""} onClick={()=>setSection(item)}>{item}</button>)}
+      <button onClick={()=>void load()}><RefreshCw size={13}/>Refresh</button>
+    </div>
+    {section === "memory" && <>
+      <div className="task-toolbar"><small>health {memoryHealth ? memoryHealth.healthScore.toFixed(3) : "—"} · {memoryHealth?.total ?? 0} objects · {memoryHealth?.contradicted?.length ?? 0} contradicted · {memoryHealth?.stale?.length ?? 0} stale</small><button onClick={consolidate}>Consolidate episodes</button><button onClick={scanContradictions}>Scan contradictions</button></div>
+      <div className="task-grid">{anchors.map(anchor => <article className="task-card" key={anchor.id}><h3>anchor · {anchor.title}</h3><p>{anchor.question}</p><small>{anchor.status} · importance {anchor.importance} · confidence {anchor.confidence} · next review {anchor.nextReviewAt.slice(0,10)}</small><code>next step: {anchor.nextStep}</code></article>)}</div>
+    </>}
+    {section === "world" && <>
+      <div className="task-toolbar"><small>calibration accuracy {calibration ? calibration.accuracy.toFixed(3) : "—"} · Brier {calibration ? calibration.brierMean.toFixed(3) : "—"} · {calibration?.resolved ?? 0} resolved · {inconsistencies.length} inconsistencies · {perspectives.length} perspectives</small><input value={question} onChange={e=>setQuestion(e.target.value)} placeholder="multi-perspective question"/><button disabled={!question.trim()} onClick={openAnalysis}>Open analysis</button></div>
+      <div className="task-grid">
+        {inconsistencies.map(item => <article className="task-card failed" key={`${item.entityId}-${item.key}`}><h3>conflict · {item.key}</h3><p>{item.recommendation}</p><small>{item.conflicting.length} competing claims</small></article>)}
+        {analyses.map(item => <article className="task-card" key={item.id}><h3>{item.problemType} · {item.question}</h3><p>{item.consensus ? `${item.consensus.decision} (score ${item.consensus.score}, agreement ${item.consensus.agreement})` : `${item.views.length}/${item.perspectiveIds.length} perspectives submitted`}</p><small>{item.status} · dissent {item.consensus?.dissentPerspectiveIds?.length ?? 0} · conflicts {item.conflicts.length} · scenarios {item.scenarios.length}</small></article>)}
+      </div>
+    </>}
+    {section === "initiative" && <>
+      <div className="task-toolbar"><small>trust {initiativeBudget ? initiativeBudget.trustScore.toFixed(2) : "—"} · immediate {initiativeBudget?.usedImmediate ?? 0}/{initiativeBudget?.dailyImmediateLimit ?? 0} · messages {initiativeBudget?.usedMessage ?? 0}/{initiativeBudget?.dailyMessageLimit ?? 0}</small><button onClick={evaluateInitiatives}>Evaluate queue</button><button onClick={()=>void buildDigest("daily")}>Daily briefing</button><button onClick={()=>void buildDigest("weekly")}>Weekly review</button></div>
+      {digest && <div className="task-toolbar"><small><b>{digest.title}</b> · {digest.sections.map((s:any)=>`${s.heading}: ${s.items.length}`).join(" · ") || "nothing worth reporting"}</small></div>}
+      <div className="task-grid">{initiatives.map(item => <article className={`task-card ${item.state}`} key={item.id}><h3>{item.priority} · {item.title}</h3><p>{item.message}</p><small>{item.kind} · {item.mode} · worthiness {item.worthiness} · {item.state} → {item.channel}{item.suppressionReason?` (${item.suppressionReason})`:""}</small><div>{item.state==="queued"&&<button onClick={()=>void deliver(item.id)}>Mark delivered</button>}{(item.state==="delivered"||item.state==="digested")&&!item.feedback&&<><button onClick={()=>void feedback(item.id,true)}><CheckCircle2 size={13}/>Useful</button><button className="danger" onClick={()=>void feedback(item.id,false)}><XCircle size={13}/>Noise</button></>}</div></article>)}</div>
+    </>}
+    {section === "user" && <>
+      <div className="task-toolbar"><input value={userId} onChange={e=>setUserId(e.target.value)} placeholder="user id"/><small>state {userState?.state ?? "unknown"} (estimate, confidence {userState ? userState.confidence.toFixed(2) : "—"}) · frustration {userSummary ? userSummary.frustrationRisk : "—"} · advice score {userSummary ? userSummary.adviceEffectiveness.score : "—"}</small><button className="danger" onClick={forgetUser}>Delete every inference</button></div>
+      <div className="task-grid">
+        {Object.entries(userSummary?.claims ?? {}).map(([category, values]) => <article className="task-card" key={category}><h3>{category}</h3>{(values as any[]).map((claim, position) => <p key={position}>{claim.key}: {claim.value} <small>({claim.status}, {claim.source}, {claim.confidence})</small></p>)}</article>)}
+        {(userSummary?.goals ?? []).map((goal: any) => <article className="task-card" key={goal.id}><h3>{goal.horizon} goal · {goal.title}</h3><p>{goal.description || "no description"}</p><small>progress {goal.progress} · importance {goal.importance} · {goal.status}</small></article>)}
+      </div>
+    </>}
+    {section === "evolution" && <>
+      <div className="task-toolbar"><small>evolution index {evolutionIndex ? evolutionIndex.index.toFixed(3) : "—"} (Δ {evolutionIndex?.delta ?? 0}) · production {evolutionIndex?.productionSkills ?? 0} · beta {evolutionIndex?.betaSkills ?? 0} · gap closure {evolutionIndex?.gapClosureRate ?? 0}</small><button onClick={retirementSweep}>Retirement sweep</button></div>
+      <div className="task-grid">
+        {gaps.map(gap => <article className="task-card" key={gap.id}><h3>{gap.kind} · ×{gap.occurrences}</h3><p>{gap.description}</p><small>{gap.status} · severity {gap.severity}</small></article>)}
+        {candidates.map(candidate => <article className="task-card" key={candidate.id}><h3>{candidate.stage} · {candidate.name} v{candidate.version}</h3><p>{candidate.purpose}</p><small>composite {candidate.scores.composite} · accuracy {candidate.scores.accuracy} · safety {candidate.scores.safety} · uses {candidate.usage.invocations}</small></article>)}
+      </div>
+    </>}
+    {section === "environment" && <>
+      <div className="task-toolbar"><small>{inventory?.totals?.resources ?? 0} resources · {inventory?.totals?.degraded ?? 0} degraded · verification debt {inventory?.unverifiedActions ?? 0} · unexpected {inventory?.unexpectedOutcomes ?? 0}</small></div>
+      <div className="task-grid">
+        {resources.map(resource => <article className={`task-card ${resource.status}`} key={resource.id}><h3>zone {resource.zone} · {resource.name}</h3><p>{resource.kind}{resource.requiresApproval?" · approval required":""}</p><small>{resource.status} · reputation {resource.health.reputation} · {resource.health.successes}/{resource.health.successes+resource.health.failures} successful</small></article>)}
+        {unverified.map(action => <article className="task-card failed" key={action.id}><h3>unverified · {action.action}</h3><p>{action.goal}</p><small>zone {action.zone} · {action.result?.summary ?? "no result"}</small></article>)}
+      </div>
+    </>}
+  </div>;
 }
 
 function CognitivePanel({sessionId,showError}:{sessionId:string;showError:(e:any)=>void}) {

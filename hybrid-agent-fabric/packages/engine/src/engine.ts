@@ -109,6 +109,19 @@ import { HostedRepositoryProviderRegistry } from "./repositories/hosted-reposito
 import { GitHubAppManager } from "./repositories/github-app-manager.js";
 import { AgentSocietyService } from "./society/agent-society-service.js";
 import { CognitiveWorkspaceService } from "./cognitive/cognitive-workspace-service.js";
+import { MemoryGraphService } from "./memory/memory-graph-service.js";
+import { WorldModelService } from "./world/world-model-service.js";
+import { MultiWorldModelService } from "./world/multi-world-model-service.js";
+import { ProactiveInitiativeService } from "./initiative/proactive-initiative-service.js";
+import { UserModelService } from "./user/user-model-service.js";
+import { SkillEvolutionService } from "./evolution/skill-evolution-service.js";
+import { EnvironmentAwarenessService } from "./environment/environment-awareness-service.js";
+import { memoryGraphCapabilities } from "./capabilities/memory-graph.js";
+import { multiWorldCapabilities, worldModelCapabilities } from "./capabilities/world-model.js";
+import { initiativeCapabilities } from "./capabilities/initiative.js";
+import { userModelCapabilities } from "./capabilities/user-model.js";
+import { evolutionCapabilities } from "./capabilities/evolution.js";
+import { environmentCapabilities } from "./capabilities/environment.js";
 
 export interface EngineConfig {
   homePath: string;
@@ -223,6 +236,13 @@ export class HybridAgentEngine {
   readonly outboundChannels: ChannelAdapterRegistry;
   readonly society: AgentSocietyService;
   readonly cognitive: CognitiveWorkspaceService;
+  readonly memoryGraph: MemoryGraphService;
+  readonly worldModel: WorldModelService;
+  readonly multiWorld: MultiWorldModelService;
+  readonly initiative: ProactiveInitiativeService;
+  readonly userModel: UserModelService;
+  readonly evolution: SkillEvolutionService;
+  readonly environment: EnvironmentAwarenessService;
 
   constructor(readonly config: EngineConfig) {
     const dataRoot = resolve(config.homePath, "data");
@@ -420,6 +440,37 @@ export class HybridAgentEngine {
     });
     this.society = new AgentSocietyService(dataRoot, this.supervisor, this.agentProfiles, this.events);
     this.cognitive = new CognitiveWorkspaceService(dataRoot);
+    this.memoryGraph = new MemoryGraphService(dataRoot);
+    this.worldModel = new WorldModelService(dataRoot);
+    this.multiWorld = new MultiWorldModelService(dataRoot);
+    this.userModel = new UserModelService(dataRoot);
+    this.evolution = new SkillEvolutionService(dataRoot);
+    this.environment = new EnvironmentAwarenessService(dataRoot);
+    // Queued initiatives are mirrored into the Global Workspace so proactive signals compete for
+    // attention under the same constitutional budget as every other cognitive object.
+    this.initiative = new ProactiveInitiativeService(dataRoot, Date.now, {
+      onQueued: async (item) => {
+        try {
+          await this.cognitive.intake({
+            tenantId: item.tenantId,
+            source: "initiative",
+            title: item.title,
+            content: item.message,
+            sourceId: item.id,
+            kind: item.kind === "risk" ? "risk" : item.kind === "opportunity" ? "opportunity" : "observation",
+            confidence: item.confidence,
+            importance: item.importance,
+            urgency: item.urgency,
+            impact: item.impact,
+            userRelevance: item.userRelevance,
+            horizon: item.priority === "P0" ? "reactive" : "tactical",
+            tags: ["initiative", item.priority.toLowerCase()],
+          });
+        } catch {
+          // Initiative delivery must never fail because the workspace quota is exhausted.
+        }
+      },
+    });
     this.refinementPlanner = new RefinementPlanner(
       dataRoot,
       this.models,
@@ -487,6 +538,13 @@ export class HybridAgentEngine {
     for (const capability of hostedReviewCapabilities(this.hostedRepositories)) this.capabilities.register(capability);
     for (const capability of societyCapabilities(this.society)) this.capabilities.register(capability);
     for (const capability of cognitiveCapabilities(this.cognitive)) this.capabilities.register(capability);
+    for (const capability of memoryGraphCapabilities(this.memoryGraph)) this.capabilities.register(capability);
+    for (const capability of worldModelCapabilities(this.worldModel)) this.capabilities.register(capability);
+    for (const capability of multiWorldCapabilities(this.multiWorld)) this.capabilities.register(capability);
+    for (const capability of initiativeCapabilities(this.initiative)) this.capabilities.register(capability);
+    for (const capability of userModelCapabilities(this.userModel)) this.capabilities.register(capability);
+    for (const capability of evolutionCapabilities(this.evolution)) this.capabilities.register(capability);
+    for (const capability of environmentCapabilities(this.environment)) this.capabilities.register(capability);
   }
 
   registerModelProvider(provider: ModelProvider, makeDefault = false): void {
