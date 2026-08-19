@@ -682,7 +682,7 @@ app.addHook("preHandler", async (request, reply) => {
   if (globalAdminPath && !identity.systemAdmin) {
     return await reply.code(403).send({ error: "system_admin_required" });
   }
-  const adminMutation = !methodIsSafe && /^\/v1\/(?:secrets|learning|agent-profiles|repositories|repository-providers|github-apps|model-oauth-sources|automation-git-sources|automation-responders|society|cognitive|memory-graph|world|multiworld|initiative|user-model|evolution|environment|constitution|harness|microagents|risk|acos|decisions|plans|experience|autopilot|channel-routing-rules)/.test(request.url);
+  const adminMutation = !methodIsSafe && /^\/v1\/(?:secrets|learning|agent-profiles|repositories|repository-providers|github-apps|model-oauth-sources|automation-git-sources|automation-responders|society|cognitive|memory-graph|world|multiworld|initiative|user-model|evolution|environment|constitution|harness|microagents|risk|acos|decisions|plans|experience|autopilot|checkpoints|aurora|channel-routing-rules)/.test(request.url);
   const required: Role = methodIsSafe ? "viewer" : adminMutation ? "admin" : "operator";
   if (!roleAllows(identityService.roleFor(identity, tenantId), required)) {
     return await reply.code(403).send({ error: "forbidden", tenantId, requiredRole: required });
@@ -833,8 +833,11 @@ app.get("/health", async () => ({
   nats: Boolean(engine.nats),
 }));
 
-app.get("/metrics", async (_request, reply) => {
-  return await reply.type("text/plain; version=0.0.4; charset=utf-8").send(engine.metrics.prometheus());
+app.get("/metrics", async (request, reply) => {
+  const { tenant } = z.object({ tenant: z.string().max(200).default("local") }).parse(request.query);
+  // Aurora gauges are content-free by construction, so they are safe on the same scrape endpoint.
+  const aurora = await engine.auroraMetrics.prometheus(tenant).catch(() => "");
+  return await reply.type("text/plain; version=0.0.4; charset=utf-8").send(`${engine.metrics.prometheus()}${aurora}`);
 });
 app.get("/v1/metrics", async () => ({
   ...engine.metrics.snapshot(),
@@ -1119,6 +1122,25 @@ app.post("/v1/autopilot/run-due", async (request) => { const b=auroraTenant.pars
 app.get("/v1/autopilot/runs", async (request) => { const q=auroraTenant.extend({limit:z.coerce.number().int().min(1).max(1000).optional()}).parse(request.query); return { runs: await engine.autopilot.runs(q.tenantId, q.limit ?? 50) }; });
 
 app.get("/v1/aurora/explain", async (request) => { const q=auroraTenant.extend({kind:z.enum(["cognitive-object","initiative","intake","memory","world-entity","world-event","environment-action","environment-resource","decision","plan","constitution-verdict"]),id:z.string().min(1).max(300),depth:z.coerce.number().int().min(1).max(6).optional()}).parse(request.query); return await engine.provenance.explain(auroraInput({ tenantId: q.tenantId, kind: q.kind, id: q.id, depth: q.depth })); });
+
+// ---------------------------------------------------------------------------
+// Aurora operations — workspace checkpoints, telemetry, governance and integrity
+// ---------------------------------------------------------------------------
+app.get("/v1/checkpoints", async (request) => { const q=auroraTenant.extend({sessionId:z.string().optional(),limit:z.coerce.number().int().min(1).max(1000).optional()}).parse(request.query); return { checkpoints: await engine.checkpoints.list(q.tenantId, auroraInput({ sessionId: q.sessionId, limit: q.limit })) }; });
+app.post("/v1/checkpoints", async (request, reply) => { const b=auroraTenant.extend({workspacePath:z.string().min(1).max(2000),label:z.string().min(1).max(200),reason:z.string().min(1).max(2000),sessionId:z.string().optional(),actionId:z.string().max(300).optional(),maxFiles:z.number().int().min(1).max(50_000).optional(),maxTotalBytes:z.number().int().min(1024).max(1_073_741_824).optional()}).parse(request.body); const { tenantId, maxFiles, maxTotalBytes, ...rest } = b; return await reply.code(201).send(await engine.checkpoints.capture(auroraInput({ tenantId, ...rest, limits: auroraInput({ maxFiles, maxTotalBytes }) }))); });
+app.get("/v1/checkpoints/:checkpointId", async (request) => { const { checkpointId } = z.object({ checkpointId: z.string() }).parse(request.params); const q=auroraTenant.parse(request.query); return await engine.checkpoints.get(q.tenantId, checkpointId); });
+app.post("/v1/checkpoints/:checkpointId/diff", async (request) => { const { checkpointId } = z.object({ checkpointId: z.string() }).parse(request.params); const b=auroraTenant.extend({workspacePath:z.string().min(1).max(2000)}).parse(request.body); return await engine.checkpoints.diff(b.tenantId, checkpointId, b.workspacePath); });
+app.post("/v1/checkpoints/:checkpointId/restore", async (request) => { const { checkpointId } = z.object({ checkpointId: z.string() }).parse(request.params); const b=auroraTenant.extend({workspacePath:z.string().min(1).max(2000),removeAddedFiles:z.boolean().optional(),safetyCheckpoint:z.boolean().optional()}).parse(request.body); const { tenantId, ...rest } = b; return await engine.checkpoints.restore(auroraInput({ tenantId, checkpointId, ...rest })); });
+app.delete("/v1/checkpoints/:checkpointId", async (request) => { const { checkpointId } = z.object({ checkpointId: z.string() }).parse(request.params); const q=auroraTenant.parse(request.query); return await engine.checkpoints.remove(q.tenantId, checkpointId); });
+app.get("/v1/checkpoints-usage", async (request) => { const q=auroraTenant.parse(request.query); return await engine.checkpoints.usage(q.tenantId); });
+
+app.get("/v1/aurora/metrics", async (request) => { const q=auroraTenant.parse(request.query); return await engine.auroraMetrics.snapshot(q.tenantId); });
+app.get("/v1/aurora/metrics.prom", async (request, reply) => { const q=auroraTenant.parse(request.query); await reply.header("content-type", "text/plain; version=0.0.4"); return await engine.auroraMetrics.prometheus(q.tenantId); });
+app.get("/v1/aurora/alerts", async (request) => { const q=auroraTenant.parse(request.query); return { alerts: await engine.auroraMetrics.alerts(q.tenantId) }; });
+app.get("/v1/aurora/export", async (request) => { const q=auroraTenant.extend({userId:z.string().max(200).optional(),includeContent:z.coerce.boolean().optional()}).parse(request.query); return await engine.dataGovernance.export(auroraInput({ tenantId: q.tenantId, userId: q.userId, includeContent: q.includeContent })); });
+app.post("/v1/aurora/purge-user", async (request) => { const b=auroraTenant.extend({userId:z.string().min(1).max(200),dryRun:z.boolean().optional()}).parse(request.body); const { tenantId, ...rest } = b; return await engine.dataGovernance.purgeUser(auroraInput({ tenantId, ...rest })); });
+app.get("/v1/aurora/selfcheck", async (request) => { const q=auroraTenant.parse(request.query); return await engine.dataGovernance.selfCheck(q.tenantId); });
+app.get("/v1/aurora/footprint", async (request) => { const q=auroraTenant.parse(request.query); return await engine.dataGovernance.footprint(q.tenantId); });
 
 app.get("/v1/media/images/providers", async () => ({ providers: engine.images.list(), upscalers: engine.images.listUpscalers() }));
 app.get("/v1/media/videos/providers", async () => ({ providers: engine.video.list(), queuedProviders: engine.video.listQueued(), upscalers: engine.video.listUpscalers() }));

@@ -34,10 +34,11 @@ export function environmentCapabilities(service: EnvironmentAwarenessService) {
     ),
     defineCapability(
       { id: "environment.action.plan", version: "1.0.0", description: "Open a standard Aurora action record: goal, plan, action, expected outcome and rollback plan. Zone 3+ requires a rollback plan.", risk: "workspace_write", sideEffect: true, source: "core" },
-      z.object({ resourceId: z.string(), goal: z.string().min(1).max(5000), plan: z.array(z.string()).min(1).max(50), action: z.string().min(1).max(2000), parameters: z.record(z.unknown()).optional(), expectedOutcome: z.string().min(1).max(5000), rollbackPlan: z.string().max(5000).optional() }),
+      z.object({ resourceId: z.string(), goal: z.string().min(1).max(5000), plan: z.array(z.string()).min(1).max(50), action: z.string().min(1).max(2000), parameters: z.record(z.unknown()).optional(), expectedOutcome: z.string().min(1).max(5000), rollbackPlan: z.string().max(5000).optional(), rollbackCheckpointId: z.string().max(300).optional() }),
       async (input, ctx) => await service.planAction({
         tenantId: ctx.tenantId, sessionId: ctx.sessionId, resourceId: input.resourceId, goal: input.goal, plan: input.plan, action: input.action, expectedOutcome: input.expectedOutcome,
         ...(input.parameters ? { parameters: input.parameters } : {}), ...(input.rollbackPlan ? { rollbackPlan: input.rollbackPlan } : {}),
+        ...(input.rollbackCheckpointId ? { rollbackCheckpointId: input.rollbackCheckpointId } : {}),
       }),
     ),
     defineCapability(
@@ -68,8 +69,8 @@ export function environmentCapabilities(service: EnvironmentAwarenessService) {
     ),
     defineCapability(
       { id: "environment.action.rollback", version: "1.0.0", description: "Record execution of the rollback plan for a finished action.", risk: "privileged", sideEffect: true, source: "core" },
-      z.object({ actionId: z.string(), reason: z.string().min(1).max(5000) }),
-      async (input, ctx) => await service.rollbackAction({ tenantId: ctx.tenantId, ...input }),
+      z.object({ actionId: z.string(), reason: z.string().min(1).max(5000), restoredCheckpointId: z.string().max(300).optional() }),
+      async (input, ctx) => await service.rollbackAction({ tenantId: ctx.tenantId, actionId: input.actionId, reason: input.reason, ...(input.restoredCheckpointId ? { restoredCheckpointId: input.restoredCheckpointId } : {}) }),
     ),
     defineCapability(
       { id: "environment.actions.list", version: "1.0.0", description: "List Aurora action records with their verification state.", risk: "pure", sideEffect: false, source: "core" },

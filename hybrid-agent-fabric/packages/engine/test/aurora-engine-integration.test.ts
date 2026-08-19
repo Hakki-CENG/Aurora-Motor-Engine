@@ -32,6 +32,8 @@ describe("Aurora substrate engine integration", () => {
       "decision.open", "decision.decide", "decision.calibration",
       "plan.create", "plan.step.update", "plan.progress",
       "experience.distill", "experience.apply", "autopilot.status", "autopilot.configure", "aurora.explain",
+      "checkpoint.capture", "checkpoint.restore", "checkpoint.diff",
+      "aurora.metrics", "aurora.alerts", "aurora.export", "aurora.purge.user", "aurora.selfcheck",
     ]) {
       expect(ids.has(id), `missing capability ${id}`).toBe(true);
     }

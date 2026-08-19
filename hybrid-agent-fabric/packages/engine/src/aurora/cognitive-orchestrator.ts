@@ -119,7 +119,10 @@ export class CognitiveOrchestrator {
     rootPath: string,
     private readonly deps: CognitiveOrchestratorDependencies,
     private readonly now: () => number = Date.now,
-    private readonly hooks: { stuckSessions?: (tenantId: string) => Promise<Array<{ sessionId: string; signature?: string; detail: string }>> } = {},
+    private readonly hooks: {
+      stuckSessions?: (tenantId: string) => Promise<Array<{ sessionId: string; signature?: string; detail: string }>>;
+      integrity?: (tenantId: string) => Promise<{ findings: number; critical: number; score: number; details: string[] }>;
+    } = {},
   ) {
     this.store = new DurableJsonState<OrchestratorStateShape>(
       join(rootPath, "acos", "state.json"),
@@ -405,8 +408,16 @@ export class CognitiveOrchestrator {
             accumulator.recommendations.push(`Decision confidence runs ${calibration.overconfidence} above the observed success rate; state lower confidence or gather more evidence.`);
           }
         }
-        const status = cognitiveHealth.healthScore < 0.5 ? "degraded" : "ok";
-        return { status, summary: `Cognitive health ${cognitiveHealth.healthScore}, compliance ${compliance.complianceRate}, ${decisionsDue} decision review(s) due.`, detail: { health: cognitiveHealth.healthScore, blocked: cognitiveHealth.totals.blocked, violations: cognitiveHealth.constitutionalViolations.length, compliance: compliance.complianceRate, decisionsDue, overconfidence } };
+        let integrityScore = 1;
+        let integrityCritical = 0;
+        if (this.hooks.integrity) {
+          const integrity = await this.hooks.integrity(tenantId);
+          integrityScore = integrity.score;
+          integrityCritical = integrity.critical;
+          for (const detail of integrity.details.slice(0, 3)) accumulator.recommendations.push(`Integrity: ${detail}`);
+        }
+        const status = cognitiveHealth.healthScore < 0.5 || integrityCritical > 0 ? "degraded" : "ok";
+        return { status, summary: `Cognitive health ${cognitiveHealth.healthScore}, compliance ${compliance.complianceRate}, ${decisionsDue} decision review(s) due, integrity ${integrityScore}.`, detail: { health: cognitiveHealth.healthScore, blocked: cognitiveHealth.totals.blocked, violations: cognitiveHealth.constitutionalViolations.length, compliance: compliance.complianceRate, decisionsDue, overconfidence, integrityScore, integrityCritical } };
       }
       case "learn": {
         // Friction observed by the cognitive layer becomes an evidence-backed capability-gap signal.

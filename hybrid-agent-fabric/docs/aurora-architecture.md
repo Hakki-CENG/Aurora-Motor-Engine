@@ -75,6 +75,9 @@ and none of it can widen that runtime's authority.
 | ACOS orchestration | `CognitiveOrchestrator` + `AuroraAutopilot` | `acos.*`, `autopilot.*` | `/v1/acos/*`, `/v1/autopilot` | `aurora-acos.test.ts`, `aurora-reasoning.test.ts` |
 | Explainability | `ProvenanceService` | `aurora.explain` | `/v1/aurora/explain` | `aurora-reasoning.test.ts`, `aurora-end-to-end.test.ts` |
 | Anomaly detection | `StuckDetectorService` | `session.stuck.analyze` | `/v1/sessions/:id/stuck` | `aurora-acos.test.ts` |
+| Recovery | `WorkspaceCheckpointService` — bounded content-addressed snapshots, reversible restore | `checkpoint.*` | `/v1/checkpoints/*` | `aurora-operations.test.ts` |
+| Telemetry | `AuroraMetricsCollector` — content-free gauges and derived alerts | `aurora.metrics`, `aurora.alerts` | `/v1/aurora/metrics`, `/metrics` | `aurora-operations.test.ts` |
+| Governance | `AuroraDataGovernanceService` — export, purge, integrity self-check, footprint | `aurora.export`, `aurora.purge.user`, `aurora.selfcheck` | `/v1/aurora/*` | `aurora-operations.test.ts` |
 
 ## The constitutional invariants, and where they are enforced
 
@@ -100,6 +103,7 @@ All Aurora state is durable, bounded, atomically written and tenant-scoped, unde
 ```
 acos/state.json            ACOS cycle reports and thought journal
 acos/autopilot.json        cadence config and unattended run ledger
+checkpoints/state.json     workspace checkpoint manifests (content blobs live under checkpoints/blobs)
 cognitive/workspace.json   objects, goals, budgets, modes, intake ledger, allocation buckets
 constitution/state.json    principles, amendments, decision verdicts, identity core
 decisions/state.json       decision records and outcomes
@@ -147,4 +151,7 @@ predate newer fields, and writes atomically through a temporary file plus rename
 - soften a hard constitutional principle, disable a critical risk rule, or amend its identity without
   a named approver;
 - keep thinking in a loop that produces the same result;
-- explain itself with a story instead of recorded provenance.
+- explain itself with a story instead of recorded provenance;
+- claim a rollback happened without naming the checkpoint it restored;
+- leak content into telemetry — every exported metric is a count, a rate or a bounded score;
+- keep a user's inferences after a purge, or delete audit-grade records without saying so.

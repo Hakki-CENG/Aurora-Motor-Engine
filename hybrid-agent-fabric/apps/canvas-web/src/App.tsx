@@ -392,7 +392,7 @@ function TasksPanel({session,command,reload,showError}:{session:Session;command:
  * and environment inventory. Every mutation goes through the audited Control API routes.
  */
 function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
-  const [section, setSection] = useState<"acos"|"memory"|"world"|"initiative"|"user"|"evolution"|"environment"|"constitution"|"harness"|"knowledge"|"risk"|"reasoning"|"autopilot">("acos");
+  const [section, setSection] = useState<"acos"|"memory"|"world"|"initiative"|"user"|"evolution"|"environment"|"constitution"|"harness"|"knowledge"|"risk"|"reasoning"|"autopilot"|"operations">("acos");
   const [memoryHealth, setMemoryHealth] = useState<any>(null);
   const [anchors, setAnchors] = useState<any[]>([]);
   const [calibration, setCalibration] = useState<any>(null);
@@ -431,6 +431,11 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
   const [proposals, setProposals] = useState<any[]>([]);
   const [autopilot, setAutopilot] = useState<any>(null);
   const [autopilotRuns, setAutopilotRuns] = useState<any[]>([]);
+  const [auroraMetrics, setAuroraMetrics] = useState<any>(null);
+  const [auroraAlerts, setAuroraAlerts] = useState<any[]>([]);
+  const [selfCheck, setSelfCheck] = useState<any>(null);
+  const [footprint, setFootprint] = useState<any>(null);
+  const [checkpoints, setCheckpoints] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -483,6 +488,15 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
       ]);
       setDecisionList(decisionsResult.decisions); setDecisionCalibration(calibrationResult); setPlanList(plansResult.plans);
       setStalledPlans(stalledResult.stalled); setProposals(proposalsResult.proposals); setAutopilot(autopilotResult); setAutopilotRuns(runsResult.runs);
+      const [metricsResult, alertsResult, selfCheckResult, footprintResult, checkpointResult] = await Promise.all([
+        api<any>("/v1/aurora/metrics?tenantId=local"),
+        api<any>("/v1/aurora/alerts?tenantId=local"),
+        api<any>("/v1/aurora/selfcheck?tenantId=local"),
+        api<any>("/v1/aurora/footprint?tenantId=local"),
+        api<any>("/v1/checkpoints?tenantId=local&limit=15"),
+      ]);
+      setAuroraMetrics(metricsResult); setAuroraAlerts(alertsResult.alerts); setSelfCheck(selfCheckResult);
+      setFootprint(footprintResult); setCheckpoints(checkpointResult.checkpoints);
     } catch (cause) { showError(cause); }
   }, [showError, userId]);
   useEffect(() => { void load(); }, [load]);
@@ -509,7 +523,7 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
   return <div className="panel tasks-panel">
     <div className="task-toolbar">
       <b>Aurora substrate</b>
-      {(["acos","memory","world","initiative","user","evolution","environment","constitution","harness","knowledge","risk","reasoning","autopilot"] as const).map(item => <button key={item} className={section===item?"active":""} onClick={()=>setSection(item)}>{item}</button>)}
+      {(["acos","memory","world","initiative","user","evolution","environment","constitution","harness","knowledge","risk","reasoning","autopilot","operations"] as const).map(item => <button key={item} className={section===item?"active":""} onClick={()=>setSection(item)}>{item}</button>)}
       <button onClick={()=>void load()}><RefreshCw size={13}/>Refresh</button>
     </div>
     {section === "acos" && <>
@@ -557,6 +571,16 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
       <div className="task-grid">
         {(autopilot?.cadences ?? []).map((cadence:any) => <article className={`task-card ${cadence.enabled?"":"failed"}`} key={cadence.kind}><h3>{cadence.kind}</h3><p>every {cadence.everyMinutes} minute(s)</p><small>{cadence.enabled?"enabled":"disabled"} · runs {cadence.runCount} · failures {cadence.failureCount} · next {cadence.nextRunAt}</small></article>)}
         {autopilotRuns.map(run => <article className={`task-card ${run.status==="failed"?"failed":"done"}`} key={run.id}><h3>{run.kind} · {run.status}</h3><p>{run.detail}</p><small>{run.startedAt} · {run.durationMs}ms</small></article>)}
+      </div>
+    </>}
+    {section === "operations" && <>
+      <div className="task-toolbar"><small>integrity {selfCheck?.score ?? "—"} ({selfCheck?.findings?.length ?? 0} finding(s), {selfCheck?.healthy?"healthy":"critical"}) · alerts {auroraAlerts.length} · records {footprint?.totalRecords ?? 0} · checkpoints {checkpoints.length}</small><a className="export-link" href="/v1/aurora/export?tenantId=local" download><Download size={13}/>Export everything</a><a className="export-link" href="/v1/aurora/metrics.prom?tenantId=local" download><Code2 size={13}/>Prometheus</a></div>
+      <div className="task-grid">
+        {auroraAlerts.map(alert => <article className={`task-card ${alert.severity==="critical"?"failed":""}`} key={alert.code}><h3>{alert.severity} · {alert.code}</h3><p>{alert.detail}</p><small>value {alert.value}</small></article>)}
+        {(selfCheck?.findings ?? []).map((finding:any) => <article className={`task-card ${finding.severity==="critical"?"failed":""}`} key={finding.code}><h3>integrity · {finding.code}</h3><p>{finding.detail}</p><small>{finding.section} · {finding.subjectIds.length} subject(s)</small></article>)}
+        {auroraMetrics && <article className="task-card"><h3>telemetry</h3><p>cognitive {auroraMetrics.cognitive.health} · memory {auroraMetrics.memory.health} · trust {auroraMetrics.initiative.trust} · evolution {auroraMetrics.evolution.index}</p><small>focused {auroraMetrics.cognitive.focused} · verification debt {auroraMetrics.environment.verificationDebt} · overconfidence {auroraMetrics.decisions.overconfidence} · compliance {auroraMetrics.constitution.complianceRate}</small></article>}
+        {(footprint?.largest ?? []).map((entry:string) => <article className="task-card" key={entry}><h3>footprint</h3><p>{entry}</p></article>)}
+        {checkpoints.map(checkpoint => <article className="task-card" key={checkpoint.id}><h3>checkpoint · {checkpoint.label}</h3><p>{checkpoint.reason}</p><small>{checkpoint.files.length} file(s) · {checkpoint.totalBytes} bytes · restored {checkpoint.restoreCount} time(s)</small></article>)}
       </div>
     </>}
     {section === "memory" && <>

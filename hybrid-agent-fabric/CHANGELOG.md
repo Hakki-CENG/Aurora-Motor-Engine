@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.42.0 — 2026-08-19
+
+- Added Aurora workspace checkpoints: bounded, content-addressed snapshots of a session workspace that turn the constitution's "recovery path" requirement into a real, executable rollback. Snapshots are limited by file count, per-file size and total size, exclude dependency/build directories, confine every path to the workspace root and reject symlink escapes.
+- Restoring a checkpoint takes an automatic safety checkpoint first, so a rollback is itself reversible; content is deduplicated by digest and blobs are reclaimed only when no checkpoint still references them; restores verify blob integrity before writing.
+- Environment actions can now bind a checkpoint as their concrete recovery path (`rollbackCheckpointId`), and a recorded rollback names the checkpoint that was restored in its verification record.
+- Added content-free Aurora telemetry: a per-tenant snapshot and Prometheus exposition across cognition, memory, world calibration, initiative trust, society, evolution, environment, decisions, plans, constitution, autopilot and ACOS. Only counts, rates and bounded scores are exported — never titles, content or identifiers — and the public `/metrics` scrape now includes them.
+- Added derived operational alerts: degraded cognitive or memory health, exhausted attention budget, world inconsistency, prediction miscalibration, low proactive trust, verification debt, decision overconfidence, review backlog, stalled plans, low constitutional compliance, failing autopilot and degraded cycles.
+- Added Aurora data governance: whole-tenant or per-user export with per-section digests, user purge with an explicit dry run and a stated retention list for audit-grade records, and a retention footprint view.
+- Added a cross-store integrity self-check with eleven checks no single service can perform alone: dangling memory relations, broken thought anchors, focus without reservation, attention-reservation drift, verification debt, high-zone actions without approval, decisions referencing missing options, decisions without a falsifiable expectation, plans completed with open steps, tasks assigned to removed roles, quarantine bypass, ungated production skills and constitutional-floor damage.
+- The ACOS evaluate phase now consumes the integrity report: critical findings degrade the cycle and surface as recommendations.
+- Added governed `checkpoint.*`, `aurora.metrics`, `aurora.alerts`, `aurora.export`, `aurora.purge.user`, `aurora.selfcheck` and `aurora.footprint` capabilities, tenant-admin REST for all of them, and a Canvas "operations" section for alerts, integrity findings, telemetry, footprint and checkpoints.
+- Added 12 tests (347 engine tests total) covering checkpoint bounds, exclusion, diffing, exact restore, reversible rollback, deduplication and tenant isolation, content-free telemetry, alert derivation, export/purge governance, integrity detection, checkpoint-bound recovery and the ACOS integrity feed.
+
 ## 1.41.0 — 2026-08-19
 
 - Added the Aurora reasoning layer (ACOS L6): durable decision records with normalized weighted criteria, deterministic option ranking, preserved dissent, computed confidence and margin, mandatory override reasons for lower-ranked choices, constitution-denial refusal, review scheduling, outcome capture and calibration (success rate, mean surprise, Brier score, overconfidence, worst decisions).

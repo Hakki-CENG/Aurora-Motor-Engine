@@ -53,6 +53,7 @@ export interface EnvironmentAction {
   verification?: { method: string; passed: boolean; evidenceRefs: string[]; note: string; at: string };
   memoryUpdateRefs: string[];
   rollbackPlan?: string;
+  rollbackCheckpointId?: string;
   rolledBackAt?: string;
   createdAt: string;
   updatedAt: string;
@@ -195,7 +196,7 @@ export class EnvironmentAwarenessService {
    */
   async planAction(input: {
     tenantId: string; resourceId: string; goal: string; plan: string[]; action: string; parameters?: unknown;
-    expectedOutcome: string; sessionId?: string; rollbackPlan?: string;
+    expectedOutcome: string; sessionId?: string; rollbackPlan?: string; rollbackCheckpointId?: string;
   }): Promise<EnvironmentAction> {
     return await this.store.mutate((state) => {
       if (state.actions.length >= MAX_ACTIONS) throw new Error("Environment action limit reached.");
@@ -218,6 +219,7 @@ export class EnvironmentAwarenessService {
         zone: resource.zone,
         status: "planned",
         ...(input.rollbackPlan ? { rollbackPlan: auroraText(input.rollbackPlan, 5000, "Rollback plan") } : {}),
+        ...(input.rollbackCheckpointId ? { rollbackCheckpointId: auroraText(input.rollbackCheckpointId, 300, "Rollback checkpoint ID") } : {}),
         memoryUpdateRefs: [],
         createdAt: nowIso,
         updatedAt: nowIso,
@@ -303,16 +305,17 @@ export class EnvironmentAwarenessService {
     });
   }
 
-  async rollbackAction(input: { tenantId: string; actionId: string; reason: string }): Promise<EnvironmentAction> {
+  async rollbackAction(input: { tenantId: string; actionId: string; reason: string; restoredCheckpointId?: string }): Promise<EnvironmentAction> {
     return await this.store.mutate((state) => {
       const action = this.mutableAction(state, input.tenantId, input.actionId);
-      if (!action.rollbackPlan) throw new Error("This action has no recorded rollback plan.");
+      if (!action.rollbackPlan && !action.rollbackCheckpointId) throw new Error("This action has no recorded rollback plan.");
       if (!["completed", "failed", "verified"].includes(action.status)) throw new Error("Only finished actions can be rolled back.");
       const nowIso = new Date(this.now()).toISOString();
       action.status = "rolled-back";
       action.rolledBackAt = nowIso;
+      const restored = input.restoredCheckpointId ?? action.rollbackCheckpointId;
       action.verification = {
-        method: "rollback",
+        method: restored ? `rollback:checkpoint:${auroraText(restored, 300, "Restored checkpoint ID")}` : "rollback",
         passed: false,
         evidenceRefs: action.verification?.evidenceRefs ?? [],
         note: auroraText(input.reason, 5000, "Rollback reason"),

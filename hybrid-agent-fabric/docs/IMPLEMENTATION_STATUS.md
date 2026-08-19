@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-19 — current milestone 1.41
+Updated: 2026-08-19 — current milestone 1.42
 
 ## Original 1.0 baseline (delivered)
 
@@ -198,6 +198,19 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] Provenance explainer across intake, cognition, memory, world, decisions, plans and actions
 - [x] Embedding-backed semantic memory recall with lexical fallback
 - [x] ACOS integration of stalled plans, decision-review backlog and overconfidence
+
+### Aurora operations (1.42)
+
+- [x] Bounded, content-addressed workspace checkpoints with exclusion and path confinement
+- [x] Exact restore with an automatic safety checkpoint and blob integrity verification
+- [x] Content deduplication and reference-counted blob reclamation
+- [x] Environment actions bound to a checkpoint as their concrete recovery path
+- [x] Content-free Aurora telemetry snapshot and Prometheus exposition
+- [x] Derived operational alerts across every Aurora subsystem
+- [x] Whole-tenant and per-user export with per-section digests
+- [x] Governed user purge with dry run and stated retention of audit-grade records
+- [x] Cross-store integrity self-check with eleven checks
+- [x] ACOS evaluate phase degradation on critical integrity findings
 
 ## Required for full target parity
 

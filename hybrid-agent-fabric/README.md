@@ -8,7 +8,7 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.41.0
+## Current milestone — 1.42.0
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -75,6 +75,9 @@ Implemented and tested:
 - Aurora autopilot: bounded unattended cadence with a durable run ledger
 - Aurora provenance explainer reconstructing why any artifact exists
 - Embedding-backed semantic memory recall
+- Aurora workspace checkpoints with reversible restore, giving destructive work a real recovery path
+- Content-free Aurora telemetry, derived operational alerts and a cross-store integrity self-check
+- Whole-tenant and per-user Aurora export plus governed user purge with stated retention
 - AES-256-GCM/Vault/KMS credential brokers, scoped leases and pinned 1Password/Bitwarden/command secret sources
 - SSRF-checked bounded public web fetch and normalized Brave/Tavily web search
 - Playwright/CDP browser automation and browser-scoped computer-use
@@ -979,6 +982,36 @@ environment action to its resource, verification and memory updates; an initiati
 that raised it; a memory to its graph neighbourhood; a decision to its constitutional verdict; a plan to
 the decision that justified it. The trace is reconstructed from durable state only — no model is asked
 to narrate causality after the fact — and it reports unresolved references instead of guessing.
+
+## Aurora operations: checkpoints, telemetry and governance
+
+A rollback plan written in prose is not a recovery path. `checkpoint.capture` takes a bounded,
+content-addressed snapshot of the session workspace: limited by file count, per-file size and total
+size, excluding dependency and build directories, confining every path to the workspace root and
+refusing symlinks. `checkpoint.restore` puts the workspace back exactly, takes an automatic safety
+checkpoint first so the rollback is itself reversible, verifies blob integrity before writing, and can
+remove files that were added after the snapshot. Content is deduplicated by digest and reclaimed only
+when no checkpoint still references it. An environment action can bind a checkpoint as its
+`rollbackCheckpointId`, and a recorded rollback names the checkpoint it restored.
+
+Aurora telemetry is content-free by construction: counts, rates and bounded scores across cognition,
+memory, world calibration, initiative trust, society, evolution, environment, decisions, plans,
+constitution, autopilot and ACOS. It is exposed as JSON and as Prometheus gauges on the existing
+`/metrics` scrape, and it is paired with derived alerts — degraded health, exhausted attention budget,
+world inconsistency, miscalibrated predictions, low proactive trust, verification debt, decision
+overconfidence, stalled plans, low constitutional compliance, failing autopilot.
+
+Data governance closes the loop that constitution rule C10 opens: `aurora.export` returns everything
+Aurora holds for a tenant or one user with per-section digests, and `aurora.purge.user` deletes a
+user's stored inferences — defaulting to a dry run and stating exactly which audit-grade records are
+retained rather than silently keeping them.
+
+`aurora.selfcheck` is the cross-store audit no single service can perform: dangling memory relations,
+broken thought anchors, focus without a reservation, attention-reservation drift, verification debt,
+high-zone actions that progressed without approval, decisions referencing a missing option or lacking a
+falsifiable expectation, plans completed with open steps, tasks assigned to removed roles, quarantine
+bypass, ungated production skills and damage to the constitutional hard floor. Critical findings
+degrade the next ACOS cycle instead of sitting in a dashboard nobody reads.
 
 ## Repository bootstrap
 

@@ -124,6 +124,12 @@ import { PlanningService } from "./aurora/planning-service.js";
 import { ExperienceDistiller } from "./aurora/experience-distiller.js";
 import { AuroraAutopilot } from "./aurora/autopilot.js";
 import { ProvenanceService } from "./aurora/provenance-service.js";
+import { WorkspaceCheckpointService } from "./aurora/workspace-checkpoint-service.js";
+import { AuroraMetricsCollector } from "./aurora/aurora-metrics.js";
+import { AuroraDataGovernanceService } from "./aurora/data-governance-service.js";
+import {
+  auroraMetricsCapabilities, checkpointCapabilities, governanceCapabilities,
+} from "./capabilities/aurora-operations.js";
 import {
   autopilotCapabilities, decisionCapabilities, distillerCapabilities, planningCapabilities, provenanceCapabilities,
 } from "./capabilities/aurora-reasoning.js";
@@ -148,6 +154,8 @@ export interface EngineConfig {
   auroraContext?: { enabled?: boolean; constitutionChars?: number; harnessChars?: number; knowledgeChars?: number; memoryChars?: number };
   /** Unattended ACOS cadence. Disabled unless explicitly enabled; bounded by the autopilot ledger. */
   autopilot?: { enabled?: boolean; tenantId?: string; driverIntervalMs?: number };
+  /** Workspace checkpoint bounds for the real rollback path. */
+  checkpoints?: { maxFiles?: number; maxTotalBytes?: number; maxFileBytes?: number; excludes?: string[] };
   kernelServerScript: string;
   sandboxBackend: SandboxBackendKind;
   sshSandbox?: SshSandboxOptions;
@@ -278,6 +286,9 @@ export class HybridAgentEngine {
   readonly distiller: ExperienceDistiller;
   readonly autopilot: AuroraAutopilot;
   readonly provenance: ProvenanceService;
+  readonly checkpoints: WorkspaceCheckpointService;
+  readonly auroraMetrics: AuroraMetricsCollector;
+  readonly dataGovernance: AuroraDataGovernanceService;
 
   constructor(readonly config: EngineConfig) {
     const dataRoot = resolve(config.homePath, "data");
@@ -504,6 +515,7 @@ export class HybridAgentEngine {
     this.riskAnalyzer = new RiskAnalyzerService(dataRoot);
     this.decisions = new DecisionService(dataRoot);
     this.planning = new PlanningService(dataRoot);
+    this.checkpoints = new WorkspaceCheckpointService(dataRoot, config.checkpoints ?? {});
     this.stuckDetector = new StuckDetectorService(this.events);
     // Queued initiatives are mirrored into the Global Workspace so proactive signals compete for
     // attention under the same constitutional budget as every other cognitive object.
@@ -633,6 +645,15 @@ export class HybridAgentEngine {
         }
         return stuck;
       },
+      integrity: async (tenantId) => {
+        const report = await this.dataGovernance.selfCheck(tenantId);
+        return {
+          findings: report.findings.length,
+          critical: report.findings.filter((item) => item.severity === "critical").length,
+          score: report.score,
+          details: report.findings.filter((item) => item.severity !== "info").map((item) => `${item.code}: ${item.detail}`),
+        };
+      },
     });
     for (const capability of constitutionCapabilities(this.constitution)) this.capabilities.register(capability);
     for (const capability of harnessCapabilities(this.harness)) this.capabilities.register(capability);
@@ -662,7 +683,23 @@ export class HybridAgentEngine {
     for (const capability of planningCapabilities(this.planning)) this.capabilities.register(capability);
     for (const capability of distillerCapabilities(this.distiller)) this.capabilities.register(capability);
     for (const capability of autopilotCapabilities(this.autopilot)) this.capabilities.register(capability);
+    this.auroraMetrics = new AuroraMetricsCollector({
+      cognitive: this.cognitive, memoryGraph: this.memoryGraph, worldModel: this.worldModel,
+      initiative: this.initiative, society: this.society, evolution: this.evolution,
+      environment: this.environment, decisions: this.decisions, planning: this.planning,
+      constitution: this.constitution, autopilot: this.autopilot, acos: this.acos,
+    });
+    this.dataGovernance = new AuroraDataGovernanceService({
+      cognitive: this.cognitive, memoryGraph: this.memoryGraph, worldModel: this.worldModel,
+      initiative: this.initiative, userModel: this.userModel, evolution: this.evolution,
+      environment: this.environment, society: this.society, constitution: this.constitution,
+      harness: this.harness, microagents: this.microagents, decisions: this.decisions,
+      planning: this.planning, acos: this.acos,
+    });
     for (const capability of provenanceCapabilities(this.provenance)) this.capabilities.register(capability);
+    for (const capability of checkpointCapabilities(this.checkpoints)) this.capabilities.register(capability);
+    for (const capability of auroraMetricsCapabilities(this.auroraMetrics)) this.capabilities.register(capability);
+    for (const capability of governanceCapabilities(this.dataGovernance)) this.capabilities.register(capability);
     if (config.autopilot?.enabled) {
       // Unattended operation is opt-in; the durable ledger and daily ceiling still bound it.
       void this.autopilot.configure({ tenantId: config.autopilot.tenantId ?? "local", enabled: true })
