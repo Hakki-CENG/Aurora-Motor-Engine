@@ -844,9 +844,32 @@ observations, expired predictions and contradictions are swept, initiatives are 
 attention budget and the harness is pruned. The cycle itself is constitution-checked, and it executes
 nothing directly — every phase calls an already-governed service.
 
+The cognitive economy splits the daily attention budget into named buckets (for example project 0.4,
+research 0.25, user support 0.2). Allocation enforces each bucket's cap in addition to the global
+budget and focus slots, reservations and consumption are accounted per bucket, and everything rolls
+over daily.
+
 `acos.status` returns the whole organism on one screen: identity version, cognitive mode and health,
 attention budget, memory health, initiative trust, evolution index, environment inventory, society
 advisories, constitutional compliance and the user-state estimate.
+
+## Aurora context composition
+
+All of this machinery only matters if it reaches the model. The Aurora context composer assembles one
+bounded block that is appended to the session system prompt on every turn:
+
+- `<AURORA_CONSTITUTION binding="true">` — mission plus principle summaries, governed system content;
+- `<AURORA_HARNESS trust="reviewable-guidance">` — agent-authored lessons that explicitly cannot
+  override policy, approvals or the constitution;
+- `<AURORA_KNOWLEDGE untrusted="true">` — trigger-activated microagent documents, marked as data;
+- `<AURORA_MEMORY untrusted="true">` — recalled memory-graph claims with their layer, type and
+  confidence.
+
+Each section has its own character budget, so a growing knowledge base can never crowd out the user's
+own instructions; overflow is reported rather than silently dropped. Composition is fail-open (a
+failing source degrades quality, never the turn), the block is SHA-256 digested for audit, and its
+size/section count/digest appear in the context-projection stats of `model.request.started`. The whole
+block can be tuned or disabled with the `auroraContext` engine option.
 
 ## Aurora constitution and identity core
 

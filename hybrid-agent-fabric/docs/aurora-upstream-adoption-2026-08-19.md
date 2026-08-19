@@ -96,6 +96,14 @@ per-phase degradation instead of an all-or-nothing failure.
 The cycle itself is constitution-checked, and it never executes side effects directly: every phase
 calls an already-governed service.
 
+### 8. Prompt assembly (Hermes prompt layering, OpenHands microagent recall) → `AuroraContextComposer`
+
+Hermes layers personality, memory and skill context into the system prompt; OpenHands injects
+microagent knowledge as a recall observation. Aurora composes all four of its own sources into one
+budgeted block with explicit trust markers, appends it to the session system prompt, digests it for
+audit and reports its size in context-projection stats. Composition is fail-open, and the base prompt
+and profile instructions stay ahead of it in precedence.
+
 ## What was deliberately not copied
 
 - **Unbounded self-modification.** Prime's `/refine` is adopted; a general "agent edits its own code"

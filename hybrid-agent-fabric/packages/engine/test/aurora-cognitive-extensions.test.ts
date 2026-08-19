@@ -104,6 +104,35 @@ describe("Aurora Phase B extensions: intake, preemption, reflection and cognitiv
     expect(health.mode).toBe("reactive");
   });
 
+  it("enforces cognitive-economy allocation buckets inside the attention budget", async () => {
+    let now = Date.parse("2026-10-01T12:00:00Z");
+    const { service } = await workspace(() => now);
+    await service.configureBudget("tenant", 100_000, 5);
+    await service.configureAllocation("tenant", [{ name: "project", share: 0.4 }, { name: "research", share: 0.2 }]);
+    const view = await service.allocationView("tenant");
+    expect(view).toEqual([
+      expect.objectContaining({ name: "project", capTokens: 40_000, remainingTokens: 40_000 }),
+      expect.objectContaining({ name: "research", capTokens: 20_000, remainingTokens: 20_000 }),
+    ]);
+    const projectWork = await service.createObject({ tenantId: "tenant", kind: "problem", title: "Ship the memory layer", content: "Implement consolidation", sourceType: "agent", confidence: 0.8, importance: 0.9, urgency: 0.8, impact: 0.9, userRelevance: 0.9, horizon: "tactical", bucket: "project", requestedTokens: 30_000 });
+    const overflow = await service.createObject({ tenantId: "tenant", kind: "problem", title: "Second project task", content: "More project work", sourceType: "agent", confidence: 0.8, importance: 0.85, urgency: 0.8, impact: 0.85, userRelevance: 0.85, horizon: "tactical", bucket: "project", requestedTokens: 30_000 });
+    const research = await service.createObject({ tenantId: "tenant", kind: "opportunity", title: "Scan new papers", content: "Weekly literature scan", sourceType: "system", confidence: 0.6, importance: 0.6, urgency: 0.4, impact: 0.6, userRelevance: 0.6, horizon: "strategic", bucket: "research", requestedTokens: 15_000 });
+
+    const allocation = await service.allocateAttention("tenant");
+    expect(allocation.focused.map((item) => item.id)).toEqual([projectWork.id, research.id]);
+    expect(allocation.deferred).toContain(overflow.id);
+    const buckets = Object.fromEntries(allocation.allocation.map((item) => [item.name, item]));
+    expect(buckets["project"]).toMatchObject({ reservedTokens: 30_000, remainingTokens: 10_000 });
+    expect(buckets["research"]).toMatchObject({ reservedTokens: 15_000, remainingTokens: 5_000 });
+
+    await service.completeFocus("tenant", projectWork.id, "solved", 25_000);
+    const after = await service.allocationView("tenant");
+    expect(after[0]).toMatchObject({ name: "project", usedTokens: 25_000, reservedTokens: 0 });
+    await expect(service.configureAllocation("tenant", [{ name: "a", share: 0.7 }, { name: "b", share: 0.5 }])).rejects.toThrow("cannot exceed 1");
+    now += 86_400_000;
+    expect((await service.allocationView("tenant"))[0]).toMatchObject({ usedTokens: 0, reservedTokens: 0 });
+  });
+
   it("keeps older workspace files readable after the intake ledger was introduced", async () => {
     const root = await mkdtemp(join(tmpdir(), "haf-aurora-cognitive-legacy-"));
     const legacy = new CognitiveWorkspaceService(root);

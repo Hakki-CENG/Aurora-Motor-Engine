@@ -19,6 +19,9 @@ export interface ContextProjectionStats {
   externalMemoryProvider?: string;
   externalMemoryEntries?: number;
   externalMemoryStatus?: "disabled" | "hit" | "empty" | "failed";
+  auroraContextChars?: number;
+  auroraContextDigest?: string;
+  auroraContextSections?: number;
 }
 
 export interface ContextProjectionResult {

@@ -118,6 +118,7 @@ import { SkillEvolutionService } from "./evolution/skill-evolution-service.js";
 import { EnvironmentAwarenessService } from "./environment/environment-awareness-service.js";
 import { ConstitutionService } from "./aurora/constitution-service.js";
 import { CognitiveOrchestrator } from "./aurora/cognitive-orchestrator.js";
+import { AuroraContextComposer } from "./aurora/aurora-context-composer.js";
 import { ContinualHarnessService } from "./harness/continual-harness-service.js";
 import { MicroagentRegistry } from "./knowledge/microagent-registry.js";
 import { RiskAnalyzerService } from "./policy/risk-analyzer.js";
@@ -135,6 +136,8 @@ import { environmentCapabilities } from "./capabilities/environment.js";
 
 export interface EngineConfig {
   homePath: string;
+  /** Aurora prompt context block: constitution, harness, microagent knowledge and memory recall. */
+  auroraContext?: { enabled?: boolean; constitutionChars?: number; harnessChars?: number; knowledgeChars?: number; memoryChars?: number };
   kernelServerScript: string;
   sandboxBackend: SandboxBackendKind;
   sshSandbox?: SshSandboxOptions;
@@ -259,6 +262,7 @@ export class HybridAgentEngine {
   readonly riskAnalyzer: RiskAnalyzerService;
   readonly stuckDetector: StuckDetectorService;
   readonly acos: CognitiveOrchestrator;
+  readonly auroraContextComposer: AuroraContextComposer | undefined;
 
   constructor(readonly config: EngineConfig) {
     const dataRoot = resolve(config.homePath, "data");
@@ -345,7 +349,23 @@ export class HybridAgentEngine {
     const rollingCompactor = config.context?.rollingMicroCompaction === false
       ? undefined
       : new RollingMicroCompactor(dataRoot, config.context?.microCompaction);
-    const context = new ContextManager(this.memory, this.skills, this.learning, contextMaxChars, this.hooks, rollingCompactor, this.externalMemory);
+    // Aurora services that feed prompt assembly must exist before the context manager is built.
+    this.constitution = new ConstitutionService(dataRoot);
+    this.harness = new ContinualHarnessService(dataRoot);
+    this.microagents = new MicroagentRegistry(dataRoot);
+    this.memoryGraph = new MemoryGraphService(dataRoot);
+    this.auroraContextComposer = config.auroraContext?.enabled === false
+      ? undefined
+      : new AuroraContextComposer(
+        { constitution: this.constitution, harness: this.harness, microagents: this.microagents, memoryGraph: this.memoryGraph },
+        {
+          ...(config.auroraContext?.constitutionChars !== undefined ? { constitutionChars: config.auroraContext.constitutionChars } : {}),
+          ...(config.auroraContext?.harnessChars !== undefined ? { harnessChars: config.auroraContext.harnessChars } : {}),
+          ...(config.auroraContext?.knowledgeChars !== undefined ? { knowledgeChars: config.auroraContext.knowledgeChars } : {}),
+          ...(config.auroraContext?.memoryChars !== undefined ? { memoryChars: config.auroraContext.memoryChars } : {}),
+        },
+      );
+    const context = new ContextManager(this.memory, this.skills, this.learning, contextMaxChars, this.hooks, rollingCompactor, this.externalMemory, this.auroraContextComposer);
     this.models = new ModelRouter();
     this.providerProfiles = new ProviderProfileRegistry(true, new FileCredentialPoolStateStore(dataRoot));
     this.modelConfigurations = new ModelConfigurationRegistry(dataRoot, this.providerProfiles, this.modelOAuth);
@@ -456,15 +476,11 @@ export class HybridAgentEngine {
     });
     this.society = new AgentSocietyService(dataRoot, this.supervisor, this.agentProfiles, this.events);
     this.cognitive = new CognitiveWorkspaceService(dataRoot);
-    this.memoryGraph = new MemoryGraphService(dataRoot);
     this.worldModel = new WorldModelService(dataRoot);
     this.multiWorld = new MultiWorldModelService(dataRoot);
     this.userModel = new UserModelService(dataRoot);
     this.evolution = new SkillEvolutionService(dataRoot);
     this.environment = new EnvironmentAwarenessService(dataRoot);
-    this.constitution = new ConstitutionService(dataRoot);
-    this.harness = new ContinualHarnessService(dataRoot);
-    this.microagents = new MicroagentRegistry(dataRoot);
     this.riskAnalyzer = new RiskAnalyzerService(dataRoot);
     this.stuckDetector = new StuckDetectorService(this.events);
     // Queued initiatives are mirrored into the Global Workspace so proactive signals compete for

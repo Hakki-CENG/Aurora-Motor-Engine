@@ -7,6 +7,11 @@ import type { HookBus } from "../plugins/hook-bus.js";
 import type { RollingMicroCompactor } from "./rolling-micro-compactor.js";
 import { injectExternalMemoryContext, type ExternalMemoryProviderManager, type ExternalMemorySyncInput, type ExternalMemorySyncResult } from "../memory/external-memory-provider.js";
 
+/** Optional Aurora context source: constitution, harness, microagent knowledge and memory recall. */
+export interface AuroraContextSource {
+  compose(request: { tenantId: string; sessionId?: string; query?: string }): Promise<{ text: string; digest: string; characters: number; sections: Array<{ section: string; characters: number; items: number; omitted: number }> }>;
+}
+
 export interface FrozenSessionContext {
   tenantId?: string;
   sessionId?: string;
@@ -41,6 +46,7 @@ export class ContextManager {
     private readonly hooks?: HookBus,
     private readonly rollingCompactor?: RollingMicroCompactor,
     private readonly externalMemory?: ExternalMemoryProviderManager,
+    private readonly auroraContext?: AuroraContextSource,
   ) {}
 
   async freeze(tenantId: string, sessionId: string, profile?: SessionAgentProfile): Promise<FrozenSessionContext> {
@@ -83,7 +89,7 @@ export class ContextManager {
     messages: AgentMessage[];
     projection: ContextProjectionStats;
   }> {
-    const systemPrompt = [
+    const baseSystemPrompt = [
       frozen.basePrompt,
       "\n<ACTIVE_CAPABILITIES>",
       ...capabilities.map((capability) => `- ${capability.id} [${capability.risk}]: ${capability.description}`),
@@ -98,6 +104,23 @@ export class ContextManager {
     const hiddenTurn = messages.at(-1)?.hidden === true;
     const latestUser = [...messages].reverse().find((message) => message.role === "user" && message.source !== "agent" && !message.hidden);
     const latestUserText = latestUser?.content.filter((part) => part.type === "text").map((part) => part.text).join("\n").trim() ?? "";
+    let auroraStats: { auroraContextChars: number; auroraContextDigest: string; auroraContextSections: number } | undefined;
+    let systemPrompt = baseSystemPrompt;
+    if (this.auroraContext && frozen.tenantId) {
+      try {
+        const block = await this.auroraContext.compose({
+          tenantId: frozen.tenantId,
+          ...(frozen.sessionId ? { sessionId: frozen.sessionId } : {}),
+          ...(latestUserText ? { query: latestUserText } : {}),
+        });
+        if (block.text) {
+          systemPrompt = `${baseSystemPrompt}\n\n${block.text}`;
+          auroraStats = { auroraContextChars: block.characters, auroraContextDigest: block.digest, auroraContextSections: block.sections.length };
+        }
+      } catch {
+        // The Aurora context block is additive. Its failure must never block a turn.
+      }
+    }
     if (!hiddenTurn && this.externalMemory && frozen.tenantId && frozen.sessionId && latestUser && latestUserText) {
       externalMemoryResult = await this.externalMemory.prefetch({
         tenantId: frozen.tenantId,
@@ -132,6 +155,7 @@ export class ContextManager {
           microCompactionWindows: microStats.windows,
           microCompactionCacheHits: microStats.cacheHits,
         } : {}),
+        ...(auroraStats ?? {}),
         ...(externalMemoryResult ? {
           ...(externalMemoryResult.providerId ? { externalMemoryProvider: externalMemoryResult.providerId } : {}),
           externalMemoryEntries: externalMemoryResult.entries.length,

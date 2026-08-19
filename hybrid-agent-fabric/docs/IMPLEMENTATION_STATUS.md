@@ -178,6 +178,9 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] ACOS control loop with cycle modes, durable reports, thought journal and degradation
 - [x] Whole-organism status aggregation across every Aurora subsystem
 - [x] Loop wiring: stuck/stalled signals to cognitive intake, friction to capability gaps
+- [x] Aurora context composition into the session system prompt with per-section budgets and trust markers
+- [x] Fail-open composition, audit digest and context-projection telemetry
+- [x] Cognitive economy: named attention-allocation buckets with enforced caps and daily rollover
 
 ## Required for full target parity
 

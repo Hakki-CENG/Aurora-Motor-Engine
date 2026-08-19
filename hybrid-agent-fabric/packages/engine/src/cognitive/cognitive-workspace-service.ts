@@ -50,6 +50,7 @@ export interface CognitiveObject {
   requestedTokens: number;
   requestedTimeMs: number;
   reservedTokens: number;
+  bucket?: string;
   tags: string[];
   relations: string[];
   iterationHashes: string[];
@@ -112,6 +113,27 @@ export interface CognitiveHealthReport {
   generatedAt: string;
 }
 
+/** Cognitive economy: a named share of the daily attention budget (for example project 40%). */
+export interface CognitiveAllocationBucket {
+  name: string;
+  share: number;
+  usedTokens: number;
+  reservedTokens: number;
+}
+export interface CognitiveAllocationPlan {
+  tenantId: string;
+  date: string;
+  buckets: CognitiveAllocationBucket[];
+}
+export interface CognitiveAllocationView {
+  name: string;
+  share: number;
+  capTokens: number;
+  usedTokens: number;
+  reservedTokens: number;
+  remainingTokens: number;
+}
+
 interface CognitiveState {
   schemaVersion: 1;
   objects: CognitiveObject[];
@@ -120,6 +142,7 @@ interface CognitiveState {
   modes: CognitiveModeState[];
   arbitrations: CognitiveArbitration[];
   intake: CognitiveIntakeRecord[];
+  allocations: CognitiveAllocationPlan[];
 }
 
 const GOAL_WEIGHT: Record<CognitiveGoalClass, number> = { P0: 2, P1: 1.6, P2: 1.25, P3: 1, P4: 0.6 };
@@ -135,7 +158,7 @@ const MODE_TRANSITIONS: Record<CognitiveMode, CognitiveMode[]> = {
 
 /** Durable Global Workspace, attention budget, cognitive modes, loop detection and goal arbitration. */
 export class CognitiveWorkspaceService {
-  private state: CognitiveState = { schemaVersion: 1, objects: [], goals: [], budgets: [], modes: [], arbitrations: [], intake: [] };
+  private state: CognitiveState = { schemaVersion: 1, objects: [], goals: [], budgets: [], modes: [], arbitrations: [], intake: [], allocations: [] };
   private loaded = false;
   private readonly mutex = new AsyncMutex();
   constructor(private readonly rootPath: string, private readonly now: () => number = Date.now) {}
@@ -150,12 +173,12 @@ export class CognitiveWorkspaceService {
   async setGoalState(tenantId: string, id: string, state: CognitiveGoal["state"]): Promise<CognitiveGoal> { return await this.mutex.runExclusive(async () => { const goal = await this.goal(tenantId, id); goal.state = state; goal.updatedAt = new Date(this.now()).toISOString(); if (state !== "active") for (const object of this.state.objects.filter((item) => item.goalId === goal.id && item.attentionState === "focused")) await this.releaseReservation(object, "deferred", 0); await this.save(); return structuredClone(goal); }); }
   async goals(tenantId: string): Promise<CognitiveGoal[]> { await this.load(); return this.state.goals.filter((item) => item.tenantId === tenantId).map((item) => structuredClone(item)); }
 
-  async createObject(input: { tenantId: string; sessionId?: string; kind: CognitiveObjectKind; title: string; content: string; sourceType: CognitiveObject["sourceType"]; sourceId?: string; confidence: number; importance: number; urgency: number; impact: number; userRelevance: number; horizon: CognitiveHorizon; goalId?: string; requestedTokens?: number; requestedTimeMs?: number; tags?: string[]; relations?: string[] }): Promise<CognitiveObject> {
+  async createObject(input: { tenantId: string; sessionId?: string; kind: CognitiveObjectKind; title: string; content: string; sourceType: CognitiveObject["sourceType"]; sourceId?: string; confidence: number; importance: number; urgency: number; impact: number; userRelevance: number; horizon: CognitiveHorizon; goalId?: string; bucket?: string; requestedTokens?: number; requestedTimeMs?: number; tags?: string[]; relations?: string[] }): Promise<CognitiveObject> {
     return await this.mutex.runExclusive(async () => {
       await this.load(); if (this.state.objects.length >= MAX_OBJECTS) throw new Error("Cognitive object limit reached.");
       let goal: CognitiveGoal | undefined; if (input.goalId) { goal = await this.goal(input.tenantId, input.goalId); if (goal.state !== "active") throw new Error("Cognitive object goal is not active."); }
       const confidence = unit(input.confidence, "Confidence"), importance = unit(input.importance, "Importance"), urgency = unit(input.urgency, "Urgency"), impact = unit(input.impact, "Impact"), relevance = unit(input.userRelevance, "User relevance");
-      const now = new Date(this.now()).toISOString(); const value: CognitiveObject = { id: randomUUID(), tenantId: input.tenantId, ...(input.sessionId ? { sessionId: input.sessionId } : {}), kind: input.kind, title: bounded(input.title, 500, "Cognitive object title"), content: bounded(input.content, 100_000, "Cognitive object content"), sourceType: input.sourceType, ...(input.sourceId ? { sourceId: bounded(input.sourceId, 500, "Cognitive source ID") } : {}), confidence, importance, urgency, impact, userRelevance: relevance, priorityScore: calculatePriority(importance, urgency, impact, confidence, relevance, goal?.class ?? "P3"), horizon: input.horizon, ...(goal ? { goalId: goal.id } : {}), state: "new", attentionState: "queued", requestedTokens: integer(input.requestedTokens ?? 10_000, 100, 10_000_000, "Requested cognitive tokens"), requestedTimeMs: integer(input.requestedTimeMs ?? 60_000, 1000, 24 * 60 * 60_000, "Requested cognitive time"), reservedTokens: 0, tags: labels(input.tags ?? []), relations: [...new Set(input.relations ?? [])].slice(0, 200), iterationHashes: [], repeatedIterationCount: 0, createdAt: now, updatedAt: now };
+      const now = new Date(this.now()).toISOString(); const value: CognitiveObject = { id: randomUUID(), tenantId: input.tenantId, ...(input.sessionId ? { sessionId: input.sessionId } : {}), kind: input.kind, title: bounded(input.title, 500, "Cognitive object title"), content: bounded(input.content, 100_000, "Cognitive object content"), sourceType: input.sourceType, ...(input.sourceId ? { sourceId: bounded(input.sourceId, 500, "Cognitive source ID") } : {}), confidence, importance, urgency, impact, userRelevance: relevance, priorityScore: calculatePriority(importance, urgency, impact, confidence, relevance, goal?.class ?? "P3"), horizon: input.horizon, ...(goal ? { goalId: goal.id } : {}), ...(input.bucket ? { bucket: labels([input.bucket])[0]! } : {}), state: "new", attentionState: "queued", requestedTokens: integer(input.requestedTokens ?? 10_000, 100, 10_000_000, "Requested cognitive tokens"), requestedTimeMs: integer(input.requestedTimeMs ?? 60_000, 1000, 24 * 60 * 60_000, "Requested cognitive time"), reservedTokens: 0, tags: labels(input.tags ?? []), relations: [...new Set(input.relations ?? [])].slice(0, 200), iterationHashes: [], repeatedIterationCount: 0, createdAt: now, updatedAt: now };
       this.state.objects.push(value); await this.save(); return structuredClone(value);
     });
   }
@@ -166,14 +189,76 @@ export class CognitiveWorkspaceService {
   async budget(tenantId: string): Promise<CognitiveBudget> { await this.load(); let b=this.state.budgets.find((item)=>item.tenantId===tenantId); if(!b) return await this.configureBudget(tenantId,500_000,8); if(this.rollBudget(b)) await this.save(); return structuredClone(b); }
 
   /**
+   * Configure the cognitive economy: named shares of the daily attention budget. Shares must sum to
+   * at most 1; whatever is left is the implicit `default` pool for unbucketed work.
+   */
+  async configureAllocation(tenantId: string, buckets: Array<{ name: string; share: number }>): Promise<CognitiveAllocationPlan> {
+    return await this.mutex.runExclusive(async () => {
+      await this.load();
+      if (buckets.length > 20) throw new Error("Cognitive allocation supports at most 20 buckets.");
+      const names = new Set<string>();
+      const normalized: CognitiveAllocationBucket[] = [];
+      let total = 0;
+      for (const bucket of buckets) {
+        const name = labels([bucket.name])[0]!;
+        if (names.has(name)) throw new Error("Cognitive allocation bucket names must be unique.");
+        names.add(name);
+        const share = unit(bucket.share, "Allocation share");
+        total += share;
+        normalized.push({ name, share, usedTokens: 0, reservedTokens: 0 });
+      }
+      if (total > 1.000001) throw new Error("Cognitive allocation shares cannot exceed 1.");
+      const existing = this.state.allocations.find((item) => item.tenantId === tenantId);
+      const plan: CognitiveAllocationPlan = { tenantId, date: day(this.now()), buckets: normalized };
+      if (existing) {
+        existing.date = plan.date;
+        existing.buckets = normalized;
+      } else this.state.allocations.push(plan);
+      await this.save();
+      return structuredClone(existing ?? plan);
+    });
+  }
+
+  /** Current per-bucket caps and consumption against the daily attention budget. */
+  async allocationView(tenantId: string): Promise<CognitiveAllocationView[]> {
+    await this.load();
+    const budget = await this.budget(tenantId);
+    const plan = this.state.allocations.find((item) => item.tenantId === tenantId);
+    if (!plan) return [];
+    if (plan.date !== day(this.now())) {
+      for (const bucket of plan.buckets) { bucket.usedTokens = 0; bucket.reservedTokens = 0; }
+      plan.date = day(this.now());
+      await this.save();
+    }
+    return plan.buckets.map((bucket) => {
+      const capTokens = Math.floor(budget.dailyTokenBudget * bucket.share);
+      return {
+        name: bucket.name,
+        share: bucket.share,
+        capTokens,
+        usedTokens: bucket.usedTokens,
+        reservedTokens: bucket.reservedTokens,
+        remainingTokens: Math.max(0, capTokens - bucket.usedTokens - bucket.reservedTokens),
+      };
+    });
+  }
+
+  /**
    * Allocate Global Workspace focus. Ordering is constitutional first (goal class), then priority score.
    * With `preempt`, a strictly higher-ranked candidate may reclaim a focused slot from a lower-ranked
    * object; the preempted object returns to the queue with its reservation released (never lost).
    */
-  async allocateAttention(tenantId: string, options?: { preempt?: boolean }): Promise<{ focused: CognitiveObject[]; deferred: string[]; preempted: string[]; budget: CognitiveBudget }> {
+  async allocateAttention(tenantId: string, options?: { preempt?: boolean }): Promise<{ focused: CognitiveObject[]; deferred: string[]; preempted: string[]; budget: CognitiveBudget; allocation: CognitiveAllocationView[] }> {
     return await this.mutex.runExclusive(async () => {
       await this.load();
       const budget = await this.mutableBudget(tenantId);
+      const plan = this.state.allocations.find((item) => item.tenantId === tenantId);
+      if (plan && plan.date !== day(this.now())) {
+        for (const bucket of plan.buckets) { bucket.usedTokens = 0; bucket.reservedTokens = 0; }
+        plan.date = day(this.now());
+      }
+      const bucketOf = (object: CognitiveObject): CognitiveAllocationBucket | undefined =>
+        plan && object.bucket ? plan.buckets.find((item) => item.name === object.bucket) : undefined;
       const activeGoals = new Map(this.state.goals.filter((g) => g.tenantId === tenantId && g.state === "active").map((g) => [g.id, g]));
       const rank = (object: CognitiveObject): number => {
         const goalClass = object.goalId ? activeGoals.get(object.goalId)?.class ?? "P3" : "P3";
@@ -200,7 +285,11 @@ export class CognitiveWorkspaceService {
             slots++;
           }
         }
-        if (slots <= 0 || budget.usedTokens + budget.reservedTokens + object.requestedTokens > budget.dailyTokenBudget) {
+        const bucket = bucketOf(object);
+        const bucketCap = bucket ? Math.floor(budget.dailyTokenBudget * bucket.share) : undefined;
+        const bucketExhausted = bucket !== undefined && bucketCap !== undefined
+          && bucket.usedTokens + bucket.reservedTokens + object.requestedTokens > bucketCap;
+        if (slots <= 0 || bucketExhausted || budget.usedTokens + budget.reservedTokens + object.requestedTokens > budget.dailyTokenBudget) {
           object.attentionState = "deferred";
           deferred.push(object.id);
           continue;
@@ -210,11 +299,16 @@ export class CognitiveWorkspaceService {
         object.reservedTokens = object.requestedTokens;
         object.updatedAt = new Date(this.now()).toISOString();
         budget.reservedTokens += object.requestedTokens;
+        if (bucket) bucket.reservedTokens += object.requestedTokens;
         slots--;
         allocated.push(structuredClone(object));
       }
       await this.save();
-      return { focused: allocated, deferred, preempted, budget: structuredClone(budget) };
+      const allocation: CognitiveAllocationView[] = (plan?.buckets ?? []).map((bucket) => {
+        const capTokens = Math.floor(budget.dailyTokenBudget * bucket.share);
+        return { name: bucket.name, share: bucket.share, capTokens, usedTokens: bucket.usedTokens, reservedTokens: bucket.reservedTokens, remainingTokens: Math.max(0, capTokens - bucket.usedTokens - bucket.reservedTokens) };
+      });
+      return { focused: allocated, deferred, preempted, budget: structuredClone(budget), allocation };
     });
   }
 
@@ -222,7 +316,7 @@ export class CognitiveWorkspaceService {
    * Automatic event intake. Duplicate signals inside the intake window are recorded and dropped,
    * and a bounded daily intake quota keeps a noisy environment from flooding the workspace.
    */
-  async intake(input: { tenantId: string; source: CognitiveIntakeSource; title: string; content: string; sourceId?: string; sessionId?: string; goalId?: string; confidence?: number; importance?: number; urgency?: number; impact?: number; userRelevance?: number; horizon?: CognitiveHorizon; kind?: CognitiveObjectKind; tags?: string[]; dailyLimit?: number }): Promise<{ accepted: boolean; reason: string; object?: CognitiveObject; record: CognitiveIntakeRecord }> {
+  async intake(input: { tenantId: string; source: CognitiveIntakeSource; title: string; content: string; sourceId?: string; sessionId?: string; goalId?: string; confidence?: number; importance?: number; urgency?: number; impact?: number; userRelevance?: number; horizon?: CognitiveHorizon; kind?: CognitiveObjectKind; tags?: string[]; bucket?: string; dailyLimit?: number }): Promise<{ accepted: boolean; reason: string; object?: CognitiveObject; record: CognitiveIntakeRecord }> {
     const digest = createHash("sha256").update(`${input.source}:${input.title.trim().toLowerCase()}:${input.content.trim()}`).digest("hex");
     const dailyLimit = integer(input.dailyLimit ?? 500, 1, 100_000, "Cognitive intake daily limit");
     const pending = await this.mutex.runExclusive(async () => {
@@ -257,6 +351,7 @@ export class CognitiveWorkspaceService {
       ...(input.sessionId ? { sessionId: input.sessionId } : {}),
       ...(input.goalId ? { goalId: input.goalId } : {}),
       ...(input.tags ? { tags: input.tags } : {}),
+      ...(input.bucket ? { bucket: input.bucket } : {}),
     });
     const record = await this.mutex.runExclusive(async () => {
       await this.load();
@@ -392,13 +487,25 @@ export class CognitiveWorkspaceService {
   async arbitrateGoals(tenantId:string):Promise<CognitiveArbitration>{return await this.mutex.runExclusive(async()=>{await this.load();const goals=this.state.goals.filter(g=>g.tenantId===tenantId&&g.state==="active").sort((a,b)=>GOAL_ORDER[a.class]-GOAL_ORDER[b.class]||goalScore(b)-goalScore(a)||a.createdAt.localeCompare(b.createdAt));const winner=goals[0];const conflicts=winner?goals.filter(g=>g.id!==winner.id&&GOAL_ORDER[g.class]===GOAL_ORDER[winner.class]&&Math.abs(goalScore(g)-goalScore(winner))<.1).map(g=>g.id):[];const result:CognitiveArbitration={id:randomUUID(),tenantId,...(winner?{winnerGoalId:winner.id}:{}),rankedGoalIds:goals.map(g=>g.id),conflictGoalIds:conflicts,reason:winner?`Selected ${winner.class} goal by constitutional class then importance/urgency/user relevance.`:"No active goals.",createdAt:new Date(this.now()).toISOString()};this.state.arbitrations.push(result);if(this.state.arbitrations.length>10_000)this.state.arbitrations.splice(0,this.state.arbitrations.length-10_000);await this.save();return structuredClone(result);});}
   async arbitrations(tenantId:string):Promise<CognitiveArbitration[]>{await this.load();return this.state.arbitrations.filter(a=>a.tenantId===tenantId).map(a=>structuredClone(a));}
 
-  private async releaseReservation(object:CognitiveObject,attention:CognitiveObject["attentionState"],actual:number):Promise<void>{const budget=await this.mutableBudget(object.tenantId);budget.reservedTokens=Math.max(0,budget.reservedTokens-object.reservedTokens);budget.usedTokens=Math.min(budget.dailyTokenBudget,budget.usedTokens+actual);object.reservedTokens=0;object.attentionState=attention;}
+  private async releaseReservation(object:CognitiveObject,attention:CognitiveObject["attentionState"],actual:number):Promise<void>{
+    const budget=await this.mutableBudget(object.tenantId);
+    budget.reservedTokens=Math.max(0,budget.reservedTokens-object.reservedTokens);
+    budget.usedTokens=Math.min(budget.dailyTokenBudget,budget.usedTokens+actual);
+    const plan=this.state.allocations.find((item)=>item.tenantId===object.tenantId);
+    const bucket=plan&&object.bucket?plan.buckets.find((item)=>item.name===object.bucket):undefined;
+    if(bucket){
+      bucket.reservedTokens=Math.max(0,bucket.reservedTokens-object.reservedTokens);
+      bucket.usedTokens+=actual;
+    }
+    object.reservedTokens=0;
+    object.attentionState=attention;
+  }
   private async goal(tenantId:string,id:string):Promise<CognitiveGoal>{await this.load();const g=this.state.goals.find(x=>x.tenantId===tenantId&&x.id===id);if(!g)throw new Error("Cognitive goal not found in tenant.");return g;}
   private async object(tenantId:string,id:string):Promise<CognitiveObject>{await this.load();const o=this.state.objects.find(x=>x.tenantId===tenantId&&x.id===id);if(!o)throw new Error("Cognitive object not found in tenant.");return o;}
   private async mutableBudget(tenantId:string):Promise<CognitiveBudget>{await this.load();let b=this.state.budgets.find(x=>x.tenantId===tenantId);if(!b){b={tenantId,date:day(this.now()),dailyTokenBudget:500_000,usedTokens:0,reservedTokens:0,maxFocusedObjects:8};this.state.budgets.push(b);}this.rollBudget(b);return b;}
   private rollBudget(b:CognitiveBudget):boolean{const current=day(this.now());if(b.date!==current){b.date=current;b.usedTokens=0;b.reservedTokens=0;for(const o of this.state.objects.filter(x=>x.tenantId===b.tenantId&&x.attentionState==="focused")){o.attentionState="queued";o.reservedTokens=0;}return true;}return false;}
   private get path():string{return join(this.rootPath,"cognitive","workspace.json");}
-  private async load():Promise<void>{if(this.loaded)return;try{const raw=await readFile(this.path,"utf8");if(Buffer.byteLength(raw)>MAX_STATE_BYTES)throw new Error("Cognitive workspace exceeds its safety bound.");const parsed=JSON.parse(raw) as CognitiveState;if(parsed.schemaVersion!==1||!Array.isArray(parsed.objects)||!Array.isArray(parsed.goals)||!Array.isArray(parsed.budgets)||!Array.isArray(parsed.modes)||!Array.isArray(parsed.arbitrations))throw new Error("Cognitive workspace is malformed.");if(!Array.isArray(parsed.intake))parsed.intake=[];this.state=parsed;}catch(error){if((error as NodeJS.ErrnoException).code!=="ENOENT")throw error;}this.loaded=true;}
+  private async load():Promise<void>{if(this.loaded)return;try{const raw=await readFile(this.path,"utf8");if(Buffer.byteLength(raw)>MAX_STATE_BYTES)throw new Error("Cognitive workspace exceeds its safety bound.");const parsed=JSON.parse(raw) as CognitiveState;if(parsed.schemaVersion!==1||!Array.isArray(parsed.objects)||!Array.isArray(parsed.goals)||!Array.isArray(parsed.budgets)||!Array.isArray(parsed.modes)||!Array.isArray(parsed.arbitrations))throw new Error("Cognitive workspace is malformed.");if(!Array.isArray(parsed.intake))parsed.intake=[];if(!Array.isArray(parsed.allocations))parsed.allocations=[];this.state=parsed;}catch(error){if((error as NodeJS.ErrnoException).code!=="ENOENT")throw error;}this.loaded=true;}
   private async save():Promise<void>{const encoded=`${JSON.stringify(this.state,null,2)}\n`;if(Buffer.byteLength(encoded)>MAX_STATE_BYTES)throw new Error("Cognitive workspace exceeds its safety bound.");await atomicWrite(this.path,encoded);}
 }
 

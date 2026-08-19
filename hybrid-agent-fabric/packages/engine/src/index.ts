@@ -92,6 +92,7 @@ export * from "./evolution/skill-evolution-service.js";
 export * from "./environment/environment-awareness-service.js";
 export * from "./aurora/constitution-service.js";
 export * from "./aurora/cognitive-orchestrator.js";
+export * from "./aurora/aurora-context-composer.js";
 export * from "./harness/continual-harness-service.js";
 export * from "./knowledge/microagent-registry.js";
 export * from "./policy/risk-analyzer.js";
