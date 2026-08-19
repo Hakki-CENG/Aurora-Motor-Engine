@@ -107,6 +107,51 @@ the failure counter. A tenant that sweeps cleanly clears itself.
 
 ---
 
+## 2b. Delegated execution and role authority
+
+Aurora can hand ready plan steps to society roles and reconcile the results back into the plan.
+
+```bash
+curl -H … "$HAF/v1/plans/$PLAN/delegation-report?tenantId=acme"   # coverage, roles, undelegated ready work
+curl -H … -X POST $HAF/v1/plans/$PLAN/delegate -d '{"tenantId":"acme"}'
+curl -H … -X POST $HAF/v1/delegations/$LINK/activate -d '{"tenantId":"acme"}'   # spawns the child session
+curl -H … -X POST $HAF/v1/delegations/sync -d '{"tenantId":"acme"}'
+curl -H … -X POST $HAF/v1/delegation-policy \
+  -d '{"tenantId":"acme","autoDelegate":true,"rootSessionId":"…","maxActiveTasksPerPlan":3}'
+haf-client aurora delegations
+haf-client aurora delegation-sync
+```
+
+Reading a link: `status` tracks the society task (`posted → nominated → assigned → running →
+completed|failed`), `match` records why that role was chosen (coverage, reputation, score), `outcome`
+carries the child session's evidence event IDs. A step only becomes `done` because a task completed
+with that evidence.
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `skipped: no-role-matches` | No active role covers the required tags | Add tags to a role, pass `capabilityTags`, or relax `requireRoleMatch` |
+| `skipped: plan-concurrency-limit` | Plan already has its allowed tasks in flight | Raise `maxActiveTasksPerPlan` or wait |
+| Link stuck in `posted` | Nomination or award failed; the reason is on the link's `note` | Usually society budget or concurrency — check `/v1/society/budget` |
+| Plan blocked after a failure | A delegated task failed, which fails the step | Replan the step, or detach and re-delegate to another role |
+
+**Role authority.** Without a bound profile, a delegated child session inherits the parent's full
+capability set. Bring the society to least authority:
+
+```bash
+curl -H … $HAF/v1/society/authority/templates            # the eight archetypes
+curl -H … $HAF/v1/society/authority/templates/coder      # resolved ids, ceiling, what was dropped
+curl -H … -X POST $HAF/v1/society/authority/apply-all -d '{"tenantId":"acme"}'
+curl -H … "$HAF/v1/society/authority/audit?tenantId=acme"
+haf-client aurora role-authority
+```
+
+Audit findings: `role-inherits-full-authority` (bind a template), `role-profile-missing` (the profile
+was deleted — re-apply), `profile-drifted-above-template` (someone widened the allowlist by hand —
+re-apply the template or justify the exception). A resolved template with a non-empty
+`unmatchedPatterns` means the template drifted away from the catalog and needs updating.
+
+---
+
 ## 3. Alert playbook
 
 | Alert | Meaning | First action |
@@ -123,6 +168,8 @@ the failure counter. A tenant that sweeps cleanly clears itself.
 | `constitution-compliance-low` | > 20% of reviewed decisions denied or sent to review | Read `/v1/constitution/decisions`; the agent is trying the wrong things |
 | `autopilot-failing` | > 25% of unattended runs fail | Read the run ledger; disable the failing cadence while you fix it |
 | `fleet-tenant-paused` | Circuit breaker opened | Read the sweep ledger for that tenant, fix, then resume |
+| `delegation-failing` | Delegated plan work fails more than it succeeds | Read the failed links' outcomes; the role or the step decomposition is wrong |
+| `roles-inherit-authority` | Over half the roles have no least-authority profile | `POST /v1/society/authority/apply-all` |
 | `acos-degraded` | Last cycle had degraded phases | The cycle report names the phase and the error |
 
 ---
@@ -177,6 +224,7 @@ layer withheld.
 1. `haf-client aurora selfcheck` — integrity score and findings.
 2. `haf-client aurora enforcement-summary` — is governance drifting?
 3. `haf-client aurora fleet` and `fleet-sweeps` — is anything paused or starving?
+3b. `haf-client aurora role-authority` and `delegations` — is anything over-privileged or stuck?
 4. Review distilled proposals; apply the good ones, reject the rest with a reason.
 5. Review decisions due for review and record outcomes — calibration is only real if outcomes are
    recorded.

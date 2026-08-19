@@ -8,7 +8,7 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.44.0
+## Current milestone — 1.45.0
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -73,7 +73,9 @@ Implemented and tested:
 - Aurora dependency-ordered plans with critical path, verification steps and auditable replanning
 - Aurora experience distillation: reusable lessons proposed from real trajectories, never auto-applied
 - Aurora fleet supervision: explicit enrollment, fair bounded sweeps, per-tenant failure isolation and a circuit breaker
-- Aurora terminal operations: an allowlisted read-only CLI surface plus three bounded actions in the headless client
+- Aurora terminal operations: an allowlisted read-only CLI surface plus bounded actions in the headless client
+- Aurora execution bridge: ready plan steps delegated to society roles with recorded match evidence and evidence-bound completion
+- Aurora role authority templates: least-privilege capability allowlists bound to society roles, with drift audit
 - Aurora autopilot: bounded unattended cadence with a durable run ledger
 - Aurora provenance explainer reconstructing why any artifact exists
 - Embedding-backed semantic memory recall
@@ -977,6 +979,31 @@ briefing, weekly review and monthly strategy — drive ACOS cycles and digests, 
 ceiling, quiet hours during which only the fast pulse may run, per-cadence enable/disable and
 exponential backoff on failure. Every run lands in a durable ledger with its outcome and duration, so
 what Aurora did while nobody was watching is always reviewable.
+
+## Aurora execution bridge
+
+A plan that names work nobody is asked to perform is a document, not a system. The execution bridge
+turns ready plan steps into society marketplace tasks and reconciles the results back into the plan.
+Only steps the planner reports as ready may be delegated, so the dependency graph still decides what
+can start. Role selection is deterministic — capability coverage, reputation and current load — and
+the resulting score is stored on the link, so the reason a role was chosen is recorded rather than
+narrated. The nomination bid says in plain words that it is machine-authored.
+
+Completion is evidence-bound: a step becomes `done` because a society task completed and carried its
+child session's event IDs back, not because anything asserted success. A failed task fails the step
+and blocks the plan. Spawning the child session is a separate privileged capability, and unattended
+delegation stays inert until a tenant enables it and names a root session.
+
+## Aurora role authority
+
+Without a profile, a delegated child session inherits the parent's entire capability set — the
+opposite of what a role-specialised society should do. Aurora ships eight reviewed least-authority
+templates (prime, researcher, coder, planner, memory-keeper, guardian, communicator, evolver). Each
+declares allow patterns, deny patterns and a hard risk ceiling, and resolves against the live
+capability catalog, so a template can never grant a capability that does not exist and never quietly
+misses a new one in its family. Everything the ceiling removes is reported, and a pattern that
+matches nothing is surfaced as drift. The guardian template is provably read-only: every capability
+it grants is side-effect free.
 
 ## Aurora fleet supervision
 

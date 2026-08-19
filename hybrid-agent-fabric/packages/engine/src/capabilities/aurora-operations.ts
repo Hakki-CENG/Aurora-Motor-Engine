@@ -1,6 +1,8 @@
 import { z } from "zod";
 import type { AuroraDataGovernanceService } from "../aurora/data-governance-service.js";
+import type { AuroraExecutionBridge } from "../aurora/execution-bridge.js";
 import type { AuroraFleetSupervisor } from "../aurora/fleet-supervisor.js";
+import type { RoleAuthorityService } from "../aurora/role-authority-service.js";
 import type { AuroraMetricsCollector } from "../aurora/aurora-metrics.js";
 import type { WorkspaceCheckpointService } from "../aurora/workspace-checkpoint-service.js";
 import { auroraDefined } from "../util/aurora-state.js";
@@ -119,6 +121,101 @@ export function fleetCapabilities(service: AuroraFleetSupervisor) {
       { id: "aurora.fleet.sweep", version: "1.0.0", description: "Run this tenant's due cadences through the fleet supervisor, honouring the per-sweep cap and circuit breaker.", risk: "privileged", sideEffect: true, source: "core" },
       z.object({}),
       async (_input, ctx) => await service.sweep({ tenantId: ctx.tenantId, limit: 1 }),
+    ),
+  ];
+}
+
+/**
+ * Delegation capabilities close the loop between a plan and the society that executes it. Posting,
+ * nominating and awarding are governed writes; spawning the child session (`plan.activate`) is a
+ * separate, explicitly privileged step so real work never starts as a side effect of planning.
+ */
+export function delegationCapabilities(service: AuroraExecutionBridge) {
+  return [
+    defineCapability(
+      { id: "plan.delegate", version: "1.0.0", description: "Turn ready plan steps into society tasks, nominating the best-matching role with recorded match evidence.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({
+        planId: z.string().min(1).max(300), rootSessionId: z.string().max(200).optional(),
+        stepKeys: z.array(z.string().min(1).max(120)).max(25).optional(), max: z.number().int().min(1).max(25).optional(),
+        priority: z.enum(["critical", "high", "normal", "low"]).optional(), capabilityTags: z.array(z.string()).max(20).optional(),
+        nominate: z.boolean().optional(), award: z.boolean().optional(), activate: z.boolean().optional(),
+      }),
+      async (input, ctx) => await service.delegate(auroraDefined({ tenantId: ctx.tenantId, ...input })),
+    ),
+    defineCapability(
+      { id: "plan.activate", version: "1.0.0", description: "Spawn the child session for an awarded delegation. The one irreversible delegation step, kept explicit.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({ linkId: z.string().min(1).max(300) }),
+      async (input, ctx) => await service.activate(ctx.tenantId, input.linkId),
+    ),
+    defineCapability(
+      { id: "plan.sync", version: "1.0.0", description: "Reconcile society task outcomes back into plan steps, carrying the child session's evidence event IDs.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({ planId: z.string().max(300).optional(), limit: z.number().int().min(1).max(2000).optional() }),
+      async (input, ctx) => await service.sync(auroraDefined({ tenantId: ctx.tenantId, ...input })),
+    ),
+    defineCapability(
+      { id: "plan.delegations", version: "1.0.0", description: "List delegation links with their match evidence, society status and outcomes.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({ planId: z.string().max(300).optional(), openOnly: z.boolean().optional(), limit: z.number().int().min(1).max(1000).optional() }),
+      async (input, ctx) => ({ links: await service.links(ctx.tenantId, auroraDefined(input)) }),
+    ),
+    defineCapability(
+      { id: "plan.delegation-report", version: "1.0.0", description: "How much of a plan is actually being executed, by which roles, with what results.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({ planId: z.string().min(1).max(300) }),
+      async (input, ctx) => await service.report(ctx.tenantId, input.planId),
+    ),
+    defineCapability(
+      { id: "plan.delegation-candidates", version: "1.0.0", description: "Rank the active society roles that could take a piece of work, with coverage, reputation and current load.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({ capabilityTags: z.array(z.string()).max(20) }),
+      async (input, ctx) => ({ candidates: await service.candidates(ctx.tenantId, input.capabilityTags) }),
+    ),
+    defineCapability(
+      { id: "plan.delegation-detach", version: "1.0.0", description: "Unhook a delegation from its plan step without touching the society task, for replanning.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({ linkId: z.string().min(1).max(300), reason: z.string().min(1).max(1000) }),
+      async (input, ctx) => await service.detach(ctx.tenantId, input.linkId, input.reason),
+    ),
+    defineCapability(
+      { id: "plan.delegation-policy", version: "1.0.0", description: "Read or change unattended delegation: auto-delegate, auto-activate, root session and concurrency bounds.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({
+        autoDelegate: z.boolean().optional(), autoActivate: z.boolean().optional(), rootSessionId: z.string().max(200).nullable().optional(),
+        maxActiveTasksPerPlan: z.number().int().min(1).max(100).optional(), maxTasksPerRun: z.number().int().min(1).max(25).optional(),
+        requireRoleMatch: z.boolean().optional(),
+      }),
+      async (input, ctx) => Object.keys(input).length
+        ? await service.configure(auroraDefined({ tenantId: ctx.tenantId, ...input }))
+        : await service.policy(ctx.tenantId),
+    ),
+  ];
+}
+
+/**
+ * Role authority: least-privilege capability allowlists for the society. Reading templates and the
+ * audit is pure; applying one changes who can do what, so it is privileged.
+ */
+export function roleAuthorityCapabilities(service: RoleAuthorityService) {
+  return [
+    defineCapability(
+      { id: "society.authority.templates", version: "1.0.0", description: "List the built-in least-authority role templates with their rationale and risk ceiling.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({}),
+      async () => ({ templates: service.templates() }),
+    ),
+    defineCapability(
+      { id: "society.authority.resolve", version: "1.0.0", description: "Resolve a role template against the live capability catalog without changing anything.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({ templateId: z.string().min(1).max(100) }),
+      async (input) => service.resolve(input.templateId),
+    ),
+    defineCapability(
+      { id: "society.authority.apply", version: "1.0.0", description: "Create or update the agent profile for a role template and bind it to its roles.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({ templateId: z.string().min(1).max(100), roleIds: z.array(z.string().min(1).max(200)).max(50).optional(), bind: z.boolean().optional(), modelRoute: z.string().max(300).optional() }),
+      async (input, ctx) => await service.apply(auroraDefined({ tenantId: ctx.tenantId, ...input })),
+    ),
+    defineCapability(
+      { id: "society.authority.apply-all", version: "1.0.0", description: "Bring the whole society to least authority by applying every built-in template.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({}),
+      async (_input, ctx) => ({ applied: await service.applyAll(ctx.tenantId) }),
+    ),
+    defineCapability(
+      { id: "society.authority.audit", version: "1.0.0", description: "Which roles still inherit full authority, which profiles are missing and which drifted above their template.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({}),
+      async (_input, ctx) => await service.audit(ctx.tenantId),
     ),
   ];
 }

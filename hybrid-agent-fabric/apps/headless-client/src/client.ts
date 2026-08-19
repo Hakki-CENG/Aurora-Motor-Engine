@@ -40,6 +40,9 @@ export const AURORA_VIEWS = {
   "enforcement-summary": "/v1/aurora/enforcement-summary",
   autopilot: "/v1/autopilot",
   "autopilot-runs": "/v1/autopilot/runs",
+  delegations: "/v1/delegations",
+  "role-authority": "/v1/society/authority/audit",
+  "delegation-policy": "/v1/delegation-policy",
   fleet: "/v1/aurora/fleet",
   "fleet-members": "/v1/aurora/fleet/members",
   "fleet-sweeps": "/v1/aurora/fleet/sweeps",
@@ -49,7 +52,7 @@ export const AURORA_VIEWS = {
 } as const satisfies Record<string, string>;
 
 export type AuroraView = keyof typeof AURORA_VIEWS;
-export type AuroraAction = "cycle" | "autopilot-run-due" | "fleet-sweep";
+export type AuroraAction = "cycle" | "autopilot-run-due" | "fleet-sweep" | "delegation-sync";
 
 export class HafApiClient {
   private readonly origin: string;
@@ -137,7 +140,10 @@ export class HafApiClient {
     if (action === "fleet-sweep") {
       return await this.request("/v1/aurora/fleet/sweep", { method: "POST", timeoutMs: 10 * 60_000, body: { tenantId: this.tenantId } });
     }
-    throw new Error(`Unknown Aurora action "${action}". Known actions: cycle, autopilot-run-due, fleet-sweep.`);
+    if (action === "delegation-sync") {
+      return await this.request("/v1/delegations/sync", { method: "POST", timeoutMs: 10 * 60_000, body: { tenantId: this.tenantId } });
+    }
+    throw new Error(`Unknown Aurora action "${action}". Known actions: cycle, autopilot-run-due, fleet-sweep, delegation-sync.`);
   }
 
   async subscribe(sessionId: string, options: EventSubscriptionOptions): Promise<void> {

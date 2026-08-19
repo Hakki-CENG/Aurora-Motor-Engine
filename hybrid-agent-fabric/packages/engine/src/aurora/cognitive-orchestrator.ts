@@ -122,6 +122,8 @@ export class CognitiveOrchestrator {
     private readonly hooks: {
       stuckSessions?: (tenantId: string) => Promise<Array<{ sessionId: string; signature?: string; detail: string }>>;
       integrity?: (tenantId: string) => Promise<{ findings: number; critical: number; score: number; details: string[] }>;
+      /** Plan-to-society reconciliation, and — only if the tenant enabled it — new delegation. */
+      delegation?: (tenantId: string) => Promise<{ synced: number; updatedSteps: number; delegated: number; skipped: number; autoDelegate: boolean }>;
     } = {},
   ) {
     this.store = new DurableJsonState<OrchestratorStateShape>(
@@ -384,10 +386,24 @@ export class CognitiveOrchestrator {
         return { status: "ok", summary: `Focused ${allocation.focused.length}, deferred ${allocation.deferred.length}, preempted ${allocation.preempted.length}.`, detail: { focused: allocation.focused.length, deferred: allocation.deferred.length, preempted: allocation.preempted.length, saturation: accumulator.attention.budgetSaturation } };
       }
       case "execute": {
-        // Execution stays with the governed capability path; the cycle only routes proactive output.
+        // Execution stays with the governed capability path; the cycle only routes proactive output
+        // and reconciles delegated plan work with what the society actually did.
         const evaluation = await this.deps.initiative.evaluate(tenantId);
         accumulator.signals.initiativesQueued = evaluation.queued.length;
-        return { status: "ok", summary: `Evaluated ${evaluation.evaluated} initiative(s): ${evaluation.queued.length} queued, ${evaluation.digested.length} digested.`, detail: { evaluated: evaluation.evaluated, queued: evaluation.queued.length, digested: evaluation.digested.length, trust: evaluation.budget.trustScore } };
+        let delegation: { synced: number; updatedSteps: number; delegated: number; skipped: number; autoDelegate: boolean } | undefined;
+        if (this.hooks.delegation) {
+          delegation = await this.hooks.delegation(tenantId);
+          if (delegation.updatedSteps > 0) accumulator.recommendations.push(`${delegation.updatedSteps} plan step(s) moved because delegated society work changed state.`);
+          if (delegation.autoDelegate && delegation.delegated > 0) accumulator.recommendations.push(`Delegated ${delegation.delegated} ready plan step(s) to the society.`);
+        }
+        return {
+          status: "ok",
+          summary: `Evaluated ${evaluation.evaluated} initiative(s): ${evaluation.queued.length} queued, ${evaluation.digested.length} digested${delegation ? `; reconciled ${delegation.synced} delegation(s), delegated ${delegation.delegated}` : ""}.`,
+          detail: {
+            evaluated: evaluation.evaluated, queued: evaluation.queued.length, digested: evaluation.digested.length, trust: evaluation.budget.trustScore,
+            delegationsSynced: delegation?.synced ?? 0, delegatedSteps: delegation?.delegated ?? 0, delegationStepUpdates: delegation?.updatedSteps ?? 0,
+          },
+        };
       }
       case "evaluate": {
         const cognitiveHealth = await this.deps.cognitive.health(tenantId);

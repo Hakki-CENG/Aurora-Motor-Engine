@@ -75,6 +75,8 @@ and none of it can widen that runtime's authority.
 | L19 enforcement | `AuroraPolicyEngine` in the layered policy stack — evidence-driven, escalation-only | (binds every capability) | `/v1/aurora/enforcement*` | `aurora-policy-enforcement.test.ts` |
 | ACOS orchestration | `CognitiveOrchestrator` + `AuroraAutopilot` | `acos.*`, `autopilot.*` | `/v1/acos/*`, `/v1/autopilot` | `aurora-acos.test.ts`, `aurora-reasoning.test.ts` |
 | Fleet supervision | `AuroraFleetSupervisor` | `aurora.fleet.*` | `/v1/aurora/fleet/*` (system admin) | `aurora-fleet.test.ts` |
+| Execution bridge | `AuroraExecutionBridge` | `plan.delegate`, `plan.sync`, `plan.activate` | `/v1/plans/:id/delegate`, `/v1/delegations/*` | `aurora-delegation.test.ts` |
+| Role authority | `RoleAuthorityService` | `society.authority.*` | `/v1/society/authority/*` | `aurora-role-authority.test.ts` |
 | Explainability | `ProvenanceService` | `aurora.explain` | `/v1/aurora/explain` | `aurora-reasoning.test.ts`, `aurora-end-to-end.test.ts` |
 | Anomaly detection | `StuckDetectorService` | `session.stuck.analyze` | `/v1/sessions/:id/stuck` | `aurora-acos.test.ts` |
 | Recovery | `WorkspaceCheckpointService` — bounded content-addressed snapshots, reversible restore | `checkpoint.*` | `/v1/checkpoints/*` | `aurora-operations.test.ts` |
@@ -107,6 +109,7 @@ All Aurora state is durable, bounded, atomically written and tenant-scoped, unde
 acos/state.json            ACOS cycle reports and thought journal
 acos/autopilot.json        cadence config and unattended run ledger
 acos/fleet.json            fleet enrollment, circuit-breaker state and the sweep ledger
+planning/delegation.json   plan-step to society-task links, match evidence and delegation policy
 checkpoints/state.json     workspace checkpoint manifests (content blobs live under checkpoints/blobs)
 cognitive/workspace.json   objects, goals, budgets, modes, intake ledger, allocation buckets
 constitution/state.json    principles, amendments, decision verdicts, identity core
@@ -160,4 +163,6 @@ predate newer fields, and writes atomically through a temporary file plus rename
 - claim a rollback happened without naming the checkpoint it restored;
 - leak content into telemetry — every exported metric is a count, a rate or a bounded score;
 - keep a user's inferences after a purge, or delete audit-grade records without saying so;
-- drive a tenant unattended that nobody enrolled, or let one tenant's failures stop the rest of the fleet.
+- drive a tenant unattended that nobody enrolled, or let one tenant's failures stop the rest of the fleet;
+- mark a plan step done without a society outcome and its evidence, or start delegated work as a side effect of planning;
+- let a delegated child session inherit more authority than its role's reviewed template grants.

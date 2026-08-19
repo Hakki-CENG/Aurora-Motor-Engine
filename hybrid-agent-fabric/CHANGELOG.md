@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.45.0 — 2026-08-20
+
+- Added the **Aurora execution bridge**: the missing nerve between "Aurora decided what to do" and "the society actually did it". Plan steps become society marketplace tasks, and society outcomes flow back into plan steps with the child session's evidence event IDs.
+- Only steps the planner itself reports as **ready** can be delegated, so the dependency graph still governs execution order; a step already in flight is never delegated twice, and a detached delegation frees the step for re-delegation after replanning.
+- Role selection is deterministic and recorded: capability coverage, earned reputation and current load produce a match score that is stored on the link, so "why this role?" is answered from durable state instead of narrated. A nomination bid is explicitly labelled machine-authored — the bridge never pretends a role volunteered.
+- Spawning the child session (`plan.activate`) is a separate, privileged step: posting and awarding work never starts real execution as a side effect of planning.
+- By default the bridge refuses to post work no active role can satisfy, rather than leaving an orphan task open forever; bounds cover active tasks per plan, tasks per run and links per tenant.
+- Reconciliation maps society reality onto the plan honestly: running → in-progress, completed → done with evidence, failed → failed (blocking the plan), cancelled → ready, and a vanished task detaches instead of freezing the plan.
+- The ACOS **execute** phase now reconciles delegations every cycle and, only when a tenant explicitly enables auto-delegation and names a root session, delegates ready steps unattended.
+- Added **role authority templates**: least-privilege capability allowlists for the agent society. Eight reviewed archetypes (prime, researcher, coder, planner, memory-keeper, guardian, communicator, evolver) each declare allow patterns, deny patterns and a hard risk ceiling.
+- Templates resolve against the **live** capability catalog, so they can never grant an id that does not exist and never miss a newly registered capability in their family; everything the ceiling or a deny pattern removes is reported, and a pattern that matches nothing is surfaced as template drift.
+- Applying a template creates or updates an agent profile and binds it to the roles it was written for, so delegated child sessions run with least authority instead of inheriting the parent's entire capability set. The audit reports roles still inheriting full authority, missing profiles and profiles that drifted above their template.
+- The guardian template is provably read-only: every capability it grants is side-effect free, verified in test.
+- Added governed `plan.delegate|activate|sync|delegations|delegation-report|delegation-candidates|delegation-detach|delegation-policy` and `society.authority.templates|resolve|apply|apply-all|audit` capabilities, tenant-admin REST for all of them, a Canvas "delegation" section (plan delegation, link inspection with match evidence, activate/detach, authority audit and one-click template application) and two new CLI views.
+- Added delegation and authority telemetry (`haf_aurora_delegation`, `haf_aurora_authority`) plus `delegation-failing` and `roles-inherit-authority` alerts.
+- Added 22 tests (391 engine tests total) covering ready-only delegation, deterministic match evidence, double-delegation refusal, the unsatisfiable-tags guard, evidence-carrying completion, failure propagation, per-plan concurrency, coverage reporting, detach-and-redelegate, inert unattended delegation, ACOS reconciliation, tenant isolation, template resolution against the live catalog, risk ceilings, deny patterns, read-only guardians, idempotent application, real session constraint, the authority audit, drift detection and tenant scoping.
+
 ## 1.44.0 — 2026-08-20
 
 - Added the **Aurora fleet supervisor**: the multi-tenant driver above the per-tenant autopilot. Unattended cognition now scales past a single tenant without letting one tenant starve or poison the others.

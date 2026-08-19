@@ -392,7 +392,7 @@ function TasksPanel({session,command,reload,showError}:{session:Session;command:
  * and environment inventory. Every mutation goes through the audited Control API routes.
  */
 function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
-  const [section, setSection] = useState<"acos"|"memory"|"world"|"initiative"|"user"|"evolution"|"environment"|"constitution"|"harness"|"knowledge"|"risk"|"reasoning"|"autopilot"|"fleet"|"operations">("acos");
+  const [section, setSection] = useState<"acos"|"memory"|"world"|"initiative"|"user"|"evolution"|"environment"|"constitution"|"harness"|"knowledge"|"risk"|"reasoning"|"autopilot"|"delegation"|"fleet"|"operations">("acos");
   const [memoryHealth, setMemoryHealth] = useState<any>(null);
   const [anchors, setAnchors] = useState<any[]>([]);
   const [calibration, setCalibration] = useState<any>(null);
@@ -431,6 +431,10 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
   const [proposals, setProposals] = useState<any[]>([]);
   const [autopilot, setAutopilot] = useState<any>(null);
   const [autopilotRuns, setAutopilotRuns] = useState<any[]>([]);
+  const [authorityAudit, setAuthorityAudit] = useState<any>(null);
+  const [authorityTemplates, setAuthorityTemplates] = useState<any[]>([]);
+  const [delegationLinks, setDelegationLinks] = useState<any[]>([]);
+  const [delegationPolicy, setDelegationPolicy] = useState<any>(null);
   const [fleetStatus, setFleetStatus] = useState<any>(null);
   const [fleetMembers, setFleetMembers] = useState<any[]>([]);
   const [fleetSweeps, setFleetSweeps] = useState<any[]>([]);
@@ -507,6 +511,16 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
         api<any>("/v1/aurora/enforcement?tenantId=local&escalatedOnly=true&limit=15"),
       ]);
       setEnforcement(enforcementSummary); setEnforcementLog(enforcementDecisions.decisions);
+      const [delegationResult, delegationPolicyResult] = await Promise.all([
+        api<any>("/v1/delegations?tenantId=local&limit=25"),
+        api<any>("/v1/delegation-policy?tenantId=local"),
+      ]);
+      setDelegationLinks(delegationResult.links); setDelegationPolicy(delegationPolicyResult);
+      const [authorityAuditResult, authorityTemplateResult] = await Promise.all([
+        api<any>("/v1/society/authority/audit?tenantId=local"),
+        api<any>("/v1/society/authority/templates"),
+      ]);
+      setAuthorityAudit(authorityAuditResult); setAuthorityTemplates(authorityTemplateResult.templates);
       // Fleet supervision is system-admin only, so a non-admin operator simply sees an empty panel
       // instead of losing the whole Aurora view to a 403.
       try {
@@ -538,6 +552,13 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
   const rejectProposal = async (id: string) => { try { await api(`/v1/experience/proposals/${id}/reject`, { method: "POST", body: JSON.stringify({ tenantId: "local", reason: "Rejected from Canvas." }) }); await load(); } catch (cause) { showError(cause); } };
   const toggleAutopilot = async (enabled: boolean) => { try { await api("/v1/autopilot", { method: "POST", body: JSON.stringify({ tenantId: "local", enabled }) }); await load(); } catch (cause) { showError(cause); } };
   const runAutopilot = async () => { try { await api("/v1/autopilot/run-due", { method: "POST", body: JSON.stringify({ tenantId: "local" }) }); await load(); } catch (cause) { showError(cause); } };
+  const applyAllAuthority = async () => { try { await api("/v1/society/authority/apply-all", { method: "POST", body: JSON.stringify({ tenantId: "local" }) }); await load(); } catch (cause) { showError(cause); } };
+  const applyAuthority = async (templateId: string) => { try { await api("/v1/society/authority/apply", { method: "POST", body: JSON.stringify({ tenantId: "local", templateId }) }); await load(); } catch (cause) { showError(cause); } };
+  const syncDelegations = async () => { try { await api("/v1/delegations/sync", { method: "POST", body: JSON.stringify({ tenantId: "local" }) }); await load(); } catch (cause) { showError(cause); } };
+  const toggleAutoDelegate = async (autoDelegate: boolean) => { try { await api("/v1/delegation-policy", { method: "POST", body: JSON.stringify({ tenantId: "local", autoDelegate }) }); await load(); } catch (cause) { showError(cause); } };
+  const activateDelegation = async (linkId: string) => { try { await api(`/v1/delegations/${encodeURIComponent(linkId)}/activate`, { method: "POST", body: JSON.stringify({ tenantId: "local" }) }); await load(); } catch (cause) { showError(cause); } };
+  const detachDelegation = async (linkId: string) => { try { await api(`/v1/delegations/${encodeURIComponent(linkId)}/detach`, { method: "POST", body: JSON.stringify({ tenantId: "local", reason: "Detached from Canvas." }) }); await load(); } catch (cause) { showError(cause); } };
+  const delegatePlan = async (planId: string) => { try { await api(`/v1/plans/${encodeURIComponent(planId)}/delegate`, { method: "POST", body: JSON.stringify({ tenantId: "local" }) }); await load(); } catch (cause) { showError(cause); } };
   const enrollTenant = async () => { const tenantId = window.prompt("Enroll tenant into the Aurora fleet:", "local"); if (!tenantId?.trim()) return; try { await api("/v1/aurora/fleet/members", { method: "POST", body: JSON.stringify({ tenantId: tenantId.trim() }) }); await load(); } catch (cause) { showError(cause); } };
   const sweepFleet = async () => { try { await api("/v1/aurora/fleet/sweep", { method: "POST", body: JSON.stringify({}) }); await load(); } catch (cause) { showError(cause); } };
   const setFleetEnabled = async (tenantId: string, enabled: boolean) => { try { await api("/v1/aurora/fleet/members", { method: "POST", body: JSON.stringify({ tenantId, enabled }) }); await load(); } catch (cause) { showError(cause); } };
@@ -548,7 +569,7 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
   return <div className="panel tasks-panel">
     <div className="task-toolbar">
       <b>Aurora substrate</b>
-      {(["acos","memory","world","initiative","user","evolution","environment","constitution","harness","knowledge","risk","reasoning","autopilot","fleet","operations"] as const).map(item => <button key={item} className={section===item?"active":""} onClick={()=>setSection(item)}>{item}</button>)}
+      {(["acos","memory","world","initiative","user","evolution","environment","constitution","harness","knowledge","risk","reasoning","autopilot","delegation","fleet","operations"] as const).map(item => <button key={item} className={section===item?"active":""} onClick={()=>setSection(item)}>{item}</button>)}
       <button onClick={()=>void load()}><RefreshCw size={13}/>Refresh</button>
     </div>
     {section === "acos" && <>
@@ -596,6 +617,15 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
       <div className="task-grid">
         {(autopilot?.cadences ?? []).map((cadence:any) => <article className={`task-card ${cadence.enabled?"":"failed"}`} key={cadence.kind}><h3>{cadence.kind}</h3><p>every {cadence.everyMinutes} minute(s)</p><small>{cadence.enabled?"enabled":"disabled"} · runs {cadence.runCount} · failures {cadence.failureCount} · next {cadence.nextRunAt}</small></article>)}
         {autopilotRuns.map(run => <article className={`task-card ${run.status==="failed"?"failed":"done"}`} key={run.id}><h3>{run.kind} · {run.status}</h3><p>{run.detail}</p><small>{run.startedAt} · {run.durationMs}ms</small></article>)}
+      </div>
+    </>}
+    {section === "delegation" && <>
+      <div className="task-toolbar"><small>{delegationLinks.filter(link=>!["completed","failed","cancelled","detached"].includes(link.status)).length} open · {delegationLinks.length} total · auto-delegate {delegationPolicy?.autoDelegate?"on":"off"} · auto-activate {delegationPolicy?.autoActivate?"on":"off"} · {delegationPolicy?.maxActiveTasksPerPlan ?? 0}/plan · root {delegationPolicy?.rootSessionId?.slice(0,8) ?? "—"}</small><button onClick={()=>void toggleAutoDelegate(!(delegationPolicy?.autoDelegate))}>{delegationPolicy?.autoDelegate?"Disable":"Enable"} auto-delegate</button><button onClick={syncDelegations}>Sync now</button></div>
+      <div className="task-grid">
+        {planList.filter(plan => plan.status === "active" || plan.status === "draft").map(plan => <article className="task-card" key={`delegate-${plan.id}`}><h3>plan · {plan.title}</h3><p>{Math.round(plan.progress*100)}% · {plan.steps.length} step(s)</p><div><button onClick={()=>void delegatePlan(plan.id)}>Delegate ready steps</button></div></article>)}
+        {authorityAudit && <article className={`task-card ${authorityAudit.findings?.some((item:any)=>item.severity==="critical")?"failed":""}`} key="authority-audit"><h3>role authority</h3><p>{authorityAudit.boundRoles}/{authorityAudit.roles} role(s) run with a least-authority profile · ratio {authorityAudit.leastAuthorityRatio}</p><small>{(authorityAudit.findings ?? []).slice(0,3).map((item:any)=>`${item.code}${item.roleId?` (${item.roleId})`:""}`).join(" · ")||"no findings"}</small><div><button onClick={applyAllAuthority}>Apply all templates</button></div></article>}
+        {authorityTemplates.map(template => <article className="task-card" key={template.id}><h3>template · {template.id}</h3><p>{template.title}</p><small>ceiling {template.maxRisk} · roles {template.roleIds.join(", ")}</small><div><button onClick={()=>void applyAuthority(template.id)}>Apply</button></div></article>)}
+        {delegationLinks.map(link => <article className={`task-card ${link.status==="failed"?"failed":link.status==="completed"?"done":""}`} key={link.id}><h3>{link.status} · {link.stepKey}</h3><p>{link.planTitle} → {link.assignedRoleId ?? link.nominatedRoleId ?? "unassigned"}</p><small>tags {link.requiredCapabilityTags.join(", ")||"none"}{link.match?` · coverage ${link.match.coverage} · reputation ${link.match.reputation} · score ${link.match.score}`:""}{link.outcome?` · quality ${link.outcome.quality} · ${link.outcome.evidenceEventIds.length} evidence event(s)`:""}{link.note?` · ${link.note}`:""}</small><div>{link.status==="assigned"&&<button onClick={()=>void activateDelegation(link.id)}>Activate</button>}{!["completed","failed","cancelled","detached"].includes(link.status)&&<button className="danger" onClick={()=>void detachDelegation(link.id)}>Detach</button>}</div></article>)}
       </div>
     </>}
     {section === "fleet" && <>

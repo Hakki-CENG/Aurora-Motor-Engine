@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-20 — current milestone 1.44
+Updated: 2026-08-20 — current milestone 1.45
 
 ## Original 1.0 baseline (delivered)
 
@@ -235,6 +235,20 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] Canvas fleet section with enroll/enable/resume/withdraw/sweep controls
 - [x] Allowlisted read-only Aurora CLI views plus three bounded CLI actions
 - [x] Operator runbook: health checks, tuning, alert playbook, recovery and privacy requests
+
+### Aurora execution bridge and role authority (1.45)
+
+- [x] Plan step to society task delegation restricted to planner-reported ready steps
+- [x] Deterministic, recorded role matching (coverage, reputation, load) with machine-authored nomination
+- [x] Award without implicit execution; child-session spawn as a separate privileged capability
+- [x] Refusal to post work no active role can satisfy, with per-plan and per-run bounds
+- [x] Evidence-bound reconciliation of society outcomes into plan steps
+- [x] Detach-and-redelegate path for replanning
+- [x] ACOS execute-phase reconciliation and opt-in unattended delegation
+- [x] Eight least-authority role templates with allow/deny patterns and risk ceilings
+- [x] Template resolution against the live capability catalog with drift reporting
+- [x] Idempotent template application, role binding and least-authority audit
+- [x] Delegation and authority telemetry with derived alerts
 
 ## Required for full target parity
 
