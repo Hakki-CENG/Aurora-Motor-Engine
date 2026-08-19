@@ -140,3 +140,9 @@ export function auroraRound(value: number, digits = 6): number {
 export function auroraArray(value: unknown): boolean {
   return Array.isArray(value);
 }
+
+/** Strips `undefined` values so optional zod fields satisfy exactOptionalPropertyTypes contracts. */
+export type AuroraDefined<T> = { [K in keyof T]-?: Exclude<T[K], undefined> };
+export function auroraDefined<T extends Record<string, unknown>>(value: T): AuroraDefined<T> {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as AuroraDefined<T>;
+}

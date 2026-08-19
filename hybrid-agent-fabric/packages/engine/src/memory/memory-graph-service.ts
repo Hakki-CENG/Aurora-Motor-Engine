@@ -110,6 +110,15 @@ export interface MemoryHealthReport {
   generatedAt: string;
 }
 
+export interface MemoryInsightCandidate {
+  leftId: string;
+  rightId: string;
+  sharedTags: string[];
+  noveltyScore: number;
+  rationale: string;
+  suggestedTitle: string;
+}
+
 export interface MemoryConsolidationReport {
   tenantId: string;
   layer: MemoryLayer;
@@ -557,6 +566,70 @@ export class MemoryGraphService {
       }
       return found;
     });
+  }
+
+  /**
+   * Dream Mode concept formation: find distant-but-related memories that share tags yet have never
+   * been connected, and propose them as insight candidates. Nothing is written until the caller
+   * materializes a candidate, so creative association can never quietly become a stored fact.
+   */
+  async proposeInsights(tenantId: string, options?: { minSharedTags?: number; minImportance?: number; limit?: number }): Promise<MemoryInsightCandidate[]> {
+    const minShared = auroraInteger(options?.minSharedTags ?? 1, 1, 20, "Insight shared-tag minimum");
+    const minImportance = options?.minImportance === undefined ? 0.3 : auroraUnit(options.minImportance, "Insight importance minimum");
+    const limit = auroraInteger(options?.limit ?? 10, 1, 100, "Insight limit");
+    const state = await this.store.read();
+    const pool = state.memories.filter((item) => item.tenantId === tenantId && item.state === "active" && item.importance >= minImportance && item.tags.length > 0);
+    const connected = new Set(state.relations.filter((item) => item.tenantId === tenantId).map((item) => [item.fromId, item.toId].sort().join("::")));
+    const candidates: MemoryInsightCandidate[] = [];
+    for (let i = 0; i < pool.length; i++) {
+      for (let j = i + 1; j < pool.length; j++) {
+        const left = pool[i]!;
+        const right = pool[j]!;
+        if (connected.has([left.id, right.id].sort().join("::"))) continue;
+        const shared = left.tags.filter((tag) => right.tags.includes(tag));
+        if (shared.length < minShared) continue;
+        const union = new Set([...left.tags, ...right.tags]).size;
+        const overlap = shared.length / union;
+        // Distance: different layers or claim types mean the connection crosses a knowledge boundary.
+        const distance = (left.layer === right.layer ? 0.5 : 1) * (left.claimType === right.claimType ? 0.8 : 1.1);
+        const lexical = 1 - auroraSimilarity(`${left.title} ${left.content}`, `${right.title} ${right.content}`);
+        const novelty = auroraRound(overlap * distance * lexical * ((left.importance + right.importance) / 2));
+        if (novelty <= 0) continue;
+        candidates.push({
+          leftId: left.id,
+          rightId: right.id,
+          sharedTags: shared,
+          noveltyScore: novelty,
+          rationale: `Shared tags [${shared.join(", ")}] across ${left.layer}/${left.claimType} and ${right.layer}/${right.claimType} with low textual overlap.`,
+          suggestedTitle: `Connection: ${left.title} <-> ${right.title}`.slice(0, 300),
+        });
+      }
+    }
+    return candidates.sort((a, b) => b.noveltyScore - a.noveltyScore).slice(0, limit);
+  }
+
+  /** Materialize an insight candidate as a palace-layer hypothesis linked to both sources. */
+  async materializeInsight(input: { tenantId: string; leftId: string; rightId: string; title: string; content: string; confidence?: number; importance?: number; tags?: string[] }): Promise<MemoryObjectRecord> {
+    const left = await this.get(input.tenantId, input.leftId);
+    const right = await this.get(input.tenantId, input.rightId);
+    const insight = await this.remember({
+      tenantId: input.tenantId,
+      layer: "palace",
+      claimType: "hypothesis",
+      title: input.title,
+      content: input.content,
+      sourceType: "memory",
+      sourceId: left.id,
+      confidence: input.confidence ?? 0.3,
+      importance: input.importance ?? Math.max(left.importance, right.importance),
+      tags: input.tags ?? [...new Set([...left.tags, ...right.tags])].slice(0, 100),
+      evidenceRefs: [...new Set([...left.evidenceRefs, ...right.evidenceRefs])].slice(0, 200),
+    });
+    await this.relate({ tenantId: input.tenantId, fromId: insight.id, toId: left.id, type: "derived-from", strength: 0.6 });
+    await this.relate({ tenantId: input.tenantId, fromId: insight.id, toId: right.id, type: "derived-from", strength: 0.6 });
+    // The insight asserts the connection itself, so the source pair is no longer an open candidate.
+    await this.relate({ tenantId: input.tenantId, fromId: left.id, toId: right.id, type: "relates", strength: 0.5, evidenceRefs: [insight.id] });
+    return insight;
   }
 
   async health(tenantId: string): Promise<MemoryHealthReport> {

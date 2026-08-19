@@ -116,6 +116,16 @@ import { ProactiveInitiativeService } from "./initiative/proactive-initiative-se
 import { UserModelService } from "./user/user-model-service.js";
 import { SkillEvolutionService } from "./evolution/skill-evolution-service.js";
 import { EnvironmentAwarenessService } from "./environment/environment-awareness-service.js";
+import { ConstitutionService } from "./aurora/constitution-service.js";
+import { CognitiveOrchestrator } from "./aurora/cognitive-orchestrator.js";
+import { ContinualHarnessService } from "./harness/continual-harness-service.js";
+import { MicroagentRegistry } from "./knowledge/microagent-registry.js";
+import { RiskAnalyzerService } from "./policy/risk-analyzer.js";
+import { StuckDetectorService } from "./runtime/stuck-detector.js";
+import {
+  constitutionCapabilities, harnessCapabilities, insightCapabilities, microagentCapabilities,
+  orchestratorCapabilities, riskCapabilities, stuckCapabilities,
+} from "./capabilities/aurora-core.js";
 import { memoryGraphCapabilities } from "./capabilities/memory-graph.js";
 import { multiWorldCapabilities, worldModelCapabilities } from "./capabilities/world-model.js";
 import { initiativeCapabilities } from "./capabilities/initiative.js";
@@ -243,6 +253,12 @@ export class HybridAgentEngine {
   readonly userModel: UserModelService;
   readonly evolution: SkillEvolutionService;
   readonly environment: EnvironmentAwarenessService;
+  readonly constitution: ConstitutionService;
+  readonly harness: ContinualHarnessService;
+  readonly microagents: MicroagentRegistry;
+  readonly riskAnalyzer: RiskAnalyzerService;
+  readonly stuckDetector: StuckDetectorService;
+  readonly acos: CognitiveOrchestrator;
 
   constructor(readonly config: EngineConfig) {
     const dataRoot = resolve(config.homePath, "data");
@@ -446,6 +462,11 @@ export class HybridAgentEngine {
     this.userModel = new UserModelService(dataRoot);
     this.evolution = new SkillEvolutionService(dataRoot);
     this.environment = new EnvironmentAwarenessService(dataRoot);
+    this.constitution = new ConstitutionService(dataRoot);
+    this.harness = new ContinualHarnessService(dataRoot);
+    this.microagents = new MicroagentRegistry(dataRoot);
+    this.riskAnalyzer = new RiskAnalyzerService(dataRoot);
+    this.stuckDetector = new StuckDetectorService(this.events);
     // Queued initiatives are mirrored into the Global Workspace so proactive signals compete for
     // attention under the same constitutional budget as every other cognitive object.
     this.initiative = new ProactiveInitiativeService(dataRoot, Date.now, {
@@ -545,6 +566,41 @@ export class HybridAgentEngine {
     for (const capability of userModelCapabilities(this.userModel)) this.capabilities.register(capability);
     for (const capability of evolutionCapabilities(this.evolution)) this.capabilities.register(capability);
     for (const capability of environmentCapabilities(this.environment)) this.capabilities.register(capability);
+    // ACOS is constructed last: it composes every governed Aurora service into one control loop.
+    this.acos = new CognitiveOrchestrator(dataRoot, {
+      cognitive: this.cognitive,
+      memoryGraph: this.memoryGraph,
+      worldModel: this.worldModel,
+      initiative: this.initiative,
+      userModel: this.userModel,
+      evolution: this.evolution,
+      environment: this.environment,
+      society: this.society,
+      constitution: this.constitution,
+      harness: this.harness,
+    }, Date.now, {
+      stuckSessions: async (tenantId) => {
+        const sessions = (await this.supervisor.listSessions()).filter((item) => item.tenantId === tenantId && item.status !== "closed").slice(0, 20);
+        const stuck: Array<{ sessionId: string; signature?: string; detail: string }> = [];
+        for (const session of sessions) {
+          const report = await this.stuckDetector.analyze(session.sessionId);
+          if (!report.stuck) continue;
+          stuck.push({
+            sessionId: session.sessionId,
+            ...(report.frictionSignature ? { signature: report.frictionSignature } : {}),
+            detail: report.patterns.map((item) => `${item.code} x${item.occurrences}: ${item.detail}`).join(" | ").slice(0, 5000),
+          });
+        }
+        return stuck;
+      },
+    });
+    for (const capability of constitutionCapabilities(this.constitution)) this.capabilities.register(capability);
+    for (const capability of harnessCapabilities(this.harness)) this.capabilities.register(capability);
+    for (const capability of microagentCapabilities(this.microagents)) this.capabilities.register(capability);
+    for (const capability of riskCapabilities(this.riskAnalyzer)) this.capabilities.register(capability);
+    for (const capability of stuckCapabilities(this.stuckDetector)) this.capabilities.register(capability);
+    for (const capability of orchestratorCapabilities(this.acos)) this.capabilities.register(capability);
+    for (const capability of insightCapabilities(this.memoryGraph)) this.capabilities.register(capability);
   }
 
   registerModelProvider(provider: ModelProvider, makeDefault = false): void {

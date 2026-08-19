@@ -24,6 +24,11 @@ describe("Aurora substrate engine integration", () => {
       "user.model.observe", "user.model.forget", "user.state.estimate",
       "evolution.gap.observe", "evolution.stage.advance", "evolution.index",
       "environment.resource.register", "environment.action.plan", "environment.action.verify", "environment.inventory",
+      "constitution.principles", "constitution.check", "constitution.compliance", "constitution.projection",
+      "harness.refine", "harness.rollback", "harness.project",
+      "microagents.register", "microagents.recall",
+      "risk.assess", "risk.policy.set", "session.stuck.analyze",
+      "acos.cycle.run", "acos.status", "acos.journal", "memory.insights.propose",
     ]) {
       expect(ids.has(id), `missing capability ${id}`).toBe(true);
     }

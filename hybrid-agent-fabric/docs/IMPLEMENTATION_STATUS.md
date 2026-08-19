@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-19 — current milestone 1.39
+Updated: 2026-08-19 — current milestone 1.40
 
 ## Original 1.0 baseline (delivered)
 
@@ -155,6 +155,29 @@ Source audit: [`aurora-pdf-feature-audit.md`](aurora-pdf-feature-audit.md). Each
 - [x] Unexpected-outcome flagging and tool execution reputation with automatic degradation
 - [x] Workspace habit learning and continuous project awareness with stale-project detection
 
+
+### Aurora core (upstream-derived, 1.40)
+
+Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-adoption-2026-08-19.md).
+
+- [x] Constitutional principle registry with hard/soft severity and stable codes
+- [x] Long-Term Identity Core: versioned mission and append-only continuity log
+- [x] Deterministic Internal Constitution Checker with allow/review/deny, remedies and audit
+- [x] Governed amendments; built-in hard principles cannot be softened or retired
+- [x] Constitutional compliance reporting and bounded prompt projection
+- [x] Continual Harness CRUD over prompt notes, memories, skill specs and sub-agent specs
+- [x] Size-limited, rate-limited, evidence-backed refinement batches with snapshots
+- [x] Ordered rollback by refinement ID plus effectiveness feedback and pruning
+- [x] Character-budgeted harness projection with usage accounting
+- [x] Microagent registry with always/keyword/glob/manual activation and recall budgets
+- [x] Prompt-injection screening with quarantine and named human review
+- [x] Escalation-only risk analyzer with built-in destructive-pattern rules and tenant rules
+- [x] Confirmation policy modes plus undisableable critical rules and safe-zone hints
+- [x] Model-free stuck detection across seven patterns with evidence event IDs
+- [x] Dream-Mode concept formation with explicit materialization
+- [x] ACOS control loop with cycle modes, durable reports, thought journal and degradation
+- [x] Whole-organism status aggregation across every Aurora subsystem
+- [x] Loop wiring: stuck/stalled signals to cognitive intake, friction to capability gaps
 
 ## Required for full target parity
 

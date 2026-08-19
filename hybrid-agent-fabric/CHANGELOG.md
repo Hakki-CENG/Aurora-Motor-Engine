@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.40.0 — 2026-08-19
+
+- Re-read the Aurora architecture source in full and re-audited OpenHands, Prime Agent and Hermes Agent, then adopted their strongest ideas into Aurora under explicit governance. Adoption rationale and refusals are recorded in `docs/aurora-upstream-adoption-2026-08-19.md`.
+- Added the Aurora constitutional identity core: sixteen seeded principles (the twelve cross-cutting PDF rules plus four ACOS operating principles), a versioned mission, an append-only continuity log and governed amendments with an approver, reason and version bump.
+- Added a deterministic Internal Constitution Checker: declared decision attributes produce allow/review/deny with violated principle codes, concrete remedies and a durable audit trail plus compliance reporting; built-in hard principles cannot be softened or retired, including by Aurora itself.
+- Added the Continual Harness (Prime-derived): prompt notes, memories, skill specs and sub-agent specs as CRUD state the agent may refine from its own trajectory, with size-limited and rate-limited evidence-backed batches, per-scope snapshots, ordered rollback by ID, effectiveness feedback, pruning and character-budgeted prompt projection. The base system prompt, policy, profiles and capability allowlists stay outside this surface.
+- Added the microagent knowledge registry (OpenHands-derived): always-on, keyword, glob and manual activation with recall budgets, prompt-injection screening that quarantines documents until a human review, effectiveness feedback and content digests.
+- Added the escalation-only risk analyzer and confirmation policy: eighteen built-in destructive-pattern rules, tenant rules, risk levels, safe-zone hints, confirmation modes and a rolling risk posture. It can raise scrutiny but never grant authority, and built-in critical rules cannot be disabled.
+- Added model-free stuck detection over the durable event log: repeated actions, repeated error classes, two-capability oscillation, monologue, byte-identical output, approval starvation and fired runtime guardrails, with evidence event IDs and a friction signature.
+- Added Dream-Mode concept formation: proposes connections between related but unlinked memories scored by tag overlap, cross-layer distance, textual dissimilarity and importance; candidates only become memories through an explicit materialization that links both sources.
+- Added ACOS, the Aurora Cognitive Operating System control loop: one bounded tick walking observe, update-world, prioritize, allocate, execute, evaluate, learn, remember, reflect and evolve across every Aurora subsystem, with cycle modes, durable cycle reports, a thought journal, whole-organism status and per-phase degradation instead of all-or-nothing failure. The cycle is itself constitution-checked and executes no side effects directly.
+- Wired the loop end to end: stuck sessions and stalled projects become sourced cognitive objects, blocked repeated-loop thoughts become evidence-backed capability-gap observations, and queued initiatives compete for the same constitutional attention budget.
+- Added governed `constitution.*`, `harness.*`, `microagents.*`, `risk.*`, `session.stuck.analyze`, `acos.*` and `memory.insights.*` capabilities, tenant-admin REST for every new subsystem and Canvas Aurora panel sections for ACOS cycles/journal, constitution, harness refinements with rollback, knowledge/microagent quarantine review and risk posture.
+- Added 26 tests covering constitutional verdicts and immutability, harness batching/rollback/pruning, microagent activation/quarantine/demotion, risk escalation and policy floors, every stuck pattern, insight formation and full/degraded ACOS cycles.
+
 ## 1.39.0 — 2026-08-19
 
 - Completed the Aurora PDF integration order: Phase A/B extensions plus Phases C, D, E, F and G, without removing or weakening any existing HAF capability.

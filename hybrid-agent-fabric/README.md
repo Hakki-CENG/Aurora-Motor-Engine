@@ -8,7 +8,7 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.39.0
+## Current milestone — 1.40.0
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -63,6 +63,12 @@ Implemented and tested:
 - Aurora governed user cognitive model with consent, correction, deletion, advice effectiveness and protected-topic refusal
 - Aurora staged skill/workflow evolution with gap detection, evidence gates, regression protection, retirement and evolution index
 - Aurora environment inventory, zone 0-4 action records with mandatory verification/rollback and tool execution reputation
+- Aurora constitutional identity core with versioned mission, governed amendments and a deterministic decision checker
+- Aurora Continual Harness: reviewable, snapshotted, rollback-capable self-improvement of prompts, memories, skill and sub-agent specs
+- Aurora microagent knowledge with trigger activation, recall budgets and injection-screening quarantine
+- Aurora escalation-only risk analyzer with destructive-pattern rules, confirmation policy and safe-zone hints
+- Aurora model-free stuck detection over the event log, feeding cognitive intake and capability-gap learning
+- Aurora ACOS control loop with cycle reports, thought journal and whole-organism status
 - AES-256-GCM/Vault/KMS credential brokers, scoped leases and pinned 1Password/Bitwarden/command secret sources
 - SSRF-checked bounded public web fetch and normalized Brave/Tavily web search
 - Playwright/CDP browser automation and browser-scoped computer-use
@@ -822,6 +828,72 @@ success rates, and continuous project awareness records open tasks, risks,
 progress and stale projects for the project watcher. This layer records and
 governs — execution itself still goes through the capability broker, policy
 engine, sandboxes, credential broker and approval service.
+
+## Aurora ACOS control loop
+
+Every Aurora subsystem is durable and independently governed; ACOS is what makes them one organism.
+`acos.cycle.run` executes one bounded tick — Observe, Update World, Prioritize, Allocate, Execute,
+Evaluate, Learn, Remember, Reflect, Evolve — in `full`, `maintenance`, `reflection`, `dream` or
+`emergency` mode. The cycle writes a durable report (phase results, attention allocation, health
+scores, signal counts, recommendations) plus thought-journal entries, and a failing phase degrades the
+cycle instead of aborting the organism.
+
+The loop is wired to real signals, not just metrics: stuck sessions and stalled projects become
+sourced cognitive objects, repeated-loop blocked thoughts become evidence-backed capability-gap
+observations, expired predictions and contradictions are swept, initiatives are evaluated against the
+attention budget and the harness is pruned. The cycle itself is constitution-checked, and it executes
+nothing directly — every phase calls an already-governed service.
+
+`acos.status` returns the whole organism on one screen: identity version, cognitive mode and health,
+attention budget, memory health, initiative trust, evolution index, environment inventory, society
+advisories, constitutional compliance and the user-state estimate.
+
+## Aurora constitution and identity core
+
+Sixteen principles are seeded per tenant: the twelve cross-cutting rules extracted from the Aurora
+architecture plus four ACOS operating principles, each with a stable code (`C1`–`C12`, `P1`–`P4`),
+category and `hard`/`soft` severity. The Long-Term Identity Core holds the mission, an identity
+version and an append-only continuity log.
+
+`constitution.check` is a deterministic rule engine over declared decision attributes — destructive,
+irreversible, external side effect, approval, evidence, rollback plan, verification, claim type,
+confidence, user relevance, self-modification, staged evolution, dissent, budget. Hard violations deny,
+soft violations require review, and every verdict is stored with the violated codes, remedies and an
+attribute digest. Amendments require an approver, a reason and a version bump; built-in hard
+principles can be clarified but never softened or retired — including by Aurora itself.
+
+## Aurora Continual Harness
+
+The harness is the scaffolding around the model — supplemental prompt notes, durable memories, skill
+descriptions and sub-agent specifications — and Aurora may improve it from its own trajectory through
+`harness.refine`. Refinements are batches (default maximum eight operations, rate-limited per day),
+each one snapshots the affected scope first, records its trigger, rationale and evidence, and can be
+rolled back by ID; newer refinements in the same scope must be rolled back first.
+
+Entries carry origin, use count, helpful/unhelpful feedback and effectiveness, so `harness.prune`
+removes agent-authored lessons that are unused or consistently unhelpful. Projection into a prompt is
+character-budgeted and priority-ordered. The immutable base system prompt, policy engine, agent
+profiles and capability allowlists are outside this surface by construction, so self-improvement can
+never widen authority.
+
+## Aurora microagents, risk analysis and stuck detection
+
+Microagents are small knowledge documents that load themselves when relevant: `always`, `keyword`,
+`glob` or `manual` activation, recall inside a character budget, effectiveness feedback and content
+digests. Because knowledge is prompt content, every write is screened for instruction override, role
+hijack, policy bypass, credential exfiltration, autonomy escalation and destructive instructions; a
+finding quarantines the document until a named human reviewer clears it.
+
+The risk analyzer scores a proposed capability call against eighteen built-in destructive-pattern
+rules plus tenant rules, returning `low`/`medium`/`high`/`critical`, a confirmation requirement from
+the tenant policy (`never`, `critical`, `high`, `medium`, `all`) and a safe execution zone hint. It is
+escalation-only — it can require more scrutiny but never grants authority — and built-in critical
+rules cannot be disabled.
+
+Stuck detection is model-free analysis over the durable event log: repeated actions, repeated error
+classes, two-capability oscillation, monologue, byte-identical output, approval starvation and fired
+runtime guardrails, each with evidence event IDs. ACOS turns those findings into cognitive objects and
+capability-gap observations, so being stuck becomes a learning signal instead of a silent stall.
 
 ## Repository bootstrap
 

@@ -392,7 +392,7 @@ function TasksPanel({session,command,reload,showError}:{session:Session;command:
  * and environment inventory. Every mutation goes through the audited Control API routes.
  */
 function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
-  const [section, setSection] = useState<"memory"|"world"|"initiative"|"user"|"evolution"|"environment">("memory");
+  const [section, setSection] = useState<"acos"|"memory"|"world"|"initiative"|"user"|"evolution"|"environment"|"constitution"|"harness"|"knowledge"|"risk">("acos");
   const [memoryHealth, setMemoryHealth] = useState<any>(null);
   const [anchors, setAnchors] = useState<any[]>([]);
   const [calibration, setCalibration] = useState<any>(null);
@@ -412,6 +412,18 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
   const [resources, setResources] = useState<any[]>([]);
   const [unverified, setUnverified] = useState<any[]>([]);
   const [question, setQuestion] = useState("");
+  const [acosStatus, setAcosStatus] = useState<any>(null);
+  const [cycles, setCycles] = useState<any[]>([]);
+  const [journal, setJournal] = useState<any[]>([]);
+  const [principles, setPrinciples] = useState<any[]>([]);
+  const [identity, setIdentity] = useState<any>(null);
+  const [compliance, setCompliance] = useState<any>(null);
+  const [harnessEntries, setHarnessEntries] = useState<any[]>([]);
+  const [refinements, setRefinements] = useState<any[]>([]);
+  const [microagents, setMicroagents] = useState<any[]>([]);
+  const [riskPolicy, setRiskPolicy] = useState<any>(null);
+  const [riskPosture, setRiskPosture] = useState<any>(null);
+  const [insights, setInsights] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -437,6 +449,22 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
       setAnalyses(analysisList.analyses); setPerspectives(perspectiveList.perspectives); setInitiatives(initiativeList.initiatives);
       setInitiativeBudget(budget); setUserSummary(summary); setUserState(estimate); setGaps(gapList.gaps); setCandidates(candidateList.candidates);
       setEvolutionIndex(index); setInventory(inv); setResources(resourceList.resources); setUnverified(unverifiedList.actions);
+      const [status, cycleList, journalList, principleList, identityCore, complianceReport, harnessList, refinementList, microagentList, policy, posture] = await Promise.all([
+        api<any>("/v1/acos/status?tenantId=local"),
+        api<any>("/v1/acos/cycles?tenantId=local&limit=10"),
+        api<any>("/v1/acos/journal?tenantId=local&limit=25"),
+        api<any>("/v1/constitution/principles?tenantId=local&status=active"),
+        api<any>("/v1/constitution/identity?tenantId=local"),
+        api<any>("/v1/constitution/compliance?tenantId=local"),
+        api<any>("/v1/harness/entries?tenantId=local"),
+        api<any>("/v1/harness/refinements?tenantId=local&limit=20"),
+        api<any>("/v1/microagents?tenantId=local"),
+        api<any>("/v1/risk/policy?tenantId=local"),
+        api<any>("/v1/risk/posture?tenantId=local"),
+      ]);
+      setAcosStatus(status); setCycles(cycleList.cycles); setJournal(journalList.entries); setPrinciples(principleList.principles);
+      setIdentity(identityCore); setCompliance(complianceReport); setHarnessEntries(harnessList.entries); setRefinements(refinementList.refinements);
+      setMicroagents(microagentList.microagents); setRiskPolicy(policy); setRiskPosture(posture);
     } catch (cause) { showError(cause); }
   }, [showError, userId]);
   useEffect(() => { void load(); }, [load]);
@@ -449,14 +477,51 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
   const deliver = async (id: string) => { try { await api(`/v1/initiative/initiatives/${id}/delivered`, { method: "POST", body: JSON.stringify({ tenantId: "local", channel: "canvas" }) }); await load(); } catch (cause) { showError(cause); } };
   const forgetUser = async () => { try { await api(`/v1/user-model/${encodeURIComponent(userId)}?tenantId=local`, { method: "DELETE" }); await load(); } catch (cause) { showError(cause); } };
   const openAnalysis = async () => { if (!question.trim()) return; try { await api("/v1/multiworld/analyses", { method: "POST", body: JSON.stringify({ tenantId: "local", question: question.trim(), problemType: "general" }) }); setQuestion(""); await load(); } catch (cause) { showError(cause); } };
+  const runCycle = async (mode: string) => { try { await api("/v1/acos/cycles", { method: "POST", body: JSON.stringify({ tenantId: "local", mode }) }); await load(); } catch (cause) { showError(cause); } };
+  const rollbackRefinement = async (id: string) => { try { await api(`/v1/harness/refinements/${id}/rollback`, { method: "POST", body: JSON.stringify({ tenantId: "local" }) }); await load(); } catch (cause) { showError(cause); } };
+  const approveMicroagent = async (id: string) => { try { await api(`/v1/microagents/${id}/approve`, { method: "POST", body: JSON.stringify({ tenantId: "local", reviewer: "canvas-operator" }) }); await load(); } catch (cause) { showError(cause); } };
+  const setRiskMode = async (mode: string) => { try { await api("/v1/risk/policy", { method: "POST", body: JSON.stringify({ tenantId: "local", mode }) }); await load(); } catch (cause) { showError(cause); } };
+  const proposeInsights = async () => { try { const result = await api<any>("/v1/memory-graph/insights", { method: "POST", body: JSON.stringify({ tenantId: "local", limit: 5 }) }); setInsights(result.candidates); } catch (cause) { showError(cause); } };
   const retirementSweep = async () => { try { await api("/v1/evolution/retirement-sweep", { method: "POST", body: JSON.stringify({ tenantId: "local" }) }); await load(); } catch (cause) { showError(cause); } };
 
   return <div className="panel tasks-panel">
     <div className="task-toolbar">
       <b>Aurora substrate</b>
-      {(["memory","world","initiative","user","evolution","environment"] as const).map(item => <button key={item} className={section===item?"active":""} onClick={()=>setSection(item)}>{item}</button>)}
+      {(["acos","memory","world","initiative","user","evolution","environment","constitution","harness","knowledge","risk"] as const).map(item => <button key={item} className={section===item?"active":""} onClick={()=>setSection(item)}>{item}</button>)}
       <button onClick={()=>void load()}><RefreshCw size={13}/>Refresh</button>
     </div>
+    {section === "acos" && <>
+      <div className="task-toolbar"><small>identity v{acosStatus?.identity?.version ?? "—"} · mode {acosStatus?.mode ?? "—"} · cognitive {acosStatus?.cognitive?.health ?? "—"} · memory {acosStatus?.memory?.health ?? "—"} · compliance {acosStatus?.constitution?.complianceRate ?? "—"} · evolution {acosStatus?.evolution?.index ?? "—"}</small><button onClick={()=>void runCycle("full")}>Run full cycle</button><button onClick={()=>void runCycle("maintenance")}>Maintenance</button><button onClick={()=>void runCycle("reflection")}>Reflection</button></div>
+      <div className="task-grid">
+        {cycles.map(cycle => <article className={`task-card ${cycle.degraded.length?"failed":"done"}`} key={cycle.id}><h3>cycle #{cycle.sequence} · {cycle.mode}</h3><p>{cycle.phases.map((phase:any)=>`${phase.phase}:${phase.status}`).join(" · ")}</p><small>focused {cycle.attention.focused} · deferred {cycle.attention.deferred} · preempted {cycle.attention.preempted} · queued initiatives {cycle.signals.initiativesQueued} · gaps {cycle.signals.gaps} · verdict {cycle.constitutionVerdict}</small>{cycle.recommendations.length>0&&<code>{cycle.recommendations.slice(0,3).join(" | ")}</code>}</article>)}
+        {journal.map(entry => <article className="task-card" key={entry.id}><h3>{entry.kind} · {entry.title}</h3><p>{entry.body.slice(0,400)}</p><small>{entry.at}</small></article>)}
+      </div>
+    </>}
+    {section === "constitution" && <>
+      <div className="task-toolbar"><small>mission v{identity?.version ?? "—"} · {principles.length} active principles · compliance {compliance?.complianceRate ?? "—"} ({compliance?.denied ?? 0} denied, {compliance?.review ?? 0} review)</small></div>
+      <div className="task-grid">
+        {identity && <article className="task-card"><h3>Identity core v{identity.version}</h3><p>{identity.mission}</p><small>{identity.continuity.length} continuity entry(ies)</small></article>}
+        {principles.map(principle => <article className={`task-card ${principle.severity==="hard"?"failed":""}`} key={principle.id}><h3>{principle.code} · {principle.title}</h3><p>{principle.statement}</p><small>{principle.severity} · {principle.category} · v{principle.version}{principle.builtin?" · builtin":""}</small></article>)}
+      </div>
+    </>}
+    {section === "harness" && <>
+      <div className="task-toolbar"><small>{harnessEntries.length} harness entry(ies) · {refinements.filter(item=>item.status==="applied").length} applied refinement(s)</small></div>
+      <div className="task-grid">
+        {harnessEntries.map(entry => <article className="task-card" key={entry.id}><h3>{entry.component} · {entry.key}</h3><p>{entry.body.slice(0,300)}</p><small>{entry.scope} · priority {entry.priority} · used {entry.useCount} · effectiveness {entry.effectiveness} · {entry.origin}</small></article>)}
+        {refinements.map(refinement => <article className={`task-card ${refinement.status==="rolled-back"?"failed":""}`} key={refinement.id}><h3>refinement · {refinement.trigger.slice(0,80)}</h3><p>{refinement.rationale.slice(0,300)}</p><small>{refinement.status} · {refinement.operations.length} operation(s) · {refinement.appliedAt}</small>{refinement.status==="applied"&&<div><button className="danger" onClick={()=>void rollbackRefinement(refinement.id)}>Roll back</button></div>}</article>)}
+      </div>
+    </>}
+    {section === "knowledge" && <>
+      <div className="task-toolbar"><small>{microagents.length} microagent(s) · {microagents.filter(item=>!item.screened).length} quarantined</small><button onClick={proposeInsights}>Propose insights</button></div>
+      <div className="task-grid">
+        {microagents.map(agent => <article className={`task-card ${agent.screened?"":"failed"}`} key={agent.id}><h3>{agent.name} · {agent.activation}</h3><p>{agent.summary}</p><small>{agent.enabled?"enabled":"disabled"} · priority {agent.priority} · recalled {agent.recallCount} · effectiveness {agent.effectiveness}{agent.screeningFindings.length?` · findings: ${agent.screeningFindings.join(", ")}`:""}</small>{!agent.screened&&<div><button onClick={()=>void approveMicroagent(agent.id)}>Review and enable</button></div>}</article>)}
+        {insights.map(candidate => <article className="task-card" key={`${candidate.leftId}-${candidate.rightId}`}><h3>insight candidate</h3><p>{candidate.suggestedTitle}</p><small>novelty {candidate.noveltyScore} · shared tags {candidate.sharedTags.join(", ")}</small></article>)}
+      </div>
+    </>}
+    {section === "risk" && <>
+      <div className="task-toolbar"><small>confirmation mode {riskPolicy?.mode ?? "—"} · {riskPosture?.total ?? 0} assessment(s) · confirmation rate {riskPosture?.confirmationRate ?? "—"}</small><select value={riskPolicy?.mode ?? "high"} onChange={e=>void setRiskMode(e.target.value)}><option value="never">never</option><option value="critical">critical</option><option value="high">high</option><option value="medium">medium</option><option value="all">all</option></select></div>
+      <div className="task-grid">{(riskPosture?.topRules ?? []).map((rule:any) => <article className="task-card" key={rule.code}><h3>{rule.code}</h3><p>Triggered {rule.count} time(s) in the window.</p></article>)}{Object.entries(riskPosture?.byLevel ?? {}).map(([level,count]) => <article className={`task-card ${level==="critical"?"failed":""}`} key={level}><h3>{level}</h3><p>{String(count)} assessment(s)</p></article>)}</div>
+    </>}
     {section === "memory" && <>
       <div className="task-toolbar"><small>health {memoryHealth ? memoryHealth.healthScore.toFixed(3) : "—"} · {memoryHealth?.total ?? 0} objects · {memoryHealth?.contradicted?.length ?? 0} contradicted · {memoryHealth?.stale?.length ?? 0} stale</small><button onClick={consolidate}>Consolidate episodes</button><button onClick={scanContradictions}>Scan contradictions</button></div>
       <div className="task-grid">{anchors.map(anchor => <article className="task-card" key={anchor.id}><h3>anchor · {anchor.title}</h3><p>{anchor.question}</p><small>{anchor.status} · importance {anchor.importance} · confidence {anchor.confidence} · next review {anchor.nextReviewAt.slice(0,10)}</small><code>next step: {anchor.nextStep}</code></article>)}</div>
