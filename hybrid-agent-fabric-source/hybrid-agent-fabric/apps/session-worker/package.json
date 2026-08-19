@@ -1,0 +1,14 @@
+{
+  "name": "@haf/session-worker",
+  "version": "1.38.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node dist/main.js",
+    "build": "tsc -b tsconfig.json --force",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@haf/engine": "1.38.0"
+  }
+}

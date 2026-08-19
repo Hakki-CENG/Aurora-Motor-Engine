@@ -1,0 +1,21 @@
+{
+  "name": "@haf/desktop",
+  "version": "1.38.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -b tsconfig.json --force",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "start": "electron dist/main.js",
+    "package": "npm run build && electron-builder --config electron-builder.config.cjs"
+  },
+  "devDependencies": {
+    "electron": "^41.7.1",
+    "electron-builder": "^26.0.12"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
