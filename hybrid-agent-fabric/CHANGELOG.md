@@ -10,7 +10,9 @@
 - Upgraded memory recall to semantic search: the memory graph now shares the engine's embedding-backed hybrid index, blending embedding similarity with lexical overlap, importance, confidence and recency so paraphrased questions recall the right memory. Indexing is fail-open and falls back to the previous lexical behaviour.
 - Wired the new layers into ACOS: the prioritize phase surfaces stalled plans with their ready steps, and the evaluate phase surfaces the decision-review backlog and flags systematic overconfidence; whole-organism status now reports decision calibration and active-plan progress.
 - Added governed `decision.*`, `plan.*`, `experience.*`, `autopilot.*` and `aurora.explain` capabilities, tenant-admin REST for all of them, and Canvas Aurora sections for reasoning (decisions, plans, distilled proposals with apply/reject) and autopilot (cadences and run ledger).
-- Added 16 tests (334 engine tests total) covering decision ranking/override/calibration, plan cycles/critical path/revision/supersession/stall detection, distillation thresholds and governed application, autopilot bounds, provenance tracing and semantic recall.
+- Added `docs/aurora-architecture.md`: the complete layer map (L0-L19 plus ACOS, explainability and anomaly detection) with the service, capability, REST surface and test that implement each layer, where each constitutional invariant is enforced, the on-disk state layout and the end-to-end journey.
+- Added an end-to-end journey test that carries one real signal through intake, initiative, attention, memory, multi-perspective dissent, constitutional review, decision, plan, verified action, outcome feedback, a full ACOS cycle and provenance reconstruction.
+- Added 17 tests (335 engine tests total) covering decision ranking/override/calibration, plan cycles/critical path/revision/supersession/stall detection, distillation thresholds and governed application, autopilot bounds, provenance tracing and semantic recall.
 
 ## 1.40.0 — 2026-08-19
 

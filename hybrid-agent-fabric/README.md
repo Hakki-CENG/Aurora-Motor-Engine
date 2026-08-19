@@ -625,6 +625,13 @@ forks inherit the parent's frozen profile, so delegation cannot recover hidden
 capabilities. Profiles may specialize behavior but cannot weaken policy,
 approvals, effect journals, sandbox or credential isolation.
 
+## Aurora architecture map
+
+[`docs/aurora-architecture.md`](docs/aurora-architecture.md) is the single reference for the Aurora
+system: every architectural layer with the service, capability, REST surface and test that implements
+it, where each constitutional invariant is enforced, the on-disk state layout, and the end-to-end
+journey test that carries one signal from observation to explained, verified action.
+
 ## Aurora Agent Society
 
 The 125-page Aurora architecture is tracked in
