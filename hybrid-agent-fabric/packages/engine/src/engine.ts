@@ -127,13 +127,14 @@ import { AuroraAutopilot } from "./aurora/autopilot.js";
 import { AuroraFleetSupervisor } from "./aurora/fleet-supervisor.js";
 import { AuroraExecutionBridge } from "./aurora/execution-bridge.js";
 import { RoleAuthorityService } from "./aurora/role-authority-service.js";
+import { AuroraOutcomeHarvester } from "./aurora/outcome-harvester.js";
 import { ProvenanceService } from "./aurora/provenance-service.js";
 import { WorkspaceCheckpointService } from "./aurora/workspace-checkpoint-service.js";
 import { AuroraMetricsCollector } from "./aurora/aurora-metrics.js";
 import { AuroraDataGovernanceService } from "./aurora/data-governance-service.js";
 import {
   auroraMetricsCapabilities, checkpointCapabilities, delegationCapabilities, fleetCapabilities, governanceCapabilities,
-  roleAuthorityCapabilities,
+  harvestCapabilities, roleAuthorityCapabilities,
 } from "./capabilities/aurora-operations.js";
 import {
   autopilotCapabilities, decisionCapabilities, distillerCapabilities, planningCapabilities, provenanceCapabilities,
@@ -305,6 +306,7 @@ export class HybridAgentEngine {
   readonly auroraFleet: AuroraFleetSupervisor;
   readonly delegation: AuroraExecutionBridge;
   readonly roleAuthority: RoleAuthorityService;
+  readonly harvester: AuroraOutcomeHarvester;
   readonly provenance: ProvenanceService;
   readonly checkpoints: WorkspaceCheckpointService;
   readonly auroraMetrics: AuroraMetricsCollector;
@@ -665,6 +667,12 @@ export class HybridAgentEngine {
     for (const capability of environmentCapabilities(this.environment)) this.capabilities.register(capability);
     this.delegation = new AuroraExecutionBridge(dataRoot, { planning: this.planning, society: this.society });
     this.roleAuthority = new RoleAuthorityService({ capabilities: this.capabilities, profiles: this.agentProfiles, society: this.society });
+    this.harvester = new AuroraOutcomeHarvester(dataRoot, {
+      bridge: this.delegation,
+      society: this.society,
+      sessions: { session: async (sessionId: string) => await this.supervisor.getSession(sessionId) },
+      events: this.events,
+    });
     // ACOS is constructed last: it composes every governed Aurora service into one control loop.
     this.acos = new CognitiveOrchestrator(dataRoot, {
       cognitive: this.cognitive,
@@ -694,7 +702,7 @@ export class HybridAgentEngine {
         }
         return stuck;
       },
-      delegation: async (tenantId) => await this.delegation.runCycle(tenantId),
+      delegation: async (tenantId) => await this.harvester.runCycle(tenantId),
       integrity: async (tenantId) => {
         const report = await this.dataGovernance.selfCheck(tenantId);
         return {
@@ -740,12 +748,13 @@ export class HybridAgentEngine {
     for (const capability of fleetCapabilities(this.auroraFleet)) this.capabilities.register(capability);
     for (const capability of delegationCapabilities(this.delegation)) this.capabilities.register(capability);
     for (const capability of roleAuthorityCapabilities(this.roleAuthority)) this.capabilities.register(capability);
+    for (const capability of harvestCapabilities(this.harvester)) this.capabilities.register(capability);
     this.auroraMetrics = new AuroraMetricsCollector({
       cognitive: this.cognitive, memoryGraph: this.memoryGraph, worldModel: this.worldModel,
       initiative: this.initiative, society: this.society, evolution: this.evolution,
       environment: this.environment, decisions: this.decisions, planning: this.planning,
       constitution: this.constitution, autopilot: this.autopilot, fleet: this.auroraFleet, acos: this.acos,
-      delegation: this.delegation, roleAuthority: this.roleAuthority,
+      delegation: this.delegation, roleAuthority: this.roleAuthority, harvester: this.harvester,
     });
     this.dataGovernance = new AuroraDataGovernanceService({
       cognitive: this.cognitive, memoryGraph: this.memoryGraph, worldModel: this.worldModel,

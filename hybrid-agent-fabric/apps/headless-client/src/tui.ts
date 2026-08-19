@@ -1,5 +1,5 @@
 import { createInterface, type Interface } from "node:readline";
-import { HafApiClient, type SessionEvent } from "./client.js";
+import { AURORA_VIEWS, HafApiClient, type AuroraAction, type AuroraView, type SessionEvent } from "./client.js";
 
 export async function runTui(client: HafApiClient): Promise<void> {
   if (!process.stdin.isTTY || !process.stdout.isTTY) throw new Error("tui mode requires an interactive terminal; use rpc or run for headless automation.");
@@ -82,6 +82,24 @@ export async function runTui(client: HafApiClient): Promise<void> {
       case "approve": if (!argument) throw new Error("Usage: /approve <approval-id>"); await client.resolveApproval(argument, "approve_once"); break;
       case "approve-session": if (!argument) throw new Error("Usage: /approve-session <approval-id>"); await client.resolveApproval(argument, "approve_session"); break;
       case "deny": if (!argument) throw new Error("Usage: /deny <approval-id>"); await client.resolveApproval(argument, "deny"); break;
+      case "aurora": {
+        // The cognitive layer is reachable from the same terminal as the conversation: read-only
+        // views by default, and only the same bounded actions the CLI exposes.
+        if (!argument || argument === "help") {
+          write(`views: ${Object.keys(AURORA_VIEWS).join(", ")}\nactions: cycle, autopilot-run-due, fleet-sweep, delegation-sync, harvest\n`);
+          break;
+        }
+        const [target, ...flags] = argument.split(/\s+/);
+        const actions: AuroraAction[] = ["cycle", "autopilot-run-due", "fleet-sweep", "delegation-sync", "harvest"];
+        const limitFlag = flags.indexOf("--limit");
+        const limit = limitFlag >= 0 ? Number(flags[limitFlag + 1]) : undefined;
+        if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 1000)) throw new Error("--limit must be an integer between 1 and 1000.");
+        const value = actions.includes(target as AuroraAction)
+          ? await client.auroraAction(target as AuroraAction)
+          : await client.auroraView(target as AuroraView, limit !== undefined ? { limit } : {});
+        write(`${JSON.stringify(value, null, 2)}\n`);
+        break;
+      }
       case "multi": multiline = true; draft = []; write("[multiline mode; enter a single . to submit]\n"); break;
       case "quit": case "exit": stopSubscription(); terminal.close(); break;
       default: throw new Error(`Unknown command /${command}; use /help.`);
@@ -107,7 +125,7 @@ export async function runTui(client: HafApiClient): Promise<void> {
     if (multiline) { multiline = false; draft = []; write("\n[multiline cancelled]\n"); prompt(); return; }
     if (sessionId) void client.command(sessionId, "session.cancel", {}).catch(() => undefined);
   });
-  write("Hybrid Agent Fabric TUI 1.38.0 — /help for commands\n");
+  write("Hybrid Agent Fabric TUI 1.46.0 — /help for commands\n");
   prompt();
   await new Promise<void>((resolve) => terminal.once("close", resolve));
   stopSubscription();
@@ -119,7 +137,9 @@ function showHelp(): void {
     "/new [name]       create a session", "/load <id>       load a session", "/sessions        list sessions",
     "/status          show health/session", "/events [seq]    recent event metadata", "/multi           multiline prompt; . submits",
     "/model <route>   select provider:model", "/pause /resume /cancel /compact /close", "/approvals       list approvals",
-    "/approve <id> /approve-session <id> /deny <id>", "/quit", "Plain input sends a prompt.", "",
+    "/approve <id> /approve-session <id> /deny <id>",
+    "/aurora [view|action] [--limit N]   Aurora status, alerts, delegations, fleet, harvest (/aurora help)",
+    "/quit", "Plain input sends a prompt.", "",
   ].join("\n"));
 }
 function requireSession(value: string | undefined): asserts value is string { if (!value) throw new Error("Create or load a session first."); }

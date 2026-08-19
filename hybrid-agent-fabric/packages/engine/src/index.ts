@@ -101,6 +101,7 @@ export * from "./aurora/autopilot.js";
 export * from "./aurora/fleet-supervisor.js";
 export * from "./aurora/execution-bridge.js";
 export * from "./aurora/role-authority-service.js";
+export * from "./aurora/outcome-harvester.js";
 export * from "./aurora/provenance-service.js";
 export * from "./aurora/workspace-checkpoint-service.js";
 export * from "./aurora/aurora-metrics.js";

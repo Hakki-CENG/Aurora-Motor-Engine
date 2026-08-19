@@ -433,6 +433,7 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
   const [autopilotRuns, setAutopilotRuns] = useState<any[]>([]);
   const [authorityAudit, setAuthorityAudit] = useState<any>(null);
   const [authorityTemplates, setAuthorityTemplates] = useState<any[]>([]);
+  const [harvestReview, setHarvestReview] = useState<any[]>([]);
   const [delegationLinks, setDelegationLinks] = useState<any[]>([]);
   const [delegationPolicy, setDelegationPolicy] = useState<any>(null);
   const [fleetStatus, setFleetStatus] = useState<any>(null);
@@ -521,6 +522,8 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
         api<any>("/v1/society/authority/templates"),
       ]);
       setAuthorityAudit(authorityAuditResult); setAuthorityTemplates(authorityTemplateResult.templates);
+      const reviewResult = await api<any>("/v1/harvest-review?tenantId=local&limit=15");
+      setHarvestReview(reviewResult.review);
       // Fleet supervision is system-admin only, so a non-admin operator simply sees an empty panel
       // instead of losing the whole Aurora view to a 403.
       try {
@@ -554,6 +557,8 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
   const runAutopilot = async () => { try { await api("/v1/autopilot/run-due", { method: "POST", body: JSON.stringify({ tenantId: "local" }) }); await load(); } catch (cause) { showError(cause); } };
   const applyAllAuthority = async () => { try { await api("/v1/society/authority/apply-all", { method: "POST", body: JSON.stringify({ tenantId: "local" }) }); await load(); } catch (cause) { showError(cause); } };
   const applyAuthority = async (templateId: string) => { try { await api("/v1/society/authority/apply", { method: "POST", body: JSON.stringify({ tenantId: "local", templateId }) }); await load(); } catch (cause) { showError(cause); } };
+  const harvestOutcomes = async () => { try { await api("/v1/delegations/harvest", { method: "POST", body: JSON.stringify({ tenantId: "local" }) }); await load(); } catch (cause) { showError(cause); } };
+  const resolveHarvest = async (assessmentId: string, success: boolean) => { try { await api(`/v1/harvest-review/${encodeURIComponent(assessmentId)}/resolve`, { method: "POST", body: JSON.stringify({ tenantId: "local", success }) }); await load(); } catch (cause) { showError(cause); } };
   const syncDelegations = async () => { try { await api("/v1/delegations/sync", { method: "POST", body: JSON.stringify({ tenantId: "local" }) }); await load(); } catch (cause) { showError(cause); } };
   const toggleAutoDelegate = async (autoDelegate: boolean) => { try { await api("/v1/delegation-policy", { method: "POST", body: JSON.stringify({ tenantId: "local", autoDelegate }) }); await load(); } catch (cause) { showError(cause); } };
   const activateDelegation = async (linkId: string) => { try { await api(`/v1/delegations/${encodeURIComponent(linkId)}/activate`, { method: "POST", body: JSON.stringify({ tenantId: "local" }) }); await load(); } catch (cause) { showError(cause); } };
@@ -620,11 +625,12 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
       </div>
     </>}
     {section === "delegation" && <>
-      <div className="task-toolbar"><small>{delegationLinks.filter(link=>!["completed","failed","cancelled","detached"].includes(link.status)).length} open · {delegationLinks.length} total · auto-delegate {delegationPolicy?.autoDelegate?"on":"off"} · auto-activate {delegationPolicy?.autoActivate?"on":"off"} · {delegationPolicy?.maxActiveTasksPerPlan ?? 0}/plan · root {delegationPolicy?.rootSessionId?.slice(0,8) ?? "—"}</small><button onClick={()=>void toggleAutoDelegate(!(delegationPolicy?.autoDelegate))}>{delegationPolicy?.autoDelegate?"Disable":"Enable"} auto-delegate</button><button onClick={syncDelegations}>Sync now</button></div>
+      <div className="task-toolbar"><small>{delegationLinks.filter(link=>!["completed","failed","cancelled","detached"].includes(link.status)).length} open · {delegationLinks.length} total · auto-delegate {delegationPolicy?.autoDelegate?"on":"off"} · auto-activate {delegationPolicy?.autoActivate?"on":"off"} · {delegationPolicy?.maxActiveTasksPerPlan ?? 0}/plan · root {delegationPolicy?.rootSessionId?.slice(0,8) ?? "—"}</small><button onClick={()=>void toggleAutoDelegate(!(delegationPolicy?.autoDelegate))}>{delegationPolicy?.autoDelegate?"Disable":"Enable"} auto-delegate</button><button onClick={syncDelegations}>Sync now</button><button onClick={harvestOutcomes}>Harvest outcomes</button></div>
       <div className="task-grid">
         {planList.filter(plan => plan.status === "active" || plan.status === "draft").map(plan => <article className="task-card" key={`delegate-${plan.id}`}><h3>plan · {plan.title}</h3><p>{Math.round(plan.progress*100)}% · {plan.steps.length} step(s)</p><div><button onClick={()=>void delegatePlan(plan.id)}>Delegate ready steps</button></div></article>)}
         {authorityAudit && <article className={`task-card ${authorityAudit.findings?.some((item:any)=>item.severity==="critical")?"failed":""}`} key="authority-audit"><h3>role authority</h3><p>{authorityAudit.boundRoles}/{authorityAudit.roles} role(s) run with a least-authority profile · ratio {authorityAudit.leastAuthorityRatio}</p><small>{(authorityAudit.findings ?? []).slice(0,3).map((item:any)=>`${item.code}${item.roleId?` (${item.roleId})`:""}`).join(" · ")||"no findings"}</small><div><button onClick={applyAllAuthority}>Apply all templates</button></div></article>}
         {authorityTemplates.map(template => <article className="task-card" key={template.id}><h3>template · {template.id}</h3><p>{template.title}</p><small>ceiling {template.maxRisk} · roles {template.roleIds.join(", ")}</small><div><button onClick={()=>void applyAuthority(template.id)}>Apply</button></div></article>)}
+        {harvestReview.map(item => <article className="task-card" key={item.id}><h3>needs verdict · {item.stepKey}</h3><p>{item.reason}</p><small>quality {item.quality} · {item.criteria.map((criterion:any)=>`${criterion.code} ${criterion.score}`).join(" · ")} · {item.evidenceEventIds.length} evidence event(s)</small><div><button onClick={()=>void resolveHarvest(item.id, true)}><CheckCircle2 size={13}/>Succeeded</button><button className="danger" onClick={()=>void resolveHarvest(item.id, false)}><XCircle size={13}/>Failed</button></div></article>)}
         {delegationLinks.map(link => <article className={`task-card ${link.status==="failed"?"failed":link.status==="completed"?"done":""}`} key={link.id}><h3>{link.status} · {link.stepKey}</h3><p>{link.planTitle} → {link.assignedRoleId ?? link.nominatedRoleId ?? "unassigned"}</p><small>tags {link.requiredCapabilityTags.join(", ")||"none"}{link.match?` · coverage ${link.match.coverage} · reputation ${link.match.reputation} · score ${link.match.score}`:""}{link.outcome?` · quality ${link.outcome.quality} · ${link.outcome.evidenceEventIds.length} evidence event(s)`:""}{link.note?` · ${link.note}`:""}</small><div>{link.status==="assigned"&&<button onClick={()=>void activateDelegation(link.id)}>Activate</button>}{!["completed","failed","cancelled","detached"].includes(link.status)&&<button className="danger" onClick={()=>void detachDelegation(link.id)}>Detach</button>}</div></article>)}
       </div>
     </>}

@@ -682,7 +682,7 @@ app.addHook("preHandler", async (request, reply) => {
   if (globalAdminPath && !identity.systemAdmin) {
     return await reply.code(403).send({ error: "system_admin_required" });
   }
-  const adminMutation = !methodIsSafe && /^\/v1\/(?:secrets|learning|agent-profiles|repositories|repository-providers|github-apps|model-oauth-sources|automation-git-sources|automation-responders|society|cognitive|memory-graph|world|multiworld|initiative|user-model|evolution|environment|constitution|harness|microagents|risk|acos|decisions|plans|experience|autopilot|checkpoints|aurora|delegations|delegation-policy|channel-routing-rules)/.test(request.url);
+  const adminMutation = !methodIsSafe && /^\/v1\/(?:secrets|learning|agent-profiles|repositories|repository-providers|github-apps|model-oauth-sources|automation-git-sources|automation-responders|society|cognitive|memory-graph|world|multiworld|initiative|user-model|evolution|environment|constitution|harness|microagents|risk|acos|decisions|plans|experience|autopilot|checkpoints|aurora|delegations|delegation-policy|harvest-review|harvest-policy|channel-routing-rules)/.test(request.url);
   const required: Role = methodIsSafe ? "viewer" : adminMutation ? "admin" : "operator";
   if (!roleAllows(identityService.roleFor(identity, tenantId), required)) {
     return await reply.code(403).send({ error: "forbidden", tenantId, requiredRole: required });
@@ -1144,6 +1144,15 @@ app.post("/v1/delegations/:linkId/detach", async (request) => { const { linkId }
 app.get("/v1/delegation-policy", async (request) => { const q=auroraTenant.parse(request.query); return await engine.delegation.policy(q.tenantId); });
 app.post("/v1/delegation-policy", async (request) => { const b=auroraTenant.extend({autoDelegate:z.boolean().optional(),autoActivate:z.boolean().optional(),rootSessionId:z.string().max(200).nullable().optional(),maxActiveTasksPerPlan:z.number().int().min(1).max(100).optional(),maxTasksPerRun:z.number().int().min(1).max(25).optional(),requireRoleMatch:z.boolean().optional()}).parse(request.body); return await engine.delegation.configure(auroraInput(b)); });
 app.get("/v1/delegation-candidates", async (request) => { const q=auroraTenant.extend({capabilityTags:z.string().max(500).optional()}).parse(request.query); const tags=(q.capabilityTags ?? "").split(",").map((item)=>item.trim()).filter(Boolean).slice(0,20); return { candidates: await engine.delegation.candidates(q.tenantId, tags) }; });
+
+// Aurora outcome harvesting — settled delegated work scored from recorded events
+app.post("/v1/delegations/harvest", async (request) => { const b=auroraTenant.extend({planId:z.string().max(300).optional(),linkId:z.string().max(300).optional(),force:z.boolean().optional()}).parse(request.body ?? {}); return await engine.harvester.harvest(auroraInput(b)); });
+app.get("/v1/delegations/:linkId/assessment", async (request) => { const { linkId } = z.object({ linkId: z.string() }).parse(request.params); const q=auroraTenant.parse(request.query); return await engine.harvester.assess(q.tenantId, linkId); });
+app.get("/v1/harvest-assessments", async (request) => { const q=auroraTenant.extend({planId:z.string().max(300).optional(),disposition:z.enum(["recorded","review","skipped"]).optional(),limit:z.coerce.number().int().min(1).max(1000).optional()}).parse(request.query); return { assessments: await engine.harvester.assessments(q.tenantId, auroraInput({ planId: q.planId, disposition: q.disposition, limit: q.limit })) }; });
+app.get("/v1/harvest-review", async (request) => { const q=auroraTenant.extend({limit:z.coerce.number().int().min(1).max(1000).optional()}).parse(request.query); return { review: await engine.harvester.reviewQueue(q.tenantId, q.limit ?? 50) }; });
+app.post("/v1/harvest-review/:assessmentId/resolve", async (request) => { const { assessmentId } = z.object({ assessmentId: z.string() }).parse(request.params); const b=auroraTenant.extend({success:z.boolean(),quality:z.number().min(0).max(1).optional(),note:z.string().max(1000).optional()}).parse(request.body); const { tenantId, ...rest } = b; return await engine.harvester.resolveReview(auroraInput({ tenantId, assessmentId, ...rest })); });
+app.get("/v1/harvest-policy", async (request) => { const q=auroraTenant.parse(request.query); return await engine.harvester.policy(q.tenantId); });
+app.post("/v1/harvest-policy", async (request) => { const b=auroraTenant.extend({autoRecord:z.boolean().optional(),successAtOrAbove:z.number().min(0).max(1).optional(),failBelow:z.number().min(0).max(1).optional(),settleAfterMs:z.number().int().min(0).max(86_400_000).optional(),maxPerRun:z.number().int().min(1).max(200).optional()}).parse(request.body); return await engine.harvester.configure(auroraInput(b)); });
 
 // Aurora role authority — least-privilege capability allowlists for the society
 app.get("/v1/society/authority/templates", async () => ({ templates: engine.roleAuthority.templates() }));

@@ -96,3 +96,18 @@ describe("Aurora CLI surface", () => {
     await expect(client.auroraAction("purge" as never)).rejects.toThrow(/Unknown Aurora action/);
   });
 });
+
+describe("Aurora harvest surface", () => {
+  it("exposes harvesting as a bounded action and its queue as a read-only view", async () => {
+    const seen: Array<{ url: string; method: string }> = [];
+    const client = new HafApiClient({
+      baseUrl: "http://127.0.0.1:8787",
+      tenantId: "acme",
+      fetch: async (input, init) => { seen.push({ url: String(input), method: init?.method ?? "GET" }); return Response.json({ ok: true }); },
+    });
+    await client.auroraView("harvest-review", { limit: 10 });
+    await client.auroraAction("harvest");
+    expect(seen[0]).toEqual({ url: "http://127.0.0.1:8787/v1/harvest-review?tenantId=acme&limit=10", method: "GET" });
+    expect(seen[1]).toEqual({ url: "http://127.0.0.1:8787/v1/delegations/harvest", method: "POST" });
+  });
+});

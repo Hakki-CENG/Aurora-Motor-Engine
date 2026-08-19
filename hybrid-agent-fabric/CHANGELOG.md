@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.46.0 — 2026-08-20
+
+- Added the **Aurora delegated-outcome harvester**: the last open link in the execution loop. Until now a finished child session still needed a human to declare the outcome, so completed delegated work looked like work in progress, plans stalled on finished steps and role reputation never moved.
+- Outcomes are scored from **recorded events only**, as a stored scorecard rather than a judgement: five named criteria with fixed weights (assistant output produced, tool-call reliability, session health, guardrail/policy trips, budget adherence). Every criterion, its weight and its score are persisted, so any quality number can be re-derived — tested by recomputing the weighted mean from the stored criteria.
+- **Hard failures are absolute**: a failed session, or one that produced no assistant output at all, is a failure regardless of the weighted score, and never lands in the ambiguous band.
+- The **ambiguous middle band is never auto-recorded**. Between the configurable failure and success thresholds the task becomes a review item with an explicit reason, because a system that guesses at its own success rate corrupts every calibration built on top of it. The same applies when the child session left no usable evidence, or when a tenant disables automatic recording.
+- Work still in flight is never harvested: a task is only scored once its child session is closed, failed, or idle and quiet for the configured settle window, with no active turn and nothing waiting on approval.
+- Evidence is mandatory and real — failures first, then the last assistant messages — and the society itself verifies that every evidence ID belongs to the child session before accepting the outcome.
+- Humans can resolve a review item with their own verdict; the machine scorecard stays attached to the record, so a disagreement between the system and its operator is itself auditable.
+- The ACOS execute phase now harvests before reconciling, and surfaces the review backlog as a recommendation. Added `harvest-review-backlog` alert and `haf_aurora_harvest` telemetry.
+- Added governed `plan.harvest|harvest-assess|harvest-assessments|harvest-review|harvest-resolve|harvest-policy` capabilities, tenant-admin REST for all of them, a Canvas review queue with one-click verdicts inside the delegation section, and two CLI views plus a bounded `harvest` action.
+- Added an **Aurora panel to the interactive TUI**: `/aurora [view|action]` reaches the same allowlisted views and bounded actions from inside a conversation, so the cognitive layer no longer requires a second tool to inspect.
+- Added 15 tests (405 engine tests, 8 headless-client tests) covering event-derived scoring, re-derivable quality, in-flight refusal, the ambiguous band, human resolution, hard failures, evidence-bound reputation movement, non-mutating assessment, threshold validation, ACOS integration, tenant isolation, tool-failure penalties, guardrail and budget penalties, evidence-free refusal and the CLI surface.
+
 ## 1.45.0 — 2026-08-20
 
 - Added the **Aurora execution bridge**: the missing nerve between "Aurora decided what to do" and "the society actually did it". Plan steps become society marketplace tasks, and society outcomes flow back into plan steps with the child session's evidence event IDs.

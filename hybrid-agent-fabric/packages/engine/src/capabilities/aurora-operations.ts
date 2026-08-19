@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { AuroraDataGovernanceService } from "../aurora/data-governance-service.js";
 import type { AuroraExecutionBridge } from "../aurora/execution-bridge.js";
 import type { AuroraFleetSupervisor } from "../aurora/fleet-supervisor.js";
+import type { AuroraOutcomeHarvester } from "../aurora/outcome-harvester.js";
 import type { RoleAuthorityService } from "../aurora/role-authority-service.js";
 import type { AuroraMetricsCollector } from "../aurora/aurora-metrics.js";
 import type { WorkspaceCheckpointService } from "../aurora/workspace-checkpoint-service.js";
@@ -216,6 +217,48 @@ export function roleAuthorityCapabilities(service: RoleAuthorityService) {
       { id: "society.authority.audit", version: "1.0.0", description: "Which roles still inherit full authority, which profiles are missing and which drifted above their template.", risk: "pure", sideEffect: false, source: "core" },
       z.object({}),
       async (_input, ctx) => await service.audit(ctx.tenantId),
+    ),
+  ];
+}
+
+/**
+ * Outcome harvesting: score settled delegated work from recorded events and close the society loop.
+ * Reading assessments is pure; recording an outcome changes reputation and plan state, so it is
+ * privileged — and the ambiguous middle band is never auto-recorded at all.
+ */
+export function harvestCapabilities(service: AuroraOutcomeHarvester) {
+  return [
+    defineCapability(
+      { id: "plan.harvest", version: "1.0.0", description: "Score settled delegated tasks from their child sessions and record unambiguous outcomes.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({ planId: z.string().max(300).optional(), linkId: z.string().max(300).optional(), force: z.boolean().optional() }),
+      async (input, ctx) => await service.harvest(auroraDefined({ tenantId: ctx.tenantId, ...input })),
+    ),
+    defineCapability(
+      { id: "plan.harvest-assess", version: "1.0.0", description: "Score one delegated task's child session without recording anything.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({ linkId: z.string().min(1).max(300) }),
+      async (input, ctx) => await service.assess(ctx.tenantId, input.linkId),
+    ),
+    defineCapability(
+      { id: "plan.harvest-assessments", version: "1.0.0", description: "Read outcome assessments with the full criteria scorecard behind each score.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({ planId: z.string().max(300).optional(), disposition: z.enum(["recorded", "review", "skipped"]).optional(), limit: z.number().int().min(1).max(1000).optional() }),
+      async (input, ctx) => ({ assessments: await service.assessments(ctx.tenantId, auroraDefined(input)) }),
+    ),
+    defineCapability(
+      { id: "plan.harvest-review", version: "1.0.0", description: "The delegated tasks the harvester refused to judge, waiting for a human verdict.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({ limit: z.number().int().min(1).max(1000).optional() }),
+      async (input, ctx) => ({ review: await service.reviewQueue(ctx.tenantId, input.limit ?? 50) }),
+    ),
+    defineCapability(
+      { id: "plan.harvest-resolve", version: "1.0.0", description: "Resolve a review item with a human verdict, keeping the machine scorecard attached.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({ assessmentId: z.string().min(1).max(300), success: z.boolean(), quality: z.number().min(0).max(1).optional(), note: z.string().max(1000).optional() }),
+      async (input, ctx) => await service.resolveReview(auroraDefined({ tenantId: ctx.tenantId, ...input })),
+    ),
+    defineCapability(
+      { id: "plan.harvest-policy", version: "1.0.0", description: "Read or change harvesting: automatic recording, success/failure thresholds and the settle window.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({ autoRecord: z.boolean().optional(), successAtOrAbove: z.number().min(0).max(1).optional(), failBelow: z.number().min(0).max(1).optional(), settleAfterMs: z.number().int().min(0).max(86_400_000).optional(), maxPerRun: z.number().int().min(1).max(200).optional() }),
+      async (input, ctx) => Object.keys(input).length
+        ? await service.configure(auroraDefined({ tenantId: ctx.tenantId, ...input }))
+        : await service.policy(ctx.tenantId),
     ),
   ];
 }

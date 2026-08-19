@@ -57,7 +57,7 @@ async function runOnce(api: HafApiClient, options: string[]): Promise<void> {
 async function runAurora(api: HafApiClient, options: string[]): Promise<void> {
   const target = options[0];
   if (!target || target === "help") {
-    process.stdout.write(`Aurora views: ${Object.keys(AURORA_VIEWS).join(", ")}\nAurora actions: cycle [--mode MODE], autopilot-run-due, fleet-sweep, delegation-sync\n`);
+    process.stdout.write(`Aurora views: ${Object.keys(AURORA_VIEWS).join(", ")}\nAurora actions: cycle [--mode MODE], autopilot-run-due, fleet-sweep, delegation-sync, harvest\n`);
     return;
   }
   let limit: number | undefined;
@@ -69,7 +69,7 @@ async function runAurora(api: HafApiClient, options: string[]): Promise<void> {
     else throw new Error(`Unknown aurora option ${option}.`);
   }
   if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 1000)) throw new Error("--limit must be an integer between 1 and 1000.");
-  const actions: AuroraAction[] = ["cycle", "autopilot-run-due", "fleet-sweep", "delegation-sync"];
+  const actions: AuroraAction[] = ["cycle", "autopilot-run-due", "fleet-sweep", "delegation-sync", "harvest"];
   const result = actions.includes(target as AuroraAction)
     ? await api.auroraAction(target as AuroraAction, cycleMode !== undefined ? { mode: cycleMode } : {})
     : await api.auroraView(target as AuroraView, limit !== undefined ? { limit } : {});
@@ -77,7 +77,7 @@ async function runAurora(api: HafApiClient, options: string[]): Promise<void> {
 }
 
 function usage(): void {
-  process.stdout.write(`Hybrid Agent Fabric client 1.44.0\n\n` +
+  process.stdout.write(`Hybrid Agent Fabric client 1.46.0\n\n` +
     `  haf-client tui\n  haf-client rpc\n  printf 'prompt' | haf-client run [--session ID] [--name NAME]\n` +
     `  haf-client aurora VIEW|ACTION [--limit N] [--mode MODE]   (haf-client aurora help lists them)\n\n` +
     `Environment: HAF_URL, HAF_API_TOKEN, HAF_TENANT, HAF_CLIENT_TIMEOUT_MS\n` +

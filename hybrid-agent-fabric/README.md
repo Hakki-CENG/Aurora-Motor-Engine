@@ -8,7 +8,7 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.45.0
+## Current milestone — 1.46.0
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -76,6 +76,7 @@ Implemented and tested:
 - Aurora terminal operations: an allowlisted read-only CLI surface plus bounded actions in the headless client
 - Aurora execution bridge: ready plan steps delegated to society roles with recorded match evidence and evidence-bound completion
 - Aurora role authority templates: least-privilege capability allowlists bound to society roles, with drift audit
+- Aurora outcome harvesting: delegated work scored from recorded events, with an explicit review band for ambiguity
 - Aurora autopilot: bounded unattended cadence with a durable run ledger
 - Aurora provenance explainer reconstructing why any artifact exists
 - Embedding-backed semantic memory recall
@@ -993,6 +994,20 @@ Completion is evidence-bound: a step becomes `done` because a society task compl
 child session's event IDs back, not because anything asserted success. A failed task fails the step
 and blocks the plan. Spawning the child session is a separate privileged capability, and unattended
 delegation stays inert until a tenant enables it and names a root session.
+
+## Aurora outcome harvesting
+
+Delegation is only a loop if someone closes it. The harvester scores a settled child session from its
+recorded events — assistant output, tool-call reliability, session health, guardrail trips, budget
+adherence — as a stored scorecard with fixed weights, so every quality number can be recomputed from
+the criteria that produced it. Nothing in flight is scored: a task is only judged once its session is
+closed, failed, or idle and quiet.
+
+Two refusals matter more than the scoring. A session that failed or produced no output is a failure
+outright, not partial credit. And anything landing between the failure and success thresholds is
+**not** recorded at all — it becomes a review item with a reason, because a system that guesses at its
+own success rate poisons the calibration, reputation and evolution signals built on top of it. When a
+human resolves a review item, the machine scorecard stays attached to their verdict.
 
 ## Aurora role authority
 

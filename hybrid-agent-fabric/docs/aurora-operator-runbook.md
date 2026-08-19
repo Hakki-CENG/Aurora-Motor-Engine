@@ -134,6 +134,24 @@ with that evidence.
 | Link stuck in `posted` | Nomination or award failed; the reason is on the link's `note` | Usually society budget or concurrency — check `/v1/society/budget` |
 | Plan blocked after a failure | A delegated task failed, which fails the step | Replan the step, or detach and re-delegate to another role |
 
+**Outcome harvesting.** Settled delegated work is scored from recorded events and recorded
+automatically only when the verdict is unambiguous.
+
+```bash
+curl -H … -X POST $HAF/v1/delegations/harvest -d '{"tenantId":"acme"}'
+curl -H … "$HAF/v1/harvest-review?tenantId=acme"                      # what needs a human verdict
+curl -H … -X POST $HAF/v1/harvest-review/$ID/resolve -d '{"tenantId":"acme","success":true}'
+curl -H … -X POST $HAF/v1/harvest-policy \
+  -d '{"tenantId":"acme","autoRecord":true,"failBelow":0.35,"successAtOrAbove":0.6,"settleAfterMs":60000}'
+haf-client aurora harvest-review
+haf-client aurora harvest
+```
+
+Each assessment stores the five weighted criteria behind its score, so a disputed quality number can
+be recomputed rather than argued about. Widen `settleAfterMs` if work is being scored too eagerly;
+widen the gap between `failBelow` and `successAtOrAbove` to send more cases to human review, narrow it
+to record more automatically. Disabling `autoRecord` routes everything to the queue.
+
 **Role authority.** Without a bound profile, a delegated child session inherits the parent's full
 capability set. Bring the society to least authority:
 
@@ -170,6 +188,7 @@ re-apply the template or justify the exception). A resolved template with a non-
 | `fleet-tenant-paused` | Circuit breaker opened | Read the sweep ledger for that tenant, fix, then resume |
 | `delegation-failing` | Delegated plan work fails more than it succeeds | Read the failed links' outcomes; the role or the step decomposition is wrong |
 | `roles-inherit-authority` | Over half the roles have no least-authority profile | `POST /v1/society/authority/apply-all` |
+| `harvest-review-backlog` | Delegated outcomes are waiting for a human verdict | Work `/v1/harvest-review`; if the band is too wide, retune the thresholds |
 | `acos-degraded` | Last cycle had degraded phases | The cycle report names the phase and the error |
 
 ---
@@ -225,6 +244,7 @@ layer withheld.
 2. `haf-client aurora enforcement-summary` — is governance drifting?
 3. `haf-client aurora fleet` and `fleet-sweeps` — is anything paused or starving?
 3b. `haf-client aurora role-authority` and `delegations` — is anything over-privileged or stuck?
+3c. `haf-client aurora harvest-review` — clear the outcome verdicts waiting on you.
 4. Review distilled proposals; apply the good ones, reject the rest with a reason.
 5. Review decisions due for review and record outcomes — calibration is only real if outcomes are
    recorded.

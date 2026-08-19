@@ -123,7 +123,7 @@ export class CognitiveOrchestrator {
       stuckSessions?: (tenantId: string) => Promise<Array<{ sessionId: string; signature?: string; detail: string }>>;
       integrity?: (tenantId: string) => Promise<{ findings: number; critical: number; score: number; details: string[] }>;
       /** Plan-to-society reconciliation, and — only if the tenant enabled it — new delegation. */
-      delegation?: (tenantId: string) => Promise<{ synced: number; updatedSteps: number; delegated: number; skipped: number; autoDelegate: boolean }>;
+      delegation?: (tenantId: string) => Promise<{ synced: number; updatedSteps: number; delegated: number; skipped: number; autoDelegate: boolean; harvested?: number; review?: number }>;
     } = {},
   ) {
     this.store = new DurableJsonState<OrchestratorStateShape>(
@@ -390,18 +390,20 @@ export class CognitiveOrchestrator {
         // and reconciles delegated plan work with what the society actually did.
         const evaluation = await this.deps.initiative.evaluate(tenantId);
         accumulator.signals.initiativesQueued = evaluation.queued.length;
-        let delegation: { synced: number; updatedSteps: number; delegated: number; skipped: number; autoDelegate: boolean } | undefined;
+        let delegation: { synced: number; updatedSteps: number; delegated: number; skipped: number; autoDelegate: boolean; harvested?: number; review?: number } | undefined;
         if (this.hooks.delegation) {
           delegation = await this.hooks.delegation(tenantId);
           if (delegation.updatedSteps > 0) accumulator.recommendations.push(`${delegation.updatedSteps} plan step(s) moved because delegated society work changed state.`);
           if (delegation.autoDelegate && delegation.delegated > 0) accumulator.recommendations.push(`Delegated ${delegation.delegated} ready plan step(s) to the society.`);
+          if (delegation.review) accumulator.recommendations.push(`${delegation.review} delegated task(s) finished ambiguously and need a human verdict.`);
         }
         return {
           status: "ok",
-          summary: `Evaluated ${evaluation.evaluated} initiative(s): ${evaluation.queued.length} queued, ${evaluation.digested.length} digested${delegation ? `; reconciled ${delegation.synced} delegation(s), delegated ${delegation.delegated}` : ""}.`,
+          summary: `Evaluated ${evaluation.evaluated} initiative(s): ${evaluation.queued.length} queued, ${evaluation.digested.length} digested${delegation ? `; harvested ${delegation.harvested ?? 0} outcome(s), reconciled ${delegation.synced} delegation(s), delegated ${delegation.delegated}` : ""}.`,
           detail: {
             evaluated: evaluation.evaluated, queued: evaluation.queued.length, digested: evaluation.digested.length, trust: evaluation.budget.trustScore,
             delegationsSynced: delegation?.synced ?? 0, delegatedSteps: delegation?.delegated ?? 0, delegationStepUpdates: delegation?.updatedSteps ?? 0,
+            outcomesHarvested: delegation?.harvested ?? 0, outcomesInReview: delegation?.review ?? 0,
           },
         };
       }

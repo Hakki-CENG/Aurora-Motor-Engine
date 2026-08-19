@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-20 — current milestone 1.45
+Updated: 2026-08-20 — current milestone 1.46
 
 ## Original 1.0 baseline (delivered)
 
@@ -249,6 +249,18 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] Template resolution against the live capability catalog with drift reporting
 - [x] Idempotent template application, role binding and least-authority audit
 - [x] Delegation and authority telemetry with derived alerts
+
+### Aurora outcome harvesting (1.46)
+
+- [x] Event-derived outcome scorecard with named criteria, fixed weights and stored scores
+- [x] Settle detection so work in flight is never scored
+- [x] Absolute hard failures for failed or output-free sessions
+- [x] Ambiguous band routed to human review instead of auto-recorded
+- [x] Mandatory child-session evidence, verified by the society
+- [x] Human review resolution with the machine scorecard retained
+- [x] ACOS execute-phase harvesting with review-backlog recommendations
+- [x] Harvest telemetry, review-backlog alert, REST, Canvas queue and CLI/TUI surfaces
+- [x] Aurora panel in the interactive TUI
 
 ## Required for full target parity
 

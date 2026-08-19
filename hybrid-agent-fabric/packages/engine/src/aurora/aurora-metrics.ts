@@ -12,6 +12,7 @@ import type { AuroraAutopilot } from "./autopilot.js";
 import type { AuroraFleetSupervisor } from "./fleet-supervisor.js";
 import type { AuroraExecutionBridge } from "./execution-bridge.js";
 import type { RoleAuthorityService } from "./role-authority-service.js";
+import type { AuroraOutcomeHarvester } from "./outcome-harvester.js";
 import type { CognitiveOrchestrator } from "./cognitive-orchestrator.js";
 import { auroraRound } from "../util/aurora-state.js";
 
@@ -31,6 +32,7 @@ export interface AuroraMetricsSnapshot {
   fleet: { enrolled: boolean; enabled: boolean; paused: boolean; priority: number; sweeps: number; runs: number; failures: number };
   delegation: { open: number; completed: number; failed: number; autoDelegate: boolean; failureRate: number };
   authority: { roles: number; boundRoles: number; leastAuthorityRatio: number; findings: number };
+  harvest: { recorded: number; review: number; autoRecord: boolean };
   acos: { cycles: number; lastDegradedPhases: number };
   generatedAt: string;
 }
@@ -60,6 +62,7 @@ export class AuroraMetricsCollector {
       fleet?: AuroraFleetSupervisor;
       delegation?: AuroraExecutionBridge;
       roleAuthority?: RoleAuthorityService;
+      harvester?: AuroraOutcomeHarvester;
       acos: CognitiveOrchestrator;
     },
     private readonly now: () => number = Date.now,
@@ -70,7 +73,7 @@ export class AuroraMetricsCollector {
       cognitiveHealth, cognitiveBudget, memoryHealth, entities, predictions, calibration, inconsistencies,
       initiativeBudget, initiatives, meta, evolutionIndex, gaps, inventory, decisionCalibration, decisionBacklog,
       plans, stalledPlans, compliance, identity, autopilotHealth, cycles, fleetMember,
-      delegationLinks, delegationPolicy, authorityAudit,
+      delegationLinks, delegationPolicy, authorityAudit, harvestAssessments, harvestPolicy,
     ] = await Promise.all([
       this.deps.cognitive.health(tenantId),
       this.deps.cognitive.budget(tenantId),
@@ -97,6 +100,8 @@ export class AuroraMetricsCollector {
       this.deps.delegation ? this.deps.delegation.links(tenantId, { limit: 1000 }) : Promise.resolve([]),
       this.deps.delegation ? this.deps.delegation.policy(tenantId) : Promise.resolve(undefined),
       this.deps.roleAuthority ? this.deps.roleAuthority.audit(tenantId) : Promise.resolve(undefined),
+      this.deps.harvester ? this.deps.harvester.assessments(tenantId, { limit: 1000 }) : Promise.resolve([]),
+      this.deps.harvester ? this.deps.harvester.policy(tenantId) : Promise.resolve(undefined),
     ]);
     const delegationCompleted = delegationLinks.filter((item) => item.status === "completed").length;
     const delegationFailed = delegationLinks.filter((item) => item.status === "failed").length;
@@ -203,6 +208,11 @@ export class AuroraMetricsCollector {
         leastAuthorityRatio: authorityAudit?.leastAuthorityRatio ?? 0,
         findings: authorityAudit?.findings.length ?? 0,
       },
+      harvest: {
+        recorded: harvestAssessments.filter((item) => item.disposition === "recorded").length,
+        review: harvestAssessments.filter((item) => item.disposition === "review").length,
+        autoRecord: harvestPolicy?.autoRecord ?? false,
+      },
       acos: {
         cycles: cycles[0]?.sequence ?? 0,
         lastDegradedPhases: cycles[0]?.degraded.length ?? 0,
@@ -288,6 +298,9 @@ export class AuroraMetricsCollector {
       `haf_aurora_authority{tenant="${label}",kind="roles"} ${snapshot.authority.roles}`,
       `haf_aurora_authority{tenant="${label}",kind="bound_roles"} ${snapshot.authority.boundRoles}`,
       `haf_aurora_authority{tenant="${label}",kind="least_authority_ratio"} ${snapshot.authority.leastAuthorityRatio}`,
+      "# TYPE haf_aurora_harvest gauge",
+      `haf_aurora_harvest{tenant="${label}",kind="recorded"} ${snapshot.harvest.recorded}`,
+      `haf_aurora_harvest{tenant="${label}",kind="review"} ${snapshot.harvest.review}`,
       "# TYPE haf_aurora_acos gauge",
       `haf_aurora_acos{tenant="${label}",kind="cycles"} ${snapshot.acos.cycles}`,
       `haf_aurora_acos{tenant="${label}",kind="degraded_phases"} ${snapshot.acos.lastDegradedPhases}`,
@@ -318,6 +331,7 @@ export class AuroraMetricsCollector {
     if (snapshot.autopilot.enabled && snapshot.autopilot.failureRate > 0.25) add("autopilot-failing", "warning", "Unattended cadences are failing more than a quarter of the time.", snapshot.autopilot.failureRate);
     if (snapshot.delegation.failed >= 3 && snapshot.delegation.failureRate > 0.4) add("delegation-failing", "warning", "Delegated plan work is failing more often than it succeeds.", snapshot.delegation.failureRate);
     if (snapshot.authority.roles > 0 && snapshot.authority.leastAuthorityRatio < 0.5) add("roles-inherit-authority", "warning", "More than half of the active society roles run with full inherited capability authority.", snapshot.authority.leastAuthorityRatio);
+    if (snapshot.harvest.review >= 5) add("harvest-review-backlog", "info", "Delegated tasks are waiting for a human verdict on their outcome.", snapshot.harvest.review);
     if (snapshot.fleet.paused) add("fleet-tenant-paused", "warning", "The fleet circuit breaker paused unattended operation for this tenant.", 1);
     if (snapshot.acos.lastDegradedPhases > 0) add("acos-degraded", "warning", "The last cognitive cycle had degraded phases.", snapshot.acos.lastDegradedPhases);
     return alerts;
