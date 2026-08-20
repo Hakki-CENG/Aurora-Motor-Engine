@@ -2,6 +2,8 @@ import { z } from "zod";
 import type { LifecycleHookService } from "../policy/lifecycle-hooks.js";
 import type { SessionModeService } from "../policy/session-modes.js";
 import type { ProjectInstructionService } from "../knowledge/project-instructions.js";
+import type { RepositoryCommandService } from "../knowledge/repository-commands.js";
+import type { SessionLifecycleService } from "../runtime/session-lifecycle.js";
 import { auroraDefined } from "../util/aurora-state.js";
 import { defineCapability } from "./schema.js";
 
@@ -123,6 +125,53 @@ export function sessionModeCapabilities(service: SessionModeService) {
       async (input, ctx) => Object.keys(input).length
         ? await service.setDefaults(auroraDefined({ tenantId: ctx.tenantId, ...input }))
         : await service.defaults(ctx.tenantId),
+    ),
+  ];
+}
+
+/** Repository-local command templates: read and render, never execute. */
+export function repositoryCommandCapabilities(service: RepositoryCommandService) {
+  return [
+    defineCapability(
+      { id: "commands.list", version: "1.0.0", description: "List repository command templates from .aurora/commands, .claude/commands, .codex/prompts and .github/prompts.", risk: "workspace_read", sideEffect: false, source: "core" },
+      z.object({}),
+      async (_input, ctx) => await service.list(ctx.workspacePath),
+    ),
+    defineCapability(
+      { id: "commands.render", version: "1.0.0", description: "Render one repository command with arguments. Returns text; it never executes anything.", risk: "workspace_read", sideEffect: false, source: "core" },
+      z.object({ name: z.string().min(1).max(60), arguments: z.array(z.string().max(10_000)).max(20).optional() }),
+      async (input, ctx) => await service.render(auroraDefined({ workspacePath: ctx.workspacePath, name: input.name, arguments: input.arguments })),
+    ),
+  ];
+}
+
+/** Session archive/restore and the cost surface. Archiving changes what a session accepts. */
+export function sessionLifecycleCapabilities(service: SessionLifecycleService) {
+  return [
+    defineCapability(
+      { id: "session.cost", version: "1.0.0", description: "Token usage and cost for this session, stating whether the number came from the provider or the price table.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({}),
+      async (_input, ctx) => await service.cost(ctx.sessionId),
+    ),
+    defineCapability(
+      { id: "session.usage", version: "1.0.0", description: "Tenant-wide usage rollup by model, with the sessions that could not be priced called out.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({ limit: z.number().int().min(1).max(100).optional() }),
+      async (input, ctx) => await service.usage(ctx.tenantId, auroraDefined(input)),
+    ),
+    defineCapability(
+      { id: "session.archive", version: "1.0.0", description: "Archive this session: it keeps every event and artefact but refuses new work until restored.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({ reason: z.string().min(1).max(1000) }),
+      async (input, ctx) => await service.archive({ tenantId: ctx.tenantId, sessionId: ctx.sessionId, reason: input.reason, actor: "agent" }),
+    ),
+    defineCapability(
+      { id: "session.restore", version: "1.0.0", description: "Restore an archived session so it accepts work again.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({ sessionId: z.string().min(1).max(200), reason: z.string().min(1).max(1000) }),
+      async (input, ctx) => await service.restore({ tenantId: ctx.tenantId, sessionId: input.sessionId, reason: input.reason, actor: "agent" }),
+    ),
+    defineCapability(
+      { id: "session.archives", version: "1.0.0", description: "List archived and restored sessions with who changed them and why.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({ state: z.enum(["active", "archived"]).optional(), limit: z.number().int().min(1).max(1000).optional() }),
+      async (input, ctx) => ({ records: await service.list(ctx.tenantId, auroraDefined(input)) }),
     ),
   ];
 }

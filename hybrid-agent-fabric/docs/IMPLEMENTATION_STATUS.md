@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-20 — current milestone 1.51
+Updated: 2026-08-20 — current milestone 1.52
 
 ## Original 1.0 baseline (delivered)
 
@@ -317,6 +317,17 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] `dontAsk` fail-fast for unattended runs; `bypass` gated per tenant
 - [x] Recorded mode transitions with actor and reason
 - [x] Tenant defaults, REST, Canvas selectors and CLI views
+
+### Peer parity, wave three (1.52)
+
+- [x] Session archive and restore, enforced on the engine command path
+- [x] Archive keeps all evidence; close still permitted; both directions audited
+- [x] Cost with an explicit source: provider, price table or unpriced
+- [x] Operator price table with longest-route matching and runtime-default model resolution
+- [x] Tenant usage rollup by model with unpriced sessions called out
+- [x] Repository command templates from Aurora, Claude, Codex and GitHub prompt folders
+- [x] Argument substitution with filled and unresolved placeholders reported
+- [x] Loud refusal for screened-out templates; symlink, size and shadowing refusals
 
 ## Required for full target parity
 

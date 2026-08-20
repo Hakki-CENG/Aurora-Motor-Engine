@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.52.0 — 2026-08-20
+
+Peer-gap audit, wave three: G7 (session archive and the cost surface) and G6 (repository command
+templates) are closed.
+
+- **Archive, not delete.** An archived session keeps every event, snapshot and artefact and simply
+  refuses new work until it is restored; the guard sits on the engine's command path, so it holds for
+  REST, CLI, schedulers and agents alike. `session.close` is still allowed, because letting go of a
+  session must never require reactivating it. Restoring is explicit, and both directions record an
+  actor and a reason. "Tidy up my session list" and "destroy the evidence" stay different gestures.
+- **Cost that says where the number came from.** A provider-reported cost is used and labelled
+  `provider`; otherwise the operator's price table is applied and labelled `price-table`; a model with
+  no price is reported as `unpriced` rather than silently counted as free, because a hidden zero
+  produces a confidently wrong invoice. Longest-matching route wins, so `openai:gpt-5` beats a bare
+  `gpt-5`, and a session that never chose a model is priced against the runtime default with the
+  source stated (`session`, `runtime-default` or `unknown`).
+- Added a tenant usage rollup: totals, per-model breakdown, the biggest sessions, and an explicit count
+  of sessions that could not be priced.
+- **Repository command templates (G6).** Aurora reads `.aurora/commands`, `.claude/commands`,
+  `.codex/prompts` and `.github/prompts`, so a repository that already has team prompts works without
+  migration. Front matter supplies the description; `$ARGUMENTS` and `$1`…`$9` are substituted with
+  every filled and unresolved placeholder reported. Discovery is bounded and path-confined, symlinks
+  are refused, duplicate names across folders are reported as shadowed instead of silently merged, and
+  a template that fails injection screening is refused **loudly at render time** — a command is invoked
+  deliberately, so silence would be worse than an error. Rendering returns text; it never executes.
+- Added governed `session.cost`, `session.usage`, `session.archive`, `session.restore`,
+  `session.archives`, `commands.list` and `commands.render` capabilities, REST for all of them
+  (including a model price table), a Canvas archive/restore button with live cost in the session
+  header, and three new CLI views.
+- Added 10 tests (467 engine tests total) covering archive/refuse/restore round-trip, audit records and
+  double-archive refusal, cross-tenant refusal, price-table costing with the unpriced case called out,
+  longest-route matching and price removal, command discovery across all four folders, argument
+  substitution, unknown and screened-out command refusal, symlink/size/shadowing refusals, and the
+  governed capability path from a real session workspace.
+
 ## 1.51.0 — 2026-08-20
 
 Continuing down the peer-gap audit: G4 (permission and sandbox modes) and G5 (plan mode) are closed.

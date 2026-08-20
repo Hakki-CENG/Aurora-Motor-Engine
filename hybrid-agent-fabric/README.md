@@ -8,7 +8,7 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.51.0
+## Current milestone — 1.52.0
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -83,6 +83,7 @@ Implemented and tested:
 - Deterministic lifecycle hooks that can deny at the capability boundary and only run governed actions
 - Tool search over the capability catalog for progressive disclosure
 - Named permission modes (plan, manual, acceptEdits, auto, dontAsk, bypass) and sandbox modes per session
+- Session archive/restore with an honest cost surface, and repository command templates
 - Aurora autopilot: bounded unattended cadence with a durable run ledger
 - Aurora provenance explainer reconstructing why any artifact exists
 - Embedding-backed semantic memory recall
@@ -1029,6 +1030,20 @@ work. It never overwrites a human verdict, never resolves a plan that is merely 
 marks the decision executed instead), and supports a dry run that shows exactly what would be written.
 Each record keeps its evidence, observed value, surprise and Brier score, so every calibration number
 traces back to the execution behind it.
+
+## Session archive and cost
+
+Archiving a session keeps everything it recorded and refuses new work until it is restored, enforced on
+the engine's command path rather than in one client. Cost always states its source: a provider number,
+the operator's price table, or `unpriced` — an unpriced model is a configuration gap, and reporting it
+as free would produce a confidently wrong invoice. The tenant rollup breaks spend down by model and
+names the sessions that could not be priced.
+
+Repository command templates come from `.aurora/commands`, `.claude/commands`, `.codex/prompts` and
+`.github/prompts`, so an existing repository works unchanged. Arguments substitute into `$ARGUMENTS`
+and `$1`…`$9`, every placeholder filled or left over is reported, and a template that fails injection
+screening is refused with an error rather than quietly dropped. Rendering produces text; it never runs
+anything.
 
 ## Session modes
 

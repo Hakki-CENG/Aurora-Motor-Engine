@@ -249,6 +249,27 @@ reason code, changing the mode will not help — fix the rule or the call.
 
 ---
 
+## 2d. Session archive, cost and repository commands
+
+```bash
+curl -H … -X POST $HAF/v1/sessions/$SESSION/archive -d '{"reason":"Migration finished."}'
+curl -H … -X POST $HAF/v1/sessions/$SESSION/restore -d '{"reason":"Follow-up work."}'
+curl -H … "$HAF/v1/session-archives?tenantId=acme&state=archived"
+curl -H … "$HAF/v1/sessions/$SESSION/cost"
+curl -H … "$HAF/v1/usage?tenantId=acme"
+curl -H … -X POST $HAF/v1/model-prices \
+  -d '{"tenantId":"acme","route":"openai:gpt-5","inputPerMillionUsd":10,"outputPerMillionUsd":30}'
+curl -H … "$HAF/v1/sessions/$SESSION/commands"
+haf-client aurora usage
+haf-client aurora session-archives
+```
+
+If `unpricedSessions` is above zero, the price table is missing a route — costs for those sessions read
+as zero and the rollup is understated. Add the route rather than assuming the spend was nil. Archived
+sessions refuse everything except `session.close`; restore before resuming work.
+
+---
+
 ## 3. Alert playbook
 
 | Alert | Meaning | First action |

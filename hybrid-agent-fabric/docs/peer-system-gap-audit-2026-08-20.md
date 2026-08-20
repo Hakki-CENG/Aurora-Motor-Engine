@@ -37,8 +37,8 @@ Ranked by (value to a real user) × (risk of not having it), with the peer that 
 
 | # | Gap | Bar | HAF today | Status |
 |---|---|---|---|---|
-| G6 | Custom slash commands / prompt templates stored in the repo | Claude Code `.claude/commands`, Codex prompts | Skills hub exists; no repo-local command files | Planned |
-| G7 | Session archive / delete lifecycle, per-session cost and rate-limit view | Codex `/archive`, `/usage`, `/status` | Usage is tracked; no archive state, no cost rollup surface | Planned |
+| G6 | Custom slash commands / prompt templates stored in the repo | Claude Code `.claude/commands`, Codex prompts | Skills hub exists; no repo-local command files | **Done in 1.52.0** |
+| G7 | Session archive / delete lifecycle, per-session cost and rate-limit view | Codex `/archive`, `/usage`, `/status` | Usage is tracked; no archive state, no cost rollup surface | **Done in 1.52.0** |
 | G8 | Code review mode (`/review`) over the working tree or against a base branch | Codex, Claude Code | Hosted review provider exists (PR-level); no local working-tree review flow | Planned |
 | G9 | Subagent declaration files with per-agent tools/model/hooks/memory/isolation | Claude Code subagent frontmatter | Agent profiles + society roles cover most fields; no single declarative file format, no per-agent hooks | Planned |
 | G10 | Plugin/skill marketplace with signed manifests and version pinning | Claude Code plugins, Codex agent plugins | Skills hub and plugin registry exist; no signing or pinning | Planned |
@@ -84,7 +84,17 @@ gated per tenant, and every transition records an actor and a reason.
 cognitive intake and memory proposals. Anything that would touch the world is refused with an
 instruction to leave plan mode, which is the same explore-then-execute shape the peers ship.
 
-## 5. Next steps
+## 5. What 1.52.0 fixes
 
-In order: G7 session archive plus a cost and rate-limit surface, G6 repo-local slash commands, G8
-working-tree review mode, G9 subagent declaration files, then G10-G12.
+**G7 — Session archive and cost.** `SessionLifecycleService` archives and restores sessions with an
+audited actor and reason, enforced on the engine command path so no client can bypass it, and reports
+cost with its source stated (`provider`, `price-table`, `unpriced`) plus a tenant rollup by model.
+
+**G6 — Repository commands.** `RepositoryCommandService` reads the four command folders the ecosystem
+uses, substitutes `$ARGUMENTS` and positional arguments, reports what was left unresolved, and refuses
+a screened-out template loudly. It renders text and never executes.
+
+## 6. Next steps
+
+In order: G8 working-tree review mode, G9 subagent declaration files, G11 per-turn effort control, G12
+worktree ergonomics for the main session, then G10 signed plugin manifests.

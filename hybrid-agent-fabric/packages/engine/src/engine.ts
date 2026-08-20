@@ -151,10 +151,15 @@ import {
   orchestratorCapabilities, riskCapabilities, stuckCapabilities,
 } from "./capabilities/aurora-core.js";
 import { discoveryCapabilities } from "./capabilities/discovery.js";
-import { lifecycleHookCapabilities, projectInstructionCapabilities, sessionModeCapabilities } from "./capabilities/workspace-conventions.js";
+import {
+  lifecycleHookCapabilities, projectInstructionCapabilities, repositoryCommandCapabilities,
+  sessionLifecycleCapabilities, sessionModeCapabilities,
+} from "./capabilities/workspace-conventions.js";
 import { LifecycleHookService } from "./policy/lifecycle-hooks.js";
 import { SessionModePolicyEngine, SessionModeService } from "./policy/session-modes.js";
 import { ProjectInstructionService } from "./knowledge/project-instructions.js";
+import { RepositoryCommandService } from "./knowledge/repository-commands.js";
+import { SessionLifecycleService } from "./runtime/session-lifecycle.js";
 import { memoryGraphCapabilities } from "./capabilities/memory-graph.js";
 import { multiWorldCapabilities, worldModelCapabilities } from "./capabilities/world-model.js";
 import { initiativeCapabilities } from "./capabilities/initiative.js";
@@ -332,6 +337,8 @@ export class HybridAgentEngine {
   readonly sessionModes: SessionModeService;
   private readonly hookWorkspaceRoot: string;
   readonly projectInstructions: ProjectInstructionService;
+  readonly repositoryCommands: RepositoryCommandService;
+  readonly sessionLifecycle: SessionLifecycleService;
 
   constructor(readonly config: EngineConfig) {
     const dataRoot = resolve(config.homePath, "data");
@@ -415,6 +422,7 @@ export class HybridAgentEngine {
       execute: async (call) => await this.runHookCapability(call),
     });
     this.projectInstructions = new ProjectInstructionService(Date.now, config.projectInstructions ?? {});
+    this.repositoryCommands = new RepositoryCommandService();
     const policyLayers: PolicyEngine[] = [localPolicy];
     if (config.opa) policyLayers.push(new OpaPolicyEngine(config.opa));
     if (config.lifecycleHooks?.enabled !== false) policyLayers.push(this.lifecycleHooks.policyLayer());
@@ -597,6 +605,11 @@ export class HybridAgentEngine {
           // ignored: distillation is an optimization, never a precondition for closing a session
         }
       },
+    });
+    this.sessionLifecycle = new SessionLifecycleService(dataRoot, {
+      sessions: async (tenantId?: string) => await this.supervisor.listSessions(tenantId),
+      session: async (sessionId: string) => await this.supervisor.getSession(sessionId),
+      defaultModel: () => modelName ?? this.models.list()[0],
     });
     this.society = new AgentSocietyService(dataRoot, this.supervisor, this.agentProfiles, this.events);
     this.cognitive = new CognitiveWorkspaceService(dataRoot);
@@ -809,6 +822,8 @@ export class HybridAgentEngine {
     for (const capability of projectInstructionCapabilities(this.projectInstructions)) this.capabilities.register(capability);
     for (const capability of lifecycleHookCapabilities(this.lifecycleHooks)) this.capabilities.register(capability);
     for (const capability of sessionModeCapabilities(this.sessionModes)) this.capabilities.register(capability);
+    for (const capability of repositoryCommandCapabilities(this.repositoryCommands)) this.capabilities.register(capability);
+    for (const capability of sessionLifecycleCapabilities(this.sessionLifecycle)) this.capabilities.register(capability);
     // Registered last so the catalog it searches already contains everything else.
     for (const capability of discoveryCapabilities(() => this.capabilities.list())) this.capabilities.register(capability);
     for (const capability of probationCapabilities(this.delegation)) this.capabilities.register(capability);
@@ -943,6 +958,12 @@ export class HybridAgentEngine {
   }
 
   async command(command: CommandEnvelope): Promise<CommandResult> {
+    // An archived session keeps everything it recorded and accepts nothing new. Restoring is an
+    // explicit, audited act, so "tidy up my list" can never quietly become "keep working in here".
+    if (command.sessionId && command.kind !== "session.close") {
+      const archived = await this.sessionLifecycle.isArchived(command.tenantId, command.sessionId).catch(() => false);
+      if (archived) throw new Error(`Session ${command.sessionId} is archived. Restore it before sending "${command.kind}".`);
+    }
     return await this.supervisor.dispatch(command);
   }
 
