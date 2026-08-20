@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.59.0 - 2026-08-20
+
+Round-two audit, N6 and N7 - the last two items on the list: long-running shells and reviewed automatic
+approvals. Round two is now closed.
+
+- **Background shells (N6).** `shell.start` launches a command that outlives the call and returns an id
+  immediately; `shell.output` reads from a cursor and can wait for new output rather than being polled;
+  `shell.stop` kills it; `shell.list` shows what a session left running. Starting one carries the same
+  `process` risk class as `process.exec` because it is the same authority - only the moment the result
+  arrives differs.
+- It reuses the sandbox factory rather than opening a second way to spawn processes, so workspace
+  confinement, environment scrubbing and the chosen backend cannot drift between the synchronous and the
+  background path. Added an incremental `onOutput` sink to `SandboxExecRequest` to make that possible.
+- **Loss is reported, not hidden.** Output lives in a 200k-character ring buffer; when a reader falls
+  behind, the evicted characters are counted and returned as `skippedChars`, because a transcript
+  silently stitched across a gap is worse than an honest one with a hole in it.
+- Bounded lifetime throughout: a per-shell timeout, a total-output ceiling that kills the process, at
+  most four running shells per session, and shells killed when their session closes. Nothing outlives
+  its owner.
+- Fixed a latent bug the kill switch exposed: a command aborted in the gap between "spawn" and "running"
+  never saw the abort, because an already-aborted signal fires no listener. `runProcess` now checks.
+- **Reviewed automatic approvals (N7).** `AutoApprovalService` answers a *named class* of approval with a
+  *stored rationale*, which is the difference between it and the `auto` mode dial: months later, "why was
+  this allowed?" is answerable without reconstructing anyone's intent.
+- A rule must name what it covers (`*` is refused), must carry a rationale, and may add argument patterns,
+  refusal patterns that force an escalation even on a match, a session scope, an expiry and a use budget.
+  Privileged capabilities are never answered automatically, and managed settings can switch the whole
+  mechanism off with a lower layer unable to switch it back on.
+- Escalations are written to the same log as approvals, so the record shows what the mechanism refused.
+  An agent may `approvals.auto.propose` a rule; the proposal arrives disabled, because proposing a policy
+  you live under is not the same as writing yourself one.
+- Added REST for both surfaces, a Canvas inspector panel for background shells with a kill button, and
+  two headless-client views.
+- Added 13 tests (530 engine tests total) covering incremental cursor reads, kill-while-starting, cross-
+  session refusal, the per-session cap, honest loss reporting, session-close cleanup, rule matching and
+  budgets, refusal floors, argument and refusal patterns, expiry, agent proposals staying disabled, the
+  managed off switch, and a live approval answered before it reached a human.
+
 ## 1.58.0 - 2026-08-20
 
 Round-two audit, N4 and N5: background-task control and model-callable plan mode.

@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-20 — current milestone 1.58
+Updated: 2026-08-20 — current milestone 1.59
 
 ## Original 1.0 baseline (delivered)
 
@@ -392,6 +392,19 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] `session.plan.exit` privileged and evidence-required, landing in manual
 - [x] Plan-mode escape hatch reachable from inside plan mode
 - [x] Managed ceiling enforced against an agent's own exit request
+
+### Peer parity round two, wave four (1.59) — round two closed
+
+- [x] `shell.start` long-running commands over the same sandbox factory as `process.exec`
+- [x] `shell.output` cursor reads with an optional wait instead of polling
+- [x] Bounded ring buffer with reported `skippedChars` rather than a silently stitched transcript
+- [x] `shell.stop` kill switch, ungated, session-scoped and reason-recorded
+- [x] Per-shell timeout, total-output ceiling, per-session cap and kill-on-session-close
+- [x] Abort honoured when it lands before the process is running
+- [x] Reviewed auto-approval rules with a required rationale copied onto every decision
+- [x] Argument patterns, refusal patterns, session scope, expiry and use budgets
+- [x] Absolute floors: no wildcard rules, never privileged, managed off switch
+- [x] Escalations logged beside approvals; agent proposals arrive disabled
 
 ## Required for full target parity
 

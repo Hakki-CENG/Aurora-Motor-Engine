@@ -237,6 +237,8 @@ export interface ApprovalRequest {
   createdAt: string;
   expiresAt: string;
   status: "pending" | "approved" | "denied" | "expired";
+  /** Present when a reviewed auto-approval rule answered instead of a human. */
+  autoApproval?: { ruleId?: string; rationale: string };
 }
 
 export interface GoalState {

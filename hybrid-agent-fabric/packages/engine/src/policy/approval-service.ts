@@ -10,12 +10,24 @@ interface PendingApproval {
 
 export type ApprovalListener = (request: ApprovalRequest) => void;
 
+/**
+ * A reviewer may answer an approval before a human sees it. It must always produce a rationale, and
+ * declining is the default: any failure inside the reviewer leaves the request in front of a person.
+ */
+export type ApprovalReviewer = (request: ApprovalRequest) => Promise<{ autoApproved: boolean; rationale: string; ruleId?: string }>;
+
 export class ApprovalService {
   private readonly pending = new Map<string, PendingApproval>();
   private readonly listeners = new Set<ApprovalListener>();
   private readonly sessionGrants = new Set<string>();
+  private reviewer?: ApprovalReviewer;
 
   constructor(private readonly defaultTimeoutMs = 5 * 60_000) {}
+
+  /** Install the reviewed auto-approval policy. Without one, every request reaches a human. */
+  bindReviewer(reviewer: ApprovalReviewer): void {
+    this.reviewer = reviewer;
+  }
 
   subscribe(listener: ApprovalListener): () => void {
     this.listeners.add(listener);
@@ -55,6 +67,21 @@ export class ApprovalService {
       expiresAt: new Date(now + this.defaultTimeoutMs).toISOString(),
       status: "pending",
     };
+
+    if (this.reviewer) {
+      try {
+        const review = await this.reviewer(request);
+        if (review.autoApproved) {
+          request.status = "approved";
+          request.autoApproval = { rationale: review.rationale, ...(review.ruleId ? { ruleId: review.ruleId } : {}) };
+          // Notified like any other resolution: an automatic answer must be as visible as a human one.
+          this.notify(request);
+          return true;
+        }
+      } catch {
+        // A reviewer that throws has not approved anything; the request goes to a human.
+      }
+    }
 
     return await new Promise<boolean>((resolve) => {
       const timer = setTimeout(() => {

@@ -8,7 +8,7 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.58.0
+## Current milestone — 1.59.0
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -90,6 +90,8 @@ Implemented and tested:
 - Layered settings with provenance and an immovable managed floor, plus structured questions to the human
 - MCP 2026-07-28 stateless client with server/discover, routing headers, cacheable listings and multi round-trip requests
 - Background task control (monitor, stop, resume) and model-callable plan mode with an evidence requirement
+- Long-running background shells with cursor-based output retrieval, honest loss reporting and a kill switch
+- Reviewed automatic approvals: named rules with a stored rationale, a use budget, expiry and a full decision log
 - Aurora autopilot: bounded unattended cadence with a durable run ledger
 - Aurora provenance explainer reconstructing why any artifact exists
 - Embedding-backed semantic memory recall
@@ -1048,6 +1050,31 @@ durable inbox.
 The agent can enter plan mode itself, because that only removes authority. Leaving requires approval
 *and* evidence: a plan id or a summary of what the exploration produced, so exploration earns execution
 rather than assuming it. A managed ceiling still caps where it can land.
+
+## Long-running shells
+
+`shell.start` runs a build or a test suite that outlives the call and returns a shell id immediately.
+`shell.output` reads from a cursor — an absolute produced-character offset — and can *wait* for new
+output instead of being polled. `shell.stop` kills it, ungated, because needing permission to stop a
+runaway build is backwards. `shell.list` shows what a session left running.
+
+It is the same sandboxed execution path as `process.exec`, so workspace confinement, environment
+scrubbing and the sandbox backend are not re-implemented and cannot drift; starting one carries the same
+`process` risk class. Output lives in a bounded ring buffer, and when a reader falls behind the loss is
+**reported** as `skippedChars` rather than stitched into a misleading transcript. Every shell has a
+timeout, a total-output ceiling and an owner: when the session closes, its shells are killed.
+
+## Reviewed automatic approvals
+
+`auto` and `dontAsk` answer by risk class — a dial, with nothing left behind. A reviewed auto-approval is
+a different thing: an operator names a capability or family, writes down *why* that class of request is
+safe, and that rationale is copied onto every decision the rule makes. Rules may carry argument patterns,
+refusal patterns that force an escalation even on a match, a session scope, an expiry and a use budget.
+
+The floors are absolute: `*` is refused, privileged capabilities are never answered automatically, and an
+installation can switch the whole mechanism off through managed settings. Escalations are logged next to
+approvals, so the record shows what the mechanism refused as well as what it waved through. An agent may
+`approvals.auto.propose` a rule, and the proposal arrives disabled — proposing is not granting.
 
 ## MCP 2026-07-28
 

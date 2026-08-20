@@ -13,6 +13,13 @@ export interface SandboxExecRequest {
   timeoutMs?: number;
   maxOutputChars?: number;
   signal?: AbortSignal;
+  /**
+   * Incremental output sink. A synchronous command only needs the final transcript, but a shell that
+   * outlives the call has to be readable *while it runs* — this is the seam that makes that possible
+   * without a second process-spawning path to audit. Backends that only return a completed transcript
+   * (the cloud gateway) simply never call it; readers must not assume it fires.
+   */
+  onOutput?: (chunk: string) => void;
 }
 
 export interface SandboxExecResult {
@@ -52,7 +59,10 @@ async function assertInside(workspace: string, cwd: string): Promise<string> {
 async function runProcess(
   executable: string,
   args: string[],
-  options: { cwd: string; env: NodeJS.ProcessEnv; timeoutMs: number; maxOutputChars: number; signal?: AbortSignal },
+  options: {
+    cwd: string; env: NodeJS.ProcessEnv; timeoutMs: number; maxOutputChars: number;
+    signal?: AbortSignal; onOutput?: ((chunk: string) => void) | undefined;
+  },
 ): Promise<SandboxExecResult> {
   const start = Date.now();
   return await new Promise<SandboxExecResult>((resolvePromise, reject) => {
@@ -72,8 +82,16 @@ async function runProcess(
       }
       const remaining = options.maxOutputChars - output.length;
       const text = chunk.toString("utf8");
-      output += text.slice(0, remaining);
+      const accepted = text.slice(0, remaining);
+      output += accepted;
       if (text.length > remaining) truncated = true;
+      if (accepted && options.onOutput) {
+        try {
+          options.onOutput(accepted);
+        } catch {
+          // A broken reader must never kill the process it is reading.
+        }
+      }
     };
     child.stdout.on("data", append);
     child.stderr.on("data", append);
@@ -96,6 +114,9 @@ async function runProcess(
     timer.unref();
     const abort = () => terminate();
     options.signal?.addEventListener("abort", abort, { once: true });
+    // A signal that was already aborted before the spawn never fires the listener, so a kill issued
+    // in the gap between "start this" and "it is running" would otherwise be silently lost.
+    if (options.signal?.aborted) terminate();
 
     child.once("error", (error) => {
       clearTimeout(timer);
@@ -123,6 +144,7 @@ export class LocalSandbox implements Sandbox {
       timeoutMs: request.timeoutMs ?? 120_000,
       maxOutputChars: request.maxOutputChars ?? 100_000,
       ...(request.signal ? { signal: request.signal } : {}),
+      ...(request.onOutput ? { onOutput: request.onOutput } : {}),
     });
   }
   async destroy(): Promise<void> {}
@@ -178,6 +200,7 @@ export class DockerSandbox implements Sandbox {
       timeoutMs: request.timeoutMs ?? 120_000,
       maxOutputChars: request.maxOutputChars ?? 100_000,
       ...(request.signal ? { signal: request.signal } : {}),
+      ...(request.onOutput ? { onOutput: request.onOutput } : {}),
     });
   }
   async destroy(): Promise<void> {}
@@ -262,6 +285,7 @@ export class SingularitySandbox implements Sandbox {
       timeoutMs: request.timeoutMs ?? 120_000,
       maxOutputChars: request.maxOutputChars ?? 100_000,
       ...(request.signal ? { signal: request.signal } : {}),
+      ...(request.onOutput ? { onOutput: request.onOutput } : {}),
     });
   }
 
@@ -374,6 +398,7 @@ export class SshSandbox implements Sandbox {
       timeoutMs: request.timeoutMs ?? 120_000,
       maxOutputChars: request.maxOutputChars ?? 100_000,
       ...(request.signal ? { signal: request.signal } : {}),
+      ...(request.onOutput ? { onOutput: request.onOutput } : {}),
     });
     await this.syncFromRemote(request.signal);
     return result;

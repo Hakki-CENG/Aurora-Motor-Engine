@@ -1,6 +1,6 @@
 {
   "name": "@haf/session-worker",
-  "version": "1.58.0",
+  "version": "1.59.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,6 +9,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@haf/engine": "1.58.0"
+    "@haf/engine": "1.59.0"
   }
 }

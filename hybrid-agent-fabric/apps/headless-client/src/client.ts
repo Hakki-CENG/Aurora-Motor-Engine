@@ -61,6 +61,8 @@ export const AURORA_VIEWS = {
   "trust-decisions": "/v1/trust/decisions",
   settings: "/v1/settings/effective",
   questions: "/v1/questions",
+  "auto-approvals": "/v1/auto-approvals",
+  "auto-approval-decisions": "/v1/auto-approvals/decisions",
   "mcp-stateless": "/v1/mcp/stateless",
   "delegation-policy": "/v1/delegation-policy",
   fleet: "/v1/aurora/fleet",

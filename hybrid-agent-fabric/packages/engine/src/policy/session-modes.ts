@@ -74,6 +74,9 @@ const PLAN_MODE_WRITE_ALLOWLIST = [
   "experience.distill", "task.",
   // The way out of plan mode must itself be reachable from inside plan mode, or the mode is a trap.
   "session.plan.exit", "session.mode.set", "user.ask",
+  // Stopping a background shell and reading its output take nothing away from plan mode's promise:
+  // one is a read, the other only ever ends activity. Starting one stays denied.
+  "shell.stop",
 ];
 
 const PERMISSION_MODES: PermissionMode[] = ["plan", "manual", "acceptEdits", "auto", "dontAsk", "bypass"];

@@ -32,8 +32,8 @@ a re-read of the old list.
 |---|---|---|---|
 | N4 | Background-task control surface: list running child work, stop one, message one, and have it resume | Aurora has children, an inbox and the society bus, but no single "what is running, stop that one" surface | **Done in 1.58.0** |
 | N5 | Model-callable mode transitions (`EnterPlanMode` / `ExitPlanMode` equivalents) | Aurora's modes are operator-set; the agent itself cannot propose "let me explore first" and then hand back | **Done in 1.58.0** |
-| N6 | Long-running shell with retrievable output and a kill switch (`BashOutput` / `KillShell`) | Process execution is currently synchronous and bounded; a build or test run that outlives the call has nowhere to live | Planned |
-| N7 | Automated approval review (`--approve-for-me`): a policy that reviews and auto-answers a class of approvals with a recorded rationale | Aurora's `auto` mode is risk-class based; a reviewed-and-recorded auto-answer is a different, auditable thing | Planned |
+| N6 | Long-running shell with retrievable output and a kill switch (`BashOutput` / `KillShell`) | Process execution is currently synchronous and bounded; a build or test run that outlives the call has nowhere to live | **Done in 1.59.0** |
+| N7 | Automated approval review (`--approve-for-me`): a policy that reviews and auto-answers a class of approvals with a recorded rationale | Aurora's `auto` mode is risk-class based; a reviewed-and-recorded auto-answer is a different, auditable thing | **Done in 1.59.0** |
 
 ### P2 — considered and rejected
 
@@ -70,6 +70,21 @@ reach-bounded) and `tasks.resume` through the durable inbox.
 `session.plan.exit` is privileged and refuses to leave without a plan id or summary. Writing the test
 exposed that plan mode had denied its own exit - the escape hatch is now explicitly allowed.
 
-## 6. Next steps
+## 6. What 1.59.0 fixes
 
-N6 long-running shells with retrievable output and a kill switch, N7 reviewed automatic approvals.
+**N6 - Background shells.** `shell.start|output|stop|list` over the same sandbox factory `process.exec`
+uses, so there is one execution path to audit. Output lives in a bounded ring buffer read by absolute
+cursor, and characters lost to a slow reader are *reported* rather than papered over. Every shell has a
+timeout, an output ceiling and an owning session; closing the session kills them.
+
+**N7 - Reviewed automatic approvals.** `AutoApprovalService` answers a named class of approval with a
+stored rationale, subject to argument patterns, refusal patterns, session scope, expiry and a use budget.
+`*` is refused, privileged capabilities are never automatic, managed settings can disable the mechanism
+outright, and both approvals and escalations are logged. Agents may propose rules; proposals arrive
+disabled.
+
+## 7. Status
+
+**Round two is closed: N1-N7 are all implemented.** The remaining P2 items were considered and rejected
+as distribution or packaging concerns rather than engine capability. A third comparison round should be
+opened against whatever the peers ship next rather than re-reading this list.

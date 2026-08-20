@@ -46,6 +46,10 @@ import { filesystemCapabilities } from "./capabilities/filesystem.js";
 import { memoryCapabilities } from "./capabilities/memory.js";
 import { skillCapabilities } from "./capabilities/skills.js";
 import { processCapability } from "./capabilities/process.js";
+import { backgroundShellCapabilities } from "./capabilities/background-shell.js";
+import { autoApprovalCapabilities } from "./capabilities/auto-approval.js";
+import { AutoApprovalService } from "./policy/auto-approval.js";
+import { BackgroundShellService } from "./sandbox/background-shell.js";
 import { gitCapabilities } from "./capabilities/git.js";
 import { pythonCapability } from "./capabilities/python.js";
 import { agentCapabilities } from "./capabilities/agents.js";
@@ -358,6 +362,8 @@ export class HybridAgentEngine {
   readonly manifestTrust: ManifestTrustService;
   readonly settings: SettingsResolver;
   readonly userQuestions: UserQuestionService;
+  readonly backgroundShells: BackgroundShellService;
+  readonly autoApprovals: AutoApprovalService;
   readonly statelessMcp: StatelessMcpRegistry;
   readonly subagents: SubagentDefinitionService;
   readonly sessionLifecycle: SessionLifecycleService;
@@ -446,6 +452,16 @@ export class HybridAgentEngine {
     this.projectInstructions = new ProjectInstructionService(Date.now, config.projectInstructions ?? {});
     this.sessionEffort = new SessionEffortService(dataRoot, Date.now, config.effort ?? {});
     this.settings = new SettingsResolver({ managedPath: config.managedSettingsPath ?? process.env.HAF_MANAGED_SETTINGS });
+    // Reviewed automatic approvals sit in front of the human queue. They start with no rules, so the
+    // default behaviour is unchanged: every approval reaches a person until an operator writes a rule
+    // and says, in words that are stored, why that class of request is safe.
+    this.autoApprovals = new AutoApprovalService(dataRoot);
+    this.autoApprovals.bindEnabled(async (tenantId) => {
+      const resolved = await this.settings.value<boolean>({ tenantId, key: "allowAutoApprovals" });
+      // Absent means allowed; only an explicit `false` (from any layer, managed included) disables it.
+      return resolved.value !== false;
+    });
+    this.approvals.bindReviewer(async (request) => await this.autoApprovals.review(request));
     this.userQuestions = new UserQuestionService();
     this.repositoryCommands = new RepositoryCommandService();
     const policyLayers: PolicyEngine[] = [localPolicy];
@@ -668,6 +684,9 @@ export class HybridAgentEngine {
       onSessionClose: async (sessionId) => {
         await this.kernels.close(sessionId);
         this.userQuestions.cancelForSession(sessionId, "session closed");
+        // Nothing a session started may outlive it: a build left running after its owner is gone is
+        // an unowned process holding a workspace open.
+        await this.backgroundShells.stopForSession(sessionId, "session closed").catch(() => undefined);
         try {
           const closing = await this.supervisor.getSession(sessionId);
           await this.lifecycleHooks.run({ tenantId: closing.tenantId, event: "session.stop", subject: sessionId });
@@ -769,6 +788,11 @@ export class HybridAgentEngine {
       },
     );
     this.capabilities.register(processCapability(sandboxFactory));
+    // A background shell is the same sandboxed execution path as `process.exec`; only the moment the
+    // result arrives differs, so it reuses the factory rather than opening a second way to spawn.
+    this.backgroundShells = new BackgroundShellService(sandboxFactory);
+    for (const capability of backgroundShellCapabilities(this.backgroundShells)) this.capabilities.register(capability);
+    for (const capability of autoApprovalCapabilities(this.autoApprovals)) this.capabilities.register(capability);
     for (const capability of gitCapabilities(sandboxFactory)) this.capabilities.register(capability);
     this.worktreeReview = new WorkingTreeReviewService(sandboxFactory);
     this.worktrees = new WorktreeService(sandboxFactory, workspaceRoot);
