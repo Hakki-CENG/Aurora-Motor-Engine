@@ -32,6 +32,19 @@ export function agentCapabilities(supervisor: Supervisor) {
       },
     ),
     defineCapability(
+      {
+        id: "agent.fanout",
+        version: "1.0.0",
+        description: "This session's child-agent budget: nesting depth, live and lifetime children, the limits in force, and whether another spawn would be accepted.",
+        risk: "pure",
+        sideEffect: false,
+        source: "core",
+      },
+      z.object({}),
+      // An agent that can see the limit can plan within it instead of discovering it by failing.
+      async (_input, context) => await supervisor.fanoutStatus(context.sessionId),
+    ),
+    defineCapability(
       { id: "agent.list", version: "1.0.0", description: "List the current tenant's active and saved agents.", risk: "pure", sideEffect: false, source: "core" },
       z.object({}),
       async (_input, context) => ({ sessions: await supervisor.listSessions(context.tenantId) }),

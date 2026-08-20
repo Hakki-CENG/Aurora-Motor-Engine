@@ -131,14 +131,48 @@ async function runProcess(
   });
 }
 
+/**
+ * Per-command resource limits.
+ *
+ * A timeout bounds how *long* a command runs; it says nothing about how much of the machine it takes
+ * while it does. A runaway build that eats all memory does not time out - it takes the host down with
+ * the agent on it. Peers reached the same conclusion and added memory limits to their shell tool; the
+ * container backends already had them, and the local backend is where the gap was.
+ *
+ * These are applied with `ulimit` inside the command's own shell, so they are inherited by everything
+ * the command starts. They are resource hygiene, not a security boundary - the local backend never was
+ * one, and a limit does not make it one.
+ */
+export interface SandboxResourceLimits {
+  /** Address space per process, in megabytes (`ulimit -v`). */
+  memoryMb?: number;
+  /** CPU seconds per process (`ulimit -t`). A hard stop for spin loops that produce no output. */
+  cpuSeconds?: number;
+  /** Largest file the command may write, in megabytes (`ulimit -f`). */
+  fileSizeMb?: number;
+  /** Processes the command's user may hold (`ulimit -u`), which bounds fork bombs. */
+  processes?: number;
+}
+
+/** Renders limits as a `ulimit` prefix. Unsupported limits are skipped rather than failing the call. */
+export function resourceLimitPrefix(limits: SandboxResourceLimits | undefined): string {
+  if (!limits) return "";
+  const parts: string[] = [];
+  if (limits.memoryMb && limits.memoryMb > 0) parts.push(`ulimit -v ${Math.floor(limits.memoryMb * 1024)} 2>/dev/null || true`);
+  if (limits.cpuSeconds && limits.cpuSeconds > 0) parts.push(`ulimit -t ${Math.floor(limits.cpuSeconds)} 2>/dev/null || true`);
+  if (limits.fileSizeMb && limits.fileSizeMb > 0) parts.push(`ulimit -f ${Math.floor(limits.fileSizeMb * 1024)} 2>/dev/null || true`);
+  if (limits.processes && limits.processes > 0) parts.push(`ulimit -u ${Math.floor(limits.processes)} 2>/dev/null || true`);
+  return parts.length ? `${parts.join("; ")}; ` : "";
+}
+
 /** Trusted-development backend. It confines cwd but is NOT an OS security boundary. */
 export class LocalSandbox implements Sandbox {
   readonly kind = "local";
-  constructor(readonly workspacePath: string) {}
+  constructor(readonly workspacePath: string, private readonly limits?: SandboxResourceLimits) {}
 
   async exec(request: SandboxExecRequest): Promise<SandboxExecResult> {
     const cwd = await assertInside(this.workspacePath, request.cwd ?? ".");
-    return await runProcess("/bin/bash", ["-lc", request.command], {
+    return await runProcess("/bin/bash", ["-lc", `${resourceLimitPrefix(this.limits)}${request.command}`], {
       cwd,
       env: scrubEnvironment(request.env),
       timeoutMs: request.timeoutMs ?? 120_000,
@@ -155,6 +189,8 @@ export interface DockerSandboxOptions {
   memory?: string;
   cpus?: string;
   network?: "none" | string;
+  /** Limits applied inside the container as well, so a single process cannot claim the whole cgroup. */
+  limits?: SandboxResourceLimits;
 }
 
 export class DockerSandbox implements Sandbox {
@@ -164,7 +200,10 @@ export class DockerSandbox implements Sandbox {
   private readonly cpus: string;
   private readonly network: string;
 
+  private readonly limits: SandboxResourceLimits | undefined;
+
   constructor(readonly workspacePath: string, options: DockerSandboxOptions = {}) {
+    this.limits = options.limits;
     this.image = options.image ?? "python:3.13-slim";
     this.memory = options.memory ?? "1g";
     this.cpus = options.cpus ?? "1";
@@ -193,7 +232,7 @@ export class DockerSandbox implements Sandbox {
     for (const [name, value] of Object.entries(request.env ?? {})) {
       if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) args.push("-e", `${name}=${value}`);
     }
-    args.push(this.image, "/bin/sh", "-lc", request.command);
+    args.push(this.image, "/bin/sh", "-lc", `${resourceLimitPrefix(this.limits)}${request.command}`);
     return await runProcess("docker", args, {
       cwd: root,
       env: scrubEnvironment(),
@@ -415,10 +454,13 @@ export type SandboxBackendKind = "local" | "docker" | "singularity" | "ssh" | Cl
 
 export function createSandboxFactory(
   kind: SandboxBackendKind,
-  options: { ssh?: SshSandboxOptions; singularity?: SingularitySandboxOptions; cloud?: CloudSandboxGatewayOptions } = {},
+  options: {
+    ssh?: SshSandboxOptions; singularity?: SingularitySandboxOptions; cloud?: CloudSandboxGatewayOptions;
+    limits?: SandboxResourceLimits;
+  } = {},
 ): SandboxFactory {
   return async (workspacePath) => {
-    if (kind === "docker") return new DockerSandbox(workspacePath);
+    if (kind === "docker") return new DockerSandbox(workspacePath, options.limits ? { limits: options.limits } : {});
     if (kind === "singularity") {
       if (!options.singularity) throw new Error("Singularity sandbox configuration is required.");
       return new SingularitySandbox(workspacePath, options.singularity);
@@ -431,7 +473,7 @@ export function createSandboxFactory(
       if (!options.cloud || options.cloud.provider !== kind) throw new Error(`${kind} sandbox gateway configuration is required.`);
       return new CloudSandboxGateway(workspacePath, options.cloud);
     }
-    return new LocalSandbox(workspacePath);
+    return new LocalSandbox(workspacePath, options.limits);
   };
 }
 

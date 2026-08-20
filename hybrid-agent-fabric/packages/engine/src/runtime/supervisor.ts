@@ -59,6 +59,40 @@ export interface AgentFamilyRosterEntry {
   generation: number;
 }
 
+/**
+ * Fan-out limits for child agents.
+ *
+ * A single instruction can otherwise turn into an unbounded tree: every child is free to spawn its
+ * own children, and nothing counts how many are alive at once. Peers hit this and added exactly three
+ * dials, with a notable default - a subagent does *not* spawn subagents unless an operator says so.
+ */
+export interface AgentFanoutLimits {
+  /** Live children one session may hold at once. */
+  maxConcurrentChildren?: number;
+  /** How deep the tree may go. 1 means a root session may spawn children, and those children may not. */
+  maxDepth?: number;
+  /** Children one session may spawn over its whole life, live or finished. 0 disables the cap. */
+  maxLifetimeChildren?: number;
+}
+
+export interface AgentFanoutStatus {
+  sessionId: string;
+  depth: number;
+  liveChildren: number;
+  lifetimeChildren: number;
+  limits: Required<AgentFanoutLimits>;
+  canSpawn: boolean;
+  reason?: string;
+}
+
+const DEFAULT_FANOUT: Required<AgentFanoutLimits> = {
+  maxConcurrentChildren: 20,
+  // Nested spawning is off by default: it is the difference between "delegate this" and an
+  // exponential tree nobody asked for. An operator who wants deeper trees can say so.
+  maxDepth: 1,
+  maxLifetimeChildren: 200,
+};
+
 export interface SupervisorOptions {
   dataRoot: string;
   workspaceRoot: string;
@@ -79,6 +113,7 @@ export interface SupervisorOptions {
   modelName?: string;
   modelFallbacks?: string[];
   onSessionClose?: (sessionId: string) => Promise<void>;
+  fanout?: AgentFanoutLimits;
 }
 
 export class Supervisor {
@@ -93,8 +128,14 @@ export class Supervisor {
   private readonly inboxDrains = new Set<string>();
   private readonly messageRate = new Map<string, { tokens: number; updatedAt: number }>();
   private readonly deliveryWaiters = new Map<string, { resolve: (message: AgentInboxMessage) => void; reject: (error: Error) => void }>();
+  private readonly fanout: Required<AgentFanoutLimits>;
 
   constructor(private readonly options: SupervisorOptions) {
+    this.fanout = {
+      maxConcurrentChildren: Math.max(0, Math.floor(options.fanout?.maxConcurrentChildren ?? DEFAULT_FANOUT.maxConcurrentChildren)),
+      maxDepth: Math.max(0, Math.floor(options.fanout?.maxDepth ?? DEFAULT_FANOUT.maxDepth)),
+      maxLifetimeChildren: Math.max(0, Math.floor(options.fanout?.maxLifetimeChildren ?? DEFAULT_FANOUT.maxLifetimeChildren)),
+    };
     this.leases = options.leaseManager ?? new SessionLeaseManager(options.dataRoot);
     this.agentInbox = options.agentInbox ?? new FileAgentInboxStore(options.dataRoot);
     this.capabilityUnsubscribe = options.capabilities.subscribe(async (event) => {
@@ -161,6 +202,52 @@ export class Supervisor {
     return actor.state;
   }
 
+  /** How deep a session sits under its family root. A root session is depth 0. */
+  private depthOf(sessionId: string): number {
+    let depth = 0;
+    let current = this.catalog.find((item) => item.sessionId === sessionId);
+    const seen = new Set<string>();
+    while (current?.parentSessionId && !seen.has(current.sessionId)) {
+      seen.add(current.sessionId);
+      depth++;
+      current = this.catalog.find((item) => item.sessionId === current!.parentSessionId);
+    }
+    return depth;
+  }
+
+  /** What a session's fan-out budget looks like right now, and whether it may spawn at all. */
+  async fanoutStatus(sessionId: string): Promise<AgentFanoutStatus> {
+    await this.loadCatalog();
+    if (!this.catalog.some((item) => item.sessionId === sessionId)) throw new Error(`Session ${sessionId} does not exist.`);
+    const children = this.catalog.filter((item) => item.parentSessionId === sessionId);
+    let live = 0;
+    for (const child of children) {
+      const active = this.actors.get(child.sessionId)?.state;
+      const persisted = active ?? await this.options.snapshotStore.load(child.sessionId);
+      if (persisted && persisted.status !== "closed") live++;
+    }
+    const depth = this.depthOf(sessionId);
+    const status: AgentFanoutStatus = {
+      sessionId,
+      depth,
+      liveChildren: live,
+      lifetimeChildren: children.length,
+      limits: { ...this.fanout },
+      canSpawn: true,
+    };
+    if (depth >= this.fanout.maxDepth) {
+      status.canSpawn = false;
+      status.reason = `Nesting depth ${depth} is at the limit of ${this.fanout.maxDepth}; this agent may not spawn its own agents.`;
+    } else if (live >= this.fanout.maxConcurrentChildren) {
+      status.canSpawn = false;
+      status.reason = `${live} child agent(s) are already live, at the concurrency limit of ${this.fanout.maxConcurrentChildren}.`;
+    } else if (this.fanout.maxLifetimeChildren > 0 && children.length >= this.fanout.maxLifetimeChildren) {
+      status.canSpawn = false;
+      status.reason = `This session has spawned ${children.length} agent(s), at its lifetime limit of ${this.fanout.maxLifetimeChildren}.`;
+    }
+    return status;
+  }
+
   async spawnChild(input: {
     parentSessionId: string;
     name?: string;
@@ -170,6 +257,10 @@ export class Supervisor {
     agentProfile?: SessionAgentProfile;
   }): Promise<SessionSnapshot> {
     const parent = await this.getActor(input.parentSessionId);
+    // Checked before any workspace is created: refusing after a git worktree exists leaves litter,
+    // and the refusal has to name which limit stopped it so an operator can raise the right one.
+    const fanout = await this.fanoutStatus(input.parentSessionId);
+    if (!fanout.canSpawn) throw new Error(fanout.reason ?? "Fan-out limit reached.");
     const childId = randomUUID();
     const childWorkspace = join(this.options.workspaceRoot, childId);
     await mkdir(childWorkspace, { recursive: true });

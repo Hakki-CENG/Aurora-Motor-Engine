@@ -239,6 +239,12 @@ export interface ApprovalRequest {
   status: "pending" | "approved" | "denied" | "expired";
   /** Present when a reviewed auto-approval rule answered instead of a human. */
   autoApproval?: { ruleId?: string; rationale: string };
+  /** What the preview masked, shortened or dropped. An approver is told, never left to guess. */
+  previewIntegrity?: {
+    maskedValues: number;
+    shortened: Array<{ key: string; originalChars: number; keptChars: number }>;
+    droppedKeys: string[];
+  };
 }
 
 export interface GoalState {

@@ -40,7 +40,7 @@ import { FileCredentialPoolStateStore, type ProviderCredentialInput } from "./mo
 import { ModelConfigurationRegistry } from "./models/model-configuration-registry.js";
 import { AgentProfileRegistry } from "./profiles/agent-profile-registry.js";
 import { KernelManager } from "./kernel/kernel-manager.js";
-import { Supervisor } from "./runtime/supervisor.js";
+import { Supervisor, type AgentFanoutLimits } from "./runtime/supervisor.js";
 import { FileAgentInboxStore, PostgresAgentInboxStore, type AgentInboxStore } from "./runtime/agent-inbox.js";
 import { filesystemCapabilities } from "./capabilities/filesystem.js";
 import { memoryCapabilities } from "./capabilities/memory.js";
@@ -49,12 +49,15 @@ import { processCapability } from "./capabilities/process.js";
 import { backgroundShellCapabilities } from "./capabilities/background-shell.js";
 import { autoApprovalCapabilities } from "./capabilities/auto-approval.js";
 import { AutoApprovalService } from "./policy/auto-approval.js";
+import { SessionBudgetService } from "./policy/session-budget.js";
+import { sessionBudgetCapabilities } from "./capabilities/session-budget.js";
 import { BackgroundShellService } from "./sandbox/background-shell.js";
 import { gitCapabilities } from "./capabilities/git.js";
 import { pythonCapability } from "./capabilities/python.js";
 import { agentCapabilities } from "./capabilities/agents.js";
 import { goalCapabilities } from "./capabilities/goals.js";
 import { taskCapabilities } from "./capabilities/tasks.js";
+import type { SandboxResourceLimits } from "./sandbox/sandbox.js";
 import { createSandboxFactory, type SandboxBackendKind, type SingularitySandboxOptions, type SshSandboxOptions } from "./sandbox/sandbox.js";
 import type { CloudSandboxGatewayOptions } from "./sandbox/cloud-sandbox.js";
 import { DurableScheduler, type Schedule, type ScheduledJob } from "./scheduler/scheduler.js";
@@ -250,6 +253,10 @@ export interface EngineConfig {
     rateCapacity?: number;
     rateRefillMs?: number;
   };
+  /** Child-agent fan-out limits: live children per session, tree depth, lifetime spawns. */
+  agentFanout?: AgentFanoutLimits;
+  /** Per-command resource limits (memory, CPU seconds, file size, processes). */
+  sandboxLimits?: SandboxResourceLimits;
   modelOAuthRedirectUri?: string;
   context?: {
     maxMessageChars?: number;
@@ -364,6 +371,7 @@ export class HybridAgentEngine {
   readonly userQuestions: UserQuestionService;
   readonly backgroundShells: BackgroundShellService;
   readonly autoApprovals: AutoApprovalService;
+  readonly sessionBudgets: SessionBudgetService;
   readonly statelessMcp: StatelessMcpRegistry;
   readonly subagents: SubagentDefinitionService;
   readonly sessionLifecycle: SessionLifecycleService;
@@ -456,6 +464,7 @@ export class HybridAgentEngine {
     // default behaviour is unchanged: every approval reaches a person until an operator writes a rule
     // and says, in words that are stored, why that class of request is safe.
     this.autoApprovals = new AutoApprovalService(dataRoot);
+    this.sessionBudgets = new SessionBudgetService(dataRoot);
     this.autoApprovals.bindEnabled(async (tenantId) => {
       const resolved = await this.settings.value<boolean>({ tenantId, key: "allowAutoApprovals" });
       // Absent means allowed; only an explicit `false` (from any layer, managed included) disables it.
@@ -668,6 +677,7 @@ export class HybridAgentEngine {
       commandJournal: commands,
       ...(leaseManager ? { leaseManager } : {}),
       agentInbox: this.agentInbox,
+      ...(config.agentFanout ? { fanout: config.agentFanout } : {}),
       ...(config.agentMessaging?.maxChars ? { agentMessageMaxChars: config.agentMessaging.maxChars } : {}),
       ...(config.agentMessaging?.maxPending ? { agentMessageMaxPending: config.agentMessaging.maxPending } : {}),
       ...(config.agentMessaging?.rateCapacity ? { agentMessageRateCapacity: config.agentMessaging.rateCapacity } : {}),
@@ -785,6 +795,9 @@ export class HybridAgentEngine {
         ...(config.sshSandbox ? { ssh: config.sshSandbox } : {}),
         ...(config.singularitySandbox ? { singularity: config.singularitySandbox } : {}),
         ...(config.cloudSandbox ? { cloud: config.cloudSandbox } : {}),
+        // Default resource hygiene for every command: a build that eats the host is not a build the
+        // agent should be able to run. Operators can raise or clear these per installation.
+        limits: config.sandboxLimits ?? { memoryMb: 4096, cpuSeconds: 900, fileSizeMb: 2048, processes: 512 },
       },
     );
     this.capabilities.register(processCapability(sandboxFactory));
@@ -793,6 +806,9 @@ export class HybridAgentEngine {
     this.backgroundShells = new BackgroundShellService(sandboxFactory);
     for (const capability of backgroundShellCapabilities(this.backgroundShells)) this.capabilities.register(capability);
     for (const capability of autoApprovalCapabilities(this.autoApprovals)) this.capabilities.register(capability);
+    for (const capability of sessionBudgetCapabilities({
+      budgets: this.sessionBudgets, cost: async (sessionId) => await this.sessionLifecycle.cost(sessionId),
+    })) this.capabilities.register(capability);
     for (const capability of gitCapabilities(sandboxFactory)) this.capabilities.register(capability);
     this.worktreeReview = new WorkingTreeReviewService(sandboxFactory);
     this.worktrees = new WorktreeService(sandboxFactory, workspaceRoot);
@@ -939,6 +955,7 @@ export class HybridAgentEngine {
     for (const capability of settingsCapabilities(this.settings)) this.capabilities.register(capability);
     for (const capability of backgroundTaskCapabilities({
       supervisor: this.supervisor, modes: this.sessionModes, effort: this.sessionEffort, questions: this.userQuestions,
+      approvals: this.approvals,
     })) this.capabilities.register(capability);
     for (const capability of planModeCapabilities(this.sessionModes)) this.capabilities.register(capability);
     for (const capability of sessionLifecycleCapabilities(this.sessionLifecycle)) this.capabilities.register(capability);
@@ -1082,7 +1099,21 @@ export class HybridAgentEngine {
       const archived = await this.sessionLifecycle.isArchived(command.tenantId, command.sessionId).catch(() => false);
       if (archived) throw new Error(`Session ${command.sessionId} is archived. Restore it before sending "${command.kind}".`);
     }
+    // A spend cap refuses *new* work only. A turn already in flight finishes: cutting a half-applied
+    // edit to save a few cents leaves a worse mess than the spend it avoided.
+    if (command.sessionId && (command.kind === "session.prompt" || command.kind === "session.resume")) {
+      const verdict = await this.budgetVerdict(command.tenantId, command.sessionId).catch(() => undefined);
+      if (verdict?.blocked) throw new Error(verdict.message);
+    }
     return await this.supervisor.dispatch(command);
+  }
+
+  /** What the session's budget looks like right now, priced from the same table the cost view uses. */
+  async budgetVerdict(tenantId: string, sessionId: string) {
+    const cost = await this.sessionLifecycle.cost(sessionId);
+    return await this.sessionBudgets.evaluate({
+      tenantId, sessionId, spentUsd: cost.costUsd, totalTokens: cost.usage.totalTokens, costSource: cost.costSource,
+    });
   }
 
   async session(sessionId: string): Promise<SessionSnapshot> {

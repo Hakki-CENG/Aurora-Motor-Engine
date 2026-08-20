@@ -8,7 +8,7 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.59.0
+## Current milestone — 1.60.0
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -92,6 +92,8 @@ Implemented and tested:
 - Background task control (monitor, stop, resume) and model-callable plan mode with an evidence requirement
 - Long-running background shells with cursor-based output retrieval, honest loss reporting and a kill switch
 - Reviewed automatic approvals: named rules with a stored rationale, a use budget, expiry and a full decision log
+- Child-agent fan-out limits (concurrency, depth, lifetime) and per-command memory/CPU/file/process limits
+- Approval previews that cannot hide the command or destination, plus enforced session spend budgets
 - Aurora autopilot: bounded unattended cadence with a durable run ledger
 - Aurora provenance explainer reconstructing why any artifact exists
 - Embedding-backed semantic memory recall
@@ -1050,6 +1052,25 @@ durable inbox.
 The agent can enter plan mode itself, because that only removes authority. Leaving requires approval
 *and* evidence: a plan id or a summary of what the exploration produced, so exploration earns execution
 rather than assuming it. A managed ceiling still caps where it can land.
+
+## Fan-out, resource and spend limits
+
+Three ceilings that were missing. **Fan-out:** a session may hold 20 live children, the tree is one level
+deep by default (a subagent does not spawn subagents unless an operator says so), and 200 spawns per
+session over its life; the refusal names the limit, and `agent.fanout` lets an agent plan inside it.
+**Resources:** every command carries memory, CPU-second, file-size and process limits applied as a
+`ulimit` prefix in its own shell, so a runaway build cannot take the host down with the agent on it.
+**Spend:** `SessionBudgetService` caps a session in dollars or tokens, warns before the wall, refuses new
+turns at it without ever truncating a turn in flight, and reports `unpriced` rather than pretending a
+money cap holds for a model with no price entry.
+
+## Approval previews
+
+The preview *is* the question being asked, so it cannot hide the answer. Decision-relevant fields —
+command, path, url, host, target — are kept whole; when one must be shortened, both ends survive with the
+omission stated inline, because a head-only cut removes exactly the dangerous tail. Credentials are
+masked by key name and by value shape, every mask is counted, and non-decision keys are dropped first
+with each one named. An approver may be shown less content, never less intent.
 
 ## Long-running shells
 

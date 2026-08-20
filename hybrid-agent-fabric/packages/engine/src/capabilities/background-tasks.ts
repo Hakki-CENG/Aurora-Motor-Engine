@@ -9,6 +9,7 @@ import { defineCapability } from "./schema.js";
 
 export interface BackgroundTaskDeps {
   supervisor: Supervisor;
+  approvals?: { list: (sessionId?: string) => Array<{ status: string }> };
   modes?: SessionModeService;
   effort?: SessionEffortService;
   questions?: UserQuestionService;
@@ -71,6 +72,13 @@ export function backgroundTaskCapabilities(deps: BackgroundTaskDeps) {
             ...(deps.modes ? { mode: (await deps.modes.get(context.tenantId, sessionId).catch(() => undefined))?.permissionMode } : {}),
             ...(deps.effort ? { effort: (await deps.effort.get(context.tenantId, sessionId).catch(() => undefined))?.level } : {}),
             openQuestions: deps.questions ? deps.questions.list({ sessionId, pendingOnly: true }).length : 0,
+            // "Busy" and "blocked" look identical from the outside unless something says so: an agent
+            // sitting on an unanswered question is not working, it is waiting on a human.
+            waitingOn: deps.questions && deps.questions.list({ sessionId, pendingOnly: true }).length > 0
+              ? "question"
+              : deps.approvals && deps.approvals.list(sessionId).some((item) => item.status === "pending")
+                ? "approval"
+                : null,
           });
         }
         return { currentSessionId: context.sessionId, agents, generatedAt: new Date().toISOString() };

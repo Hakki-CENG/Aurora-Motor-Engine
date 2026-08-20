@@ -76,6 +76,8 @@ export function App() {
   const [sessionEffort, setSessionEffort] = useState<any>(null);
   const [questions, setQuestions] = useState<any[]>([]);
   const [shells, setShells] = useState<any[]>([]);
+  const [budget, setBudget] = useState<any>(null);
+  const [fanout, setFanout] = useState<any>(null);
   const [tab, setTab] = useState<Tab>("chat");
   const [prompt, setPrompt] = useState("");
   const [promptImages, setPromptImages] = useState<Array<{path:string;mimeType:string;sha256:string;fileName:string}>>([]);
@@ -147,6 +149,8 @@ export function App() {
     try { setSessionEffort(await api<any>(`/v1/sessions/${id}/effort`)); } catch { setSessionEffort(null); }
     try { setQuestions((await api<any>(`/v1/questions?tenantId=local&sessionId=${id}&pendingOnly=true`)).questions); } catch { setQuestions([]); }
     try { setShells((await api<any>(`/v1/sessions/${id}/shells?limit=10`)).shells); } catch { setShells([]); }
+    try { setBudget(await api<any>(`/v1/sessions/${id}/budget`)); } catch { setBudget(null); }
+    try { setFanout(await api<any>(`/v1/sessions/${id}/fanout`)); } catch { setFanout(null); }
   }, [activeId]);
   const stopShell = useCallback(async (shellId: string) => {
     if (!activeId) return;
@@ -338,7 +342,7 @@ export function App() {
       <section><h3>Background shells</h3>{shells.length ? shells.map((item) => <div className="approval" key={item.id}><b>{item.label}</b><small>{item.status} · {item.producedChars} chars{item.droppedChars ? ` · ${item.droppedChars} dropped` : ""}</small><pre>{item.command}</pre>{item.status === "running" && <div><button onClick={() => void stopShell(item.id)} className="danger"><XCircle size={13}/>Kill</button></div>}{item.stopReason && <small>{item.stopReason}</small>}</div>) : <p className="muted">No background shells.</p>}</section>
       <section><h3>Approvals</h3>{approvals.length ? approvals.map((item) => <div className="approval" key={item.id}><b>{item.capabilityId}</b><small>{item.risk}</small><pre>{JSON.stringify(item.argumentsPreview,null,2)}</pre><div><button onClick={() => resolveApproval(item.id,"approve_once")}><CheckCircle2 size={13}/>Once</button><button onClick={() => resolveApproval(item.id,"deny")} className="danger"><XCircle size={13}/>Deny</button></div></div>) : <p className="muted">No pending approvals.</p>}</section>
       <section><h3>Agent family</h3>{roster.length ? <>{roster.map((item) => <button className="child" key={item.sessionId} onClick={() => setActiveId(item.sessionId)}><Bot size={14}/><span><b>{item.name}</b><small>{item.relationship} · {item.status}</small></span></button>)}<div className="family-composer"><select value={familyTarget} onChange={e=>setFamilyTarget(e.target.value)}>{roster.map(item=><option key={item.sessionId} value={item.sessionId}>{item.relationship}: {item.name}</option>)}</select><select value={familyMode} onChange={e=>setFamilyMode(e.target.value)}><option value="auto">Auto</option><option value="steer">Steer</option><option value="follow_up">Follow up</option></select><textarea value={familyMessage} onChange={e=>setFamilyMessage(e.target.value)} placeholder="Message a reachable agent…"/><button onClick={sendFamilyMessage} disabled={!familyMessage.trim()||!familyTarget}><Send size={13}/>Send</button></div></> : <p className="muted">No directly reachable agents.</p>}{inbox.length>0&&<p className="inbox-warning"><MessageSquare size={13}/>{inbox.length} queued or uncertain messages</p>}</section>
-      <section><h3>Runtime</h3><dl><dt>Profile</dt><dd>{session?.agentProfile?`${session.agentProfile.name} v${session.agentProfile.version}`:"none"}</dd><dt>Model</dt><dd>{session?.modelName ?? "default"}</dd><dt>Fallbacks</dt><dd>{session?.modelFallbacks?.length ?? 0}</dd><dt>Open tasks</dt><dd>{session?.tasks?.filter(task=>!["done","cancelled"].includes(task.status)).length ?? 0}</dd><dt>Sequence</dt><dd>{session?.lastSequence ?? 0}</dd><dt>Fleet events</dt><dd>{metrics?.eventsTotal ?? 0}</dd></dl></section>
+      <section><h3>Runtime</h3><dl><dt>Profile</dt><dd>{session?.agentProfile?`${session.agentProfile.name} v${session.agentProfile.version}`:"none"}</dd><dt>Model</dt><dd>{session?.modelName ?? "default"}</dd><dt>Fallbacks</dt><dd>{session?.modelFallbacks?.length ?? 0}</dd><dt>Open tasks</dt><dd>{session?.tasks?.filter(task=>!["done","cancelled"].includes(task.status)).length ?? 0}</dd><dt>Sequence</dt><dd>{session?.lastSequence ?? 0}</dd><dt>Fleet events</dt><dd>{metrics?.eventsTotal ?? 0}</dd><dt>Budget</dt><dd>{budget && budget.state !== "unlimited" ? `${budget.state}${budget.remainingUsd !== undefined ? ` · $${budget.remainingUsd.toFixed(2)} left` : ""}${budget.blocked ? " · blocked" : ""}` : "unlimited"}</dd><dt>Fan-out</dt><dd>{fanout ? `${fanout.liveChildren}/${fanout.limits.maxConcurrentChildren} live · depth ${fanout.depth}/${fanout.limits.maxDepth}` : "—"}</dd></dl></section>
     </aside>
     {error && <div className="toast"><XCircle size={16}/>{error}</div>}
   </div>;

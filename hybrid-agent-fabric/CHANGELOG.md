@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.60.0 - 2026-08-20
+
+Round-three peer audit (`docs/peer-system-gap-audit-round3.md`) against Claude Code 2.1.235, Codex CLI
+0.147, the OpenHands Agent SDK and the final MCP 2026-07-28 spec. Four P0 gaps found and closed.
+
+- **Child-agent fan-out limits (R1).** `spawnChild` had no ceiling of any kind: one instruction could
+  fan out into an exponential tree, each node holding a git worktree. Three bounds now apply before any
+  workspace is created - live children per session (20), tree depth (**1 by default, so a subagent does
+  not spawn subagents**), and lifetime spawns per session (200). The refusal names the limit that
+  stopped it, and `agent.fanout` lets an agent read its own budget instead of discovering it by failing.
+- **Per-command resource limits (R2).** A timeout bounds how *long* a command runs and says nothing
+  about how much of the machine it takes. `SandboxResourceLimits` adds memory, CPU-second, file-size and
+  process caps as a `ulimit` prefix inside the command's own shell, inherited by everything it starts,
+  on the local and Docker backends. Defaults: 4 GB, 900 CPU-seconds, 2 GB files, 512 processes.
+- **Approval preview integrity (R3).** The old preview was a flat 2000-character cut with no redaction:
+  the tail of a long command - exactly where `&& rm -rf /` would sit - could vanish, and credentials
+  passed straight through. `buildApprovalPreview` keeps decision-relevant fields (command, path, url,
+  host, target) whole, keeps **both ends** when even those must be shortened with the omission stated
+  inline, masks credentials by key name and value shape, counts every mask, drops only non-decision keys
+  when over budget and names each one. The request carries a `previewIntegrity` report: an approver may
+  be shown less content, never less intent.
+- **Session spend budgets (R4).** Aurora could price a session and roll costs up per tenant, but nothing
+  could stop at a number. `SessionBudgetService` adds tenant defaults and attributed per-session
+  overrides with a spend cap, a token cap, a warning fraction and a block-or-warn policy. The cap refuses
+  *new* turns and never truncates a turn in flight, because killing a half-applied edit to save cents is
+  the worse outcome. An unpriced model reports `unpriced` rather than pretending a money cap holds - the
+  token cap, always measurable, still applies.
+- **Blocked versus busy (R8).** `tasks.monitor` now reports `waitingOn: "question" | "approval" | null`,
+  so an agent sitting on an unanswered question no longer reads as working.
+- Fixed as a side effect: `session.budget` and `agent.fanout` are pure reads, and neither can raise its
+  own limit - a cap an agent can lift is not a cap.
+- Added REST for fan-out status, session budgets and tenant budget defaults; Canvas shows budget state
+  and fan-out occupancy in the session inspector; a `session-budgets` view in the headless client.
+- Added 14 tests (544 engine tests total) covering nested-spawn refusal, the concurrency cap, the agent's
+  own view of both budgets, `ulimit` rendering and a real file-size limit taking effect, preview tail
+  preservation, credential masking that leaves the destination readable, budget warn-then-block, the
+  unpriced refusal, tenant-default fallback with session override, and a live prompt blocked by a cap.
+
 ## 1.59.0 - 2026-08-20
 
 Round-two audit, N6 and N7 - the last two items on the list: long-running shells and reviewed automatic

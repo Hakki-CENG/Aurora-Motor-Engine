@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-20 — current milestone 1.59
+Updated: 2026-08-20 — current milestone 1.60
 
 ## Original 1.0 baseline (delivered)
 
@@ -405,6 +405,20 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] Argument patterns, refusal patterns, session scope, expiry and use budgets
 - [x] Absolute floors: no wildcard rules, never privileged, managed off switch
 - [x] Escalations logged beside approvals; agent proposals arrive disabled
+
+### Peer parity round three, wave one (1.60)
+
+- [x] Child-agent concurrency, depth and lifetime caps enforced before any workspace is created
+- [x] Nested subagent spawning off by default, raisable by configuration
+- [x] `agent.fanout` read-only view of a session's own spawn budget
+- [x] Per-command memory, CPU-second, file-size and process limits on local and Docker backends
+- [x] Approval previews that keep the command, path and destination readable
+- [x] Credential masking by key name and value shape, with every mask counted
+- [x] `previewIntegrity` report on approval requests naming what was shortened or dropped
+- [x] Session spend budgets in dollars and tokens, tenant defaults plus attributed overrides
+- [x] Budget blocks new turns only, never truncates a turn in flight
+- [x] Unpriced models reported rather than treated as free
+- [x] `waitingOn` in the monitor distinguishing blocked from busy
 
 ## Required for full target parity
 

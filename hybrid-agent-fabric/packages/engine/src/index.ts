@@ -123,6 +123,8 @@ export * from "./capabilities/background-tasks.js";
 export * from "./capabilities/background-shell.js";
 export * from "./capabilities/auto-approval.js";
 export * from "./policy/auto-approval.js";
+export * from "./policy/session-budget.js";
+export * from "./capabilities/session-budget.js";
 export * from "./sandbox/background-shell.js";
 export * from "./aurora/provenance-service.js";
 export * from "./aurora/workspace-checkpoint-service.js";
