@@ -1,6 +1,6 @@
 {
   "name": "@haf/acp-server",
-  "version": "1.53.0",
+  "version": "1.54.0",
   "private": true,
   "type": "module",
   "bin": {
@@ -13,6 +13,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@haf/engine": "1.53.0"
+    "@haf/engine": "1.54.0"
   }
 }

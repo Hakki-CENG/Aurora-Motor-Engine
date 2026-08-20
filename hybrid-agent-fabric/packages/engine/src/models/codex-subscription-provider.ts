@@ -47,7 +47,7 @@ export class CodexSubscriptionProvider implements ModelProvider {
       instructions: request.systemPrompt,
       input: await openAIResponsesInputItems(request.messages, request.workspacePath),
       ...(tools.length ? { tools, tool_choice: "auto", parallel_tool_calls: true } : {}),
-      reasoning: { effort: this.options.reasoningEffort ?? "medium", summary: "auto" },
+      reasoning: { effort: request.reasoningEffort ?? this.options.reasoningEffort ?? "medium", summary: "auto" },
       include: ["reasoning.encrypted_content"],
       prompt_cache_key: cacheKey,
       store: false,

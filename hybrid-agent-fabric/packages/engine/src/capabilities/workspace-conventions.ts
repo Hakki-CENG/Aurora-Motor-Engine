@@ -5,6 +5,8 @@ import type { ProjectInstructionService } from "../knowledge/project-instruction
 import type { RepositoryCommandService } from "../knowledge/repository-commands.js";
 import type { SessionLifecycleService } from "../runtime/session-lifecycle.js";
 import type { SubagentDefinitionService } from "../knowledge/subagent-definitions.js";
+import type { SessionEffortService } from "../policy/session-effort.js";
+import type { WorktreeService } from "../repositories/worktree-service.js";
 import { reviewVerdict, type WorkingTreeReviewService } from "../repositories/working-tree-review.js";
 import { auroraDefined } from "../util/aurora-state.js";
 import { defineCapability } from "./schema.js";
@@ -219,6 +221,48 @@ export function subagentCapabilities(service: SubagentDefinitionService) {
       { id: "subagents.materialize-all", version: "1.0.0", description: "Materialise every screened subagent definition in this workspace.", risk: "privileged", sideEffect: true, source: "core" },
       z.object({}),
       async (_input, ctx) => ({ applied: await service.materializeAll({ tenantId: ctx.tenantId, workspacePath: ctx.workspacePath }) }),
+    ),
+  ];
+}
+
+/** Per-session effort: one dial for reasoning effort and what the harness is willing to spend. */
+export function effortCapabilities(service: SessionEffortService) {
+  return [
+    defineCapability(
+      { id: "session.effort", version: "1.0.0", description: "The effort level for this session and the exact numbers it implies: tool iterations, context scale, reasoning effort.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({}),
+      async (_input, ctx) => await service.get(ctx.tenantId, ctx.sessionId),
+    ),
+    defineCapability(
+      { id: "session.effort.levels", version: "1.0.0", description: "List effort levels with the runtime budgets each one selects.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({}),
+      async () => ({ levels: service.levels() }),
+    ),
+    defineCapability(
+      { id: "session.effort.set", version: "1.0.0", description: "Change this session's effort level. Takes effect on the next turn, never mid-turn.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({ level: z.enum(["low", "medium", "high", "xhigh", "max"]), note: z.string().max(500).optional() }),
+      async (input, ctx) => await service.set(auroraDefined({ tenantId: ctx.tenantId, sessionId: ctx.sessionId, actor: "agent", ...input })),
+    ),
+  ];
+}
+
+/** Deliberate git worktrees for the main session, confined to the engine workspace root. */
+export function worktreeCapabilities(service: WorktreeService) {
+  return [
+    defineCapability(
+      { id: "worktree.list", version: "1.0.0", description: "List the git worktrees attached to this session's repository.", risk: "workspace_read", sideEffect: false, source: "core" },
+      z.object({}),
+      async (_input, ctx) => ({ worktrees: await service.list(ctx.workspacePath, ctx.signal) }),
+    ),
+    defineCapability(
+      { id: "worktree.create", version: "1.0.0", description: "Create a new branch in an isolated git worktree inside the engine workspace root, ready for a new session.", risk: "workspace_write", sideEffect: true, source: "core" },
+      z.object({ branch: z.string().min(1).max(200), base: z.string().max(200).optional() }),
+      async (input, ctx) => await service.create(auroraDefined({ workspacePath: ctx.workspacePath, branch: input.branch, base: input.base, signal: ctx.signal })),
+    ),
+    defineCapability(
+      { id: "worktree.remove", version: "1.0.0", description: "Remove a worktree inside the engine workspace root. A session can never remove the tree it runs in.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({ path: z.string().min(1).max(4096), force: z.boolean().optional() }),
+      async (input, ctx) => await service.remove(auroraDefined({ workspacePath: ctx.workspacePath, path: input.path, force: input.force, signal: ctx.signal })),
     ),
   ];
 }

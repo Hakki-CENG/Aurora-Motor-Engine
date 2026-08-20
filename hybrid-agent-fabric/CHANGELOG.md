@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.54.0 — 2026-08-20
+
+Peer-gap audit, wave five: G11 (per-session effort) and G12 (worktrees for the main session).
+
+- **Effort is one dial that moves two things.** Peers expose "how hard should I think about this?", and
+  it has always meant both *ask the provider for more reasoning* and *let the harness spend more*.
+  Aurora had the first fixed per provider and the second hard-coded at actor construction. Now
+  `low | medium | high | xhigh | max` selects an explicit profile: tool iterations (4 → 32), context
+  scale (0.6 → 1.5), reasoning effort and a continuation ceiling.
+- Nothing about it is a hidden multiplier: `session.effort` returns the exact numbers the runtime will
+  use, so "why did this turn stop after four tool calls?" is answerable without reading the source. The
+  guardrail event now records the ceiling and the effort that produced it.
+- Effort is resolved **once per turn**, so a change mid-turn cannot move the ceiling under a running
+  loop; it applies from the next turn. `ModelRequest` carries an optional `reasoningEffort` that
+  providers may honour and must never break on — the Codex provider prefers it over its constructed
+  default, every other provider ignores it.
+- Levels are monotonic by test: a higher level never buys fewer iterations or a smaller context.
+  Tenant defaults exist, per-session overrides do not leak between sessions, and an unresolvable
+  session falls back to the runtime default instead of failing a turn.
+- **Deliberate worktrees (G12).** Child sessions always got an isolated worktree; what was missing was
+  "give me a clean branch to try this in". `worktree.create` makes one from the session's repository —
+  inside the engine's own workspace root, never at a caller-supplied path — and the REST endpoint can
+  bind a fresh session to it in the same call.
+- Branch and base names are validated as plain git references so neither can smuggle shell syntax,
+  removal refuses anything outside the workspace root, and a session can never remove the tree it is
+  running in. Every command goes through the same sandbox factory the git capabilities use.
+- Added governed `session.effort`, `session.effort.levels`, `session.effort.set`, `worktree.list`,
+  `worktree.create` and `worktree.remove` capabilities, REST for all of them, an effort selector in the
+  Canvas session header next to the mode selectors, and a new CLI view.
+- Added 7 tests (482 engine tests total) covering monotonic level profiles, tenant defaults with
+  per-session isolation, the ceiling applied to a real turn, the safe fallback, worktree creation with a
+  session bound to it, refusal of unsafe references, outside paths and self-removal, and removal of a
+  worktree Aurora created.
+
 ## 1.53.0 — 2026-08-20
 
 Peer-gap audit, wave four: G8 (working-tree review) and G9 (declarative subagent files) are closed.

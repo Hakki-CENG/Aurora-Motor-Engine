@@ -55,6 +55,7 @@ export const AURORA_VIEWS = {
   usage: "/v1/usage",
   "session-archives": "/v1/session-archives",
   "model-prices": "/v1/model-prices",
+  "effort-levels": "/v1/effort-levels",
   "delegation-policy": "/v1/delegation-policy",
   fleet: "/v1/aurora/fleet",
   "fleet-members": "/v1/aurora/fleet/members",

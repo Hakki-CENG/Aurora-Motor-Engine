@@ -157,6 +157,8 @@ export interface ModelRequest {
   tools: CapabilityDescriptor[];
   /** Explicit, ordered provider:model routes. They are never inferred across data-policy boundaries. */
   fallbackModels?: string[];
+  /** Requested reasoning effort. Providers that do not support it ignore it; none may be broken by it. */
+  reasoningEffort?: "low" | "medium" | "high" | "max";
   signal?: AbortSignal;
 }
 

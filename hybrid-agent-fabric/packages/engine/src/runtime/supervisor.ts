@@ -74,6 +74,8 @@ export interface SupervisorOptions {
   model: ModelProvider;
   capabilities: CapabilityBroker;
   context: ContextManager;
+  /** Optional per-session effort resolution, consulted once per turn. */
+  resolveEffort?: (tenantId: string, sessionId: string) => Promise<{ toolIterations: number; reasoningEffort: "low" | "medium" | "high" | "max" }>;
   modelName?: string;
   modelFallbacks?: string[];
   onSessionClose?: (sessionId: string) => Promise<void>;
@@ -599,6 +601,7 @@ export class Supervisor {
       frozenContext,
       ...(this.options.modelName ? { modelName: this.options.modelName } : {}),
       ...(this.options.modelFallbacks?.length ? { modelFallbacks: this.options.modelFallbacks } : {}),
+      ...(this.options.resolveEffort ? { resolveEffort: this.options.resolveEffort } : {}),
       claimSteeringMessages: async (sessionId) => await this.claimSteeringMessages(sessionId),
       markInboxDelivered: async (message, deliveredAt) => await this.markInboxDelivered(message, deliveredAt),
       markInboxUncertain: async (message, reason) => await this.markInboxUncertain(message, reason),

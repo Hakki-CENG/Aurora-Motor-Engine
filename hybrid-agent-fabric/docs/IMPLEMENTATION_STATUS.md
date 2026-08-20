@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-20 — current milestone 1.53
+Updated: 2026-08-20 — current milestone 1.54
 
 ## Original 1.0 baseline (delivered)
 
@@ -339,6 +339,16 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] Tool resolution against the live catalog with deny applied and reported
 - [x] Unsupported front-matter fields named rather than dropped
 - [x] Idempotent materialisation into agent profiles with society role binding
+
+### Peer parity, wave five (1.54)
+
+- [x] Effort levels with explicit, inspectable runtime profiles
+- [x] Tool-iteration ceiling, context scale, reasoning effort and continuation ceiling per level
+- [x] Effort resolved once per turn; `ModelRequest.reasoningEffort` honoured by providers that support it
+- [x] Tenant default effort with per-session overrides and a safe fallback
+- [x] Deliberate git worktrees for the main session, confined to the engine workspace root
+- [x] Validated git references, confined removal, no self-removal
+- [x] Worktree creation that can bind a new session in one call
 
 ## Required for full target parity
 

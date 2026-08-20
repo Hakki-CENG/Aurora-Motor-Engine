@@ -42,8 +42,8 @@ Ranked by (value to a real user) × (risk of not having it), with the peer that 
 | G8 | Code review mode (`/review`) over the working tree or against a base branch | Codex, Claude Code | Hosted review provider exists (PR-level); no local working-tree review flow | **Done in 1.53.0** |
 | G9 | Subagent declaration files with per-agent tools/model/hooks/memory/isolation | Claude Code subagent frontmatter | Agent profiles + society roles cover most fields; no single declarative file format, no per-agent hooks | **Done in 1.53.0** (per-agent hooks still open) |
 | G10 | Plugin/skill marketplace with signed manifests and version pinning | Claude Code plugins, Codex agent plugins | Skills hub and plugin registry exist; no signing or pinning | Planned |
-| G11 | Effort/verbosity control per turn (`/reasoning`, effort levels) | Codex, Claude Code | Only Codex-provider reasoning effort | Planned |
-| G12 | Worktree ergonomics for the main session (`/worktree`) | Codex, Claude Code | Child sessions already use git worktrees; the main session cannot move into one | Planned |
+| G11 | Effort/verbosity control per turn (`/reasoning`, effort levels) | Codex, Claude Code | Only Codex-provider reasoning effort | **Done in 1.54.0** |
+| G12 | Worktree ergonomics for the main session (`/worktree`) | Codex, Claude Code | Child sessions already use git worktrees; the main session cannot move into one | **Done in 1.54.0** |
 
 ### P2 — deliberate non-goals (recorded so they are not re-discovered)
 
@@ -104,7 +104,18 @@ hard bounds on files, diff size and command output.
 materialises it into an agent profile plus a society role binding, resolving tools against the live
 catalog and naming everything it could not honour.
 
-## 7. Next steps
+## 7. What 1.54.0 fixes
 
-In order: G11 per-turn effort control, G12 worktree ergonomics for the main session, per-agent hooks to
-finish G9, then G10 signed plugin manifests and version pinning.
+**G11 — Effort.** `SessionEffortService` publishes an explicit profile per level (tool iterations,
+context scale, reasoning effort, continuation ceiling), resolved once per turn and surfaced on the
+guardrail event. `ModelRequest.reasoningEffort` carries the request to providers that support it.
+
+**G12 — Worktrees.** `WorktreeService` creates a validated, confined worktree from the session's
+repository, and the REST endpoint can bind a new session to it in the same call.
+
+## 8. Remaining
+
+- **G9 (partial)** per-agent lifecycle hooks: hook rules are tenant-scoped; scoping them to an agent
+  profile needs the profile id on the capability context.
+- **G10** signed plugin/skill manifests with version pinning.
+- Everything else in the audit is closed.

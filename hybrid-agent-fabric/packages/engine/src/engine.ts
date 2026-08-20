@@ -152,8 +152,9 @@ import {
 } from "./capabilities/aurora-core.js";
 import { discoveryCapabilities } from "./capabilities/discovery.js";
 import {
-  lifecycleHookCapabilities, projectInstructionCapabilities, repositoryCommandCapabilities,
+  effortCapabilities, lifecycleHookCapabilities, projectInstructionCapabilities, repositoryCommandCapabilities,
   reviewCapabilities, sessionLifecycleCapabilities, sessionModeCapabilities, subagentCapabilities,
+  worktreeCapabilities,
 } from "./capabilities/workspace-conventions.js";
 import { LifecycleHookService } from "./policy/lifecycle-hooks.js";
 import { SessionModePolicyEngine, SessionModeService } from "./policy/session-modes.js";
@@ -161,6 +162,8 @@ import { ProjectInstructionService } from "./knowledge/project-instructions.js";
 import { RepositoryCommandService } from "./knowledge/repository-commands.js";
 import { SubagentDefinitionService } from "./knowledge/subagent-definitions.js";
 import { WorkingTreeReviewService } from "./repositories/working-tree-review.js";
+import { WorktreeService } from "./repositories/worktree-service.js";
+import { SessionEffortService } from "./policy/session-effort.js";
 import { SessionLifecycleService } from "./runtime/session-lifecycle.js";
 import { memoryGraphCapabilities } from "./capabilities/memory-graph.js";
 import { multiWorldCapabilities, worldModelCapabilities } from "./capabilities/world-model.js";
@@ -191,6 +194,8 @@ export interface EngineConfig {
   experienceDistillation?: { onSessionClose?: boolean };
   /** Deterministic operator hooks at the capability boundary and session lifecycle. Enabled by default. */
   lifecycleHooks?: { enabled?: boolean };
+  /** Default per-session effort level; sessions may still set their own. */
+  effort?: { defaultLevel?: "low" | "medium" | "high" | "xhigh" | "max" };
   /** Named permission and sandbox modes per session, with the tenant default and bypass switch. */
   sessionModes?: { defaultPermissionMode?: "plan" | "manual" | "acceptEdits" | "auto" | "dontAsk" | "bypass"; defaultSandboxMode?: "read-only" | "workspace-write" | "danger-full-access"; allowBypass?: boolean };
   /** Discovery bounds for AGENTS.md / CLAUDE.md style repository instruction files. */
@@ -341,6 +346,8 @@ export class HybridAgentEngine {
   readonly projectInstructions: ProjectInstructionService;
   readonly repositoryCommands: RepositoryCommandService;
   readonly worktreeReview: WorkingTreeReviewService;
+  readonly worktrees: WorktreeService;
+  readonly sessionEffort: SessionEffortService;
   readonly subagents: SubagentDefinitionService;
   readonly sessionLifecycle: SessionLifecycleService;
 
@@ -426,6 +433,7 @@ export class HybridAgentEngine {
       execute: async (call) => await this.runHookCapability(call),
     });
     this.projectInstructions = new ProjectInstructionService(Date.now, config.projectInstructions ?? {});
+    this.sessionEffort = new SessionEffortService(dataRoot, Date.now, config.effort ?? {});
     this.repositoryCommands = new RepositoryCommandService();
     const policyLayers: PolicyEngine[] = [localPolicy];
     if (config.opa) policyLayers.push(new OpaPolicyEngine(config.opa));
@@ -591,6 +599,10 @@ export class HybridAgentEngine {
       context,
       ...(modelName ? { modelName } : {}),
       ...(config.modelFallbacks?.length ? { modelFallbacks: config.modelFallbacks } : {}),
+      resolveEffort: async (tenantId: string, sessionId: string) => {
+        const resolved = await this.sessionEffort.get(tenantId, sessionId);
+        return { toolIterations: resolved.profile.toolIterations, reasoningEffort: resolved.profile.reasoningEffort };
+      },
       onSessionClose: async (sessionId) => {
         await this.kernels.close(sessionId);
         try {
@@ -694,6 +706,7 @@ export class HybridAgentEngine {
     this.capabilities.register(processCapability(sandboxFactory));
     for (const capability of gitCapabilities(sandboxFactory)) this.capabilities.register(capability);
     this.worktreeReview = new WorkingTreeReviewService(sandboxFactory);
+    this.worktrees = new WorktreeService(sandboxFactory, workspaceRoot);
     this.capabilities.register(pythonCapability(this.kernels));
     for (const capability of agentCapabilities(this.supervisor)) this.capabilities.register(capability);
     for (const capability of goalCapabilities(this.supervisor)) this.capabilities.register(capability);
@@ -831,6 +844,8 @@ export class HybridAgentEngine {
     for (const capability of repositoryCommandCapabilities(this.repositoryCommands)) this.capabilities.register(capability);
     for (const capability of reviewCapabilities(this.worktreeReview)) this.capabilities.register(capability);
     for (const capability of subagentCapabilities(this.subagents)) this.capabilities.register(capability);
+    for (const capability of effortCapabilities(this.sessionEffort)) this.capabilities.register(capability);
+    for (const capability of worktreeCapabilities(this.worktrees)) this.capabilities.register(capability);
     for (const capability of sessionLifecycleCapabilities(this.sessionLifecycle)) this.capabilities.register(capability);
     // Registered last so the catalog it searches already contains everything else.
     for (const capability of discoveryCapabilities(() => this.capabilities.list())) this.capabilities.register(capability);
