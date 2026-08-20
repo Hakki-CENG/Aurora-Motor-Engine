@@ -8,7 +8,7 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.60.0
+## Current milestone — 1.61.0
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -94,6 +94,8 @@ Implemented and tested:
 - Reviewed automatic approvals: named rules with a stored rationale, a use budget, expiry and a full decision log
 - Child-agent fan-out limits (concurrency, depth, lifetime) and per-command memory/CPU/file/process limits
 - Approval previews that cannot hide the command or destination, plus enforced session spend budgets
+- Tenant-wide agent directory with privileged cross-family messaging, and conversation-inheriting spawn
+- MCP 2026-07-28 in full: cache hints, named error codes, the Tasks extension and subscription streams
 - Aurora autopilot: bounded unattended cadence with a durable run ledger
 - Aurora provenance explainer reconstructing why any artifact exists
 - Embedding-backed semantic memory recall
@@ -1053,6 +1055,18 @@ The agent can enter plan mode itself, because that only removes authority. Leavi
 *and* evidence: a plan id or a summary of what the exploration produced, so exploration earns execution
 rather than assuming it. A managed ceiling still caps where it can land.
 
+## Agent directory and cross-family messaging
+
+`agent.directory` lists every live agent in the tenant — name, status, depth, and whether the name is
+unique — but listing is not permission. Messaging a child is ungated because the family tree *is* the
+authorisation; `agent.message.direct` reaches an agent outside that tree and is privileged, because it
+puts text into a session nobody here supervises. A tenant boundary is never crossed, an ambiguous name is
+refused rather than guessed at, and delivery reuses the family path exactly, receipts included.
+
+`agent.spawn` can also start a child from the parent's own conversation (`inheritConversation`), so
+delegation stops meaning "re-explain everything you already know". The transcript is copied, never
+shared: a child cannot rewrite its parent's history.
+
 ## Fan-out, resource and spend limits
 
 Three ceilings that were missing. **Fan-out:** a session may hold 20 live children, the tree is one level
@@ -1098,6 +1112,13 @@ approvals, so the record shows what the mechanism refused as well as what it wav
 `approvals.auto.propose` a rule, and the proposal arrives disabled — proposing is not granting.
 
 ## MCP 2026-07-28
+
+Implemented in full, including the optional halves: server-supplied `ttlMs` / `cacheScope` drive the
+client cache (`none` disables it), the renumbered error codes are named and acted on — an endpoint that
+answers UnsupportedProtocolVersion is not asked again — the **Tasks extension** is polled through
+`tasks/get` with a bounded poll count and `tasks/update` for mid-task input, and `subscriptions/listen`
+is an opt-in, abortable, byte- and lifetime-bounded stream whose `toolsListChanged` invalidates exactly
+the cache it names. The log level rides per request, because `logging/setLevel` is gone.
 
 The stateless revision removed the `initialize` handshake and `Mcp-Session-Id` entirely. Aurora speaks it
 natively: `server/discover` for capabilities, `MCP-Protocol-Version` / `Mcp-Method` / `Mcp-Name` routing

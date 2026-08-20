@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-20 — current milestone 1.60
+Updated: 2026-08-20 — current milestone 1.61
 
 ## Original 1.0 baseline (delivered)
 
@@ -419,6 +419,18 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] Budget blocks new turns only, never truncates a turn in flight
 - [x] Unpriced models reported rather than treated as free
 - [x] `waitingOn` in the monitor distinguishing blocked from busy
+
+### Peer parity round three, wave two (1.61) — round three closed
+
+- [x] Tenant-wide agent directory with unique-name flagging and resident/cold status
+- [x] Directed messaging outside family reach, privileged, tenant-bounded, ambiguity refused
+- [x] Directed delivery reusing the family rate limits, pending caps and receipts
+- [x] `inheritConversation` spawn that copies (never shares) the parent transcript
+- [x] MCP `ttlMs` / `cacheScope` cache hints honoured, including `none`
+- [x] MCP renumbered error codes named, unsupported revision remembered per endpoint
+- [x] MCP Tasks extension: `tasks/get` polling with bounds, `tasks/update` input, failure surfaced
+- [x] MCP `subscriptions/listen` stream, abortable and bounded, invalidating only the named cache
+- [x] Per-request `logLevel` in `_meta`, tasks extension advertised, `serverInfo` captured
 
 ## Required for full target parity
 

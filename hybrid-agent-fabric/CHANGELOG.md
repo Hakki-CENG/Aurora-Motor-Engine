@@ -1,5 +1,45 @@
 # Changelog
 
+## 1.61.0 - 2026-08-20
+
+Round three closed: the three remaining P1 gaps - cross-family messaging, conversation-inheriting spawn,
+and the rest of MCP 2026-07-28.
+
+- **Agent directory and directed messaging (R5).** `supervisor.directory()` lists every live agent in a
+  tenant with the facts a sender needs before choosing one: status, whether it is resident, how deep it
+  sits, and **whether its name is unique**. A directory is not a grant: `agent.message.direct` reaches a
+  same-tenant agent outside family reach and is **privileged**, because putting text into an agent
+  nobody in this tree supervises is a different act from messaging a child. Family messaging stays
+  ungated - there, the tree itself is the authorisation.
+- The refusals are the design: a tenant boundary is never crossed, a name matching two live agents is
+  refused rather than guessed at, and an agent cannot message itself. Delivery reuses the family path
+  entirely - same rate limit, same pending-inbox cap, same receipts and uncertain-delivery handling -
+  because a second delivery path is a second thing to get wrong. Receipts report real kinship when it
+  exists and `external` when it does not, so a receipt never invents a family tie.
+- **Conversation-inheriting spawn (R7).** `agent.spawn` accepts `inheritConversation`, so a child can
+  start from what the parent already knows instead of being re-briefed. The transcript is **copied, not
+  shared**: a child cannot rewrite its parent's history, and the inherited count is recorded on the
+  spawn prompt.
+- **MCP 2026-07-28 remainder (R6).** `ttlMs` and `cacheScope` from list results now drive the cache, and
+  `cacheScope: "none"` disables it outright. The renumbered error codes are named and acted on:
+  HeaderMismatch (-32020), MissingRequiredClientCapability (-32021) and UnsupportedProtocolVersion
+  (-32022), with an unsupported revision remembered per endpoint so the client stops asking a server
+  that has already said no.
+- The **Tasks extension** is implemented: a tool call that returns a task handle is polled through
+  `tasks/get` to a terminal state with a bounded poll count and a server-suggested interval that cannot
+  drop below a floor, `tasks/update` sends client-to-server input, and a failed task surfaces as an
+  error rather than a silent non-result.
+- **`subscriptions/listen`** is implemented as an opt-in, abortable, byte- and lifetime-bounded stream. A
+  `toolsListChanged` notification invalidates exactly the cache it names and nothing else.
+- Per-request `logLevel` rides in `_meta` (the revision removed `logging/setLevel`), the client advertises
+  the tasks extension in its capabilities, and `serverInfo` echoed in result `_meta` is captured.
+- Added REST for the agent directory and directed messages, plus an `agent-directory` headless view.
+- Added 13 tests (557 engine tests total) covering directory scoping and duplicate-name flagging,
+  external delivery and its refusals, the privilege boundary between family and directed messaging,
+  inheritance on and off, copy-not-share, cache-scope honouring, the renumbered errors and the
+  no-retry rule, task polling to completion, task input with a log level, notification-driven cache
+  invalidation, captured server identity, and the header/body self-check.
+
 ## 1.60.0 - 2026-08-20
 
 Round-three peer audit (`docs/peer-system-gap-audit-round3.md`) against Claude Code 2.1.235, Codex CLI

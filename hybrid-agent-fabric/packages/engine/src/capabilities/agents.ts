@@ -13,12 +13,19 @@ export function agentCapabilities(supervisor: Supervisor) {
         sideEffect: true,
         source: "core",
       },
-      z.object({ task: z.string().min(1).max(100_000), name: z.string().max(100).optional() }),
-      async ({ task, name }, context) => {
+      z.object({
+        task: z.string().min(1).max(100_000),
+        name: z.string().max(100).optional(),
+        // A forked child starts from what the parent already knows, which is usually the difference
+        // between a useful delegate and one that asks the same questions again.
+        inheritConversation: z.union([z.boolean(), z.number().int().min(1).max(200)]).optional(),
+      }),
+      async ({ task, name, inheritConversation }, context) => {
         const child = await supervisor.spawnChild({
           parentSessionId: context.sessionId,
           task,
           ...(name ? { name } : {}),
+          ...(inheritConversation === undefined ? {} : { inheritConversation }),
           source: "agent",
           insideParentTurn: true,
         });
@@ -43,6 +50,50 @@ export function agentCapabilities(supervisor: Supervisor) {
       z.object({}),
       // An agent that can see the limit can plan within it instead of discovering it by failing.
       async (_input, context) => await supervisor.fanoutStatus(context.sessionId),
+    ),
+    defineCapability(
+      {
+        id: "agent.directory",
+        version: "1.0.0",
+        description: "Every live agent in this tenant, family or not: name, status, whether the name is unique and how deep it sits. Listing is not permission to message.",
+        risk: "pure",
+        sideEffect: false,
+        source: "core",
+      },
+      z.object({ query: z.string().max(200).optional(), includeClosed: z.boolean().optional(), limit: z.number().int().min(1).max(500).optional() }),
+      async (input, context) => ({
+        agents: await supervisor.directory(context.tenantId, {
+          ...(input.query === undefined ? {} : { query: input.query }),
+          ...(input.includeClosed === undefined ? {} : { includeClosed: input.includeClosed }),
+          ...(input.limit === undefined ? {} : { limit: input.limit }),
+        }),
+      }),
+    ),
+    defineCapability(
+      {
+        id: "agent.message.direct",
+        version: "1.0.0",
+        description: "Message a same-tenant agent outside family reach, by session id or unique name. Crossing a family boundary is privileged and reviewed.",
+        // Family messages are ungated because the family tree *is* the authorisation. Reaching outside
+        // it is a different act: it puts text into an agent nobody in this tree supervises, so it goes
+        // through the same review as any other privileged capability.
+        risk: "privileged",
+        sideEffect: true,
+        source: "core",
+      },
+      z.object({
+        message: z.string().min(1).max(16_384),
+        targetSessionId: z.string().max(200).optional(),
+        targetName: z.string().max(200).optional(),
+        mode: z.enum(["auto", "steer", "follow_up"]).optional(),
+      }),
+      async (input, context) => await supervisor.sendDirectedMessage({
+        senderSessionId: context.sessionId,
+        message: input.message,
+        ...(input.targetSessionId ? { targetSessionId: input.targetSessionId } : {}),
+        ...(input.targetName ? { targetName: input.targetName } : {}),
+        ...(input.mode ? { mode: input.mode } : {}),
+      }),
     ),
     defineCapability(
       { id: "agent.list", version: "1.0.0", description: "List the current tenant's active and saved agents.", risk: "pure", sideEffect: false, source: "core" },

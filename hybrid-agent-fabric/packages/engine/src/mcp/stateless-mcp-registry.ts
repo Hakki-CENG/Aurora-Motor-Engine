@@ -164,6 +164,7 @@ export class StatelessMcpRegistry {
         });
         if (outcome.status === "error") throw new Error(outcome.message);
         if (outcome.status === "input-required") throw new Error("MCP server still requires input.");
+        if (outcome.status === "task") throw new Error(`MCP task ${outcome.taskId} is still ${outcome.state}.`);
         return asJsonValue({ result: outcome.result, rounds: outcome.rounds });
       },
     };

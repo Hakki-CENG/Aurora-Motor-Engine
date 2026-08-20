@@ -63,6 +63,7 @@ export const AURORA_VIEWS = {
   questions: "/v1/questions",
   "auto-approvals": "/v1/auto-approvals",
   "session-budgets": "/v1/session-budgets",
+  "agent-directory": "/v1/agent-directory",
   "auto-approval-decisions": "/v1/auto-approvals/decisions",
   "mcp-stateless": "/v1/mcp/stateless",
   "delegation-policy": "/v1/delegation-policy",

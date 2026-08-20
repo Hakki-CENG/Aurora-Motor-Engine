@@ -297,7 +297,8 @@ export interface SessionTreeState {
 }
 
 export type AgentMessageDeliveryMode = "auto" | "steer" | "follow_up";
-export type AgentMessageRelationship = "parent" | "sibling" | "child";
+/** `external` is a same-tenant agent outside the sender's family: reachable by name, not by kinship. */
+export type AgentMessageRelationship = "parent" | "sibling" | "child" | "external";
 export type AgentInboxState = "pending" | "claimed" | "delivered" | "uncertain";
 
 export interface AgentInboxMessage {

@@ -36,9 +36,9 @@ Software Agent SDK, and the final MCP 2026-07-28 specification — not a re-read
 
 | # | Gap | Why it matters | Status |
 |---|---|---|---|
-| R5 | **Cross-family agent directory and named messaging**, with messages classified by policy before dispatch | Reach is currently family-bounded. Peers now message any session by name across machines, and pass those messages through the permission classifier first | Planned |
-| R6 | **MCP 2026-07-28 remainder**: `subscriptions/listen`, the Tasks extension (`tasks/get`, `tasks/update`), per-request `logLevel`, the renumbered error codes, and honouring `ttlMs` / `cacheScope` ordering hints | The core revision is implemented; these are the optional halves that servers are starting to rely on | Planned |
-| R7 | **Conversation-inheriting spawn** (`fork` subagents) | Aurora can fork a session and can spawn a child, but not spawn a child that *starts from* the parent's conversation. Delegation currently re-explains context it already has | Planned |
+| R5 | **Cross-family agent directory and named messaging**, with messages classified by policy before dispatch | Reach is currently family-bounded. Peers now message any session by name across machines, and pass those messages through the permission classifier first | **Done in 1.61.0** |
+| R6 | **MCP 2026-07-28 remainder**: `subscriptions/listen`, the Tasks extension (`tasks/get`, `tasks/update`), per-request `logLevel`, the renumbered error codes, and honouring `ttlMs` / `cacheScope` ordering hints | The core revision is implemented; these are the optional halves that servers are starting to rely on | **Done in 1.61.0** |
+| R7 | **Conversation-inheriting spawn** (`fork` subagents) | Aurora can fork a session and can spawn a child, but not spawn a child that *starts from* the parent's conversation. Delegation currently re-explains context it already has | **Done in 1.61.0** |
 | R8 | **Blocked versus busy in the monitor** | `tasks.monitor` reported `busy` from an in-flight turn; an agent stuck on an unanswered question read the same as one doing work | **Done in 1.60.0** |
 
 ### P2 — considered and rejected
@@ -77,7 +77,22 @@ pretending a money cap holds; the token cap, always measurable, still applies.
 
 **R8 — Blocked versus busy.** `tasks.monitor` now reports `waitingOn: "question" | "approval" | null`.
 
-## 4. Next steps
+## 4. What 1.61.0 fixes
 
-R5 cross-family directory with classified messaging, R6 the remaining MCP 2026-07-28 surfaces, R7
-conversation-inheriting spawn.
+**R5 — Directory and directed messaging.** `supervisor.directory()` lists live agents per tenant with
+unique-name flagging; `agent.message.direct` crosses a family boundary and is privileged for exactly
+that reason, while family messaging stays ungated. Tenant boundaries are absolute, ambiguous names are
+refused, and delivery reuses the family path with its existing limits and receipts.
+
+**R6 — MCP remainder.** Cache hints (`ttlMs`, `cacheScope`), the renumbered error codes with a per-
+endpoint "stop asking" rule for UnsupportedProtocolVersion, the Tasks extension (`tasks/get` polling
+with bounds, `tasks/update`), `subscriptions/listen` as a bounded abortable stream that invalidates only
+the cache it names, and per-request `logLevel`.
+
+**R7 — Conversation-inheriting spawn.** `agent.spawn { inheritConversation }` copies a bounded tail of
+the parent transcript into the child. Copied, never shared.
+
+## 5. Status
+
+**Round three is closed: R1–R8 are all implemented.** A fourth round should be opened against whatever
+the peers ship next rather than re-reading this list.

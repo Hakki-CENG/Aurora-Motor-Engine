@@ -51,6 +51,20 @@ export interface CreateSessionInput {
   skipParentLink?: boolean;
 }
 
+export interface AgentDirectoryEntry {
+  sessionId: string;
+  name: string;
+  familyId: string;
+  status: SessionSnapshot["status"];
+  busy: boolean;
+  resident: boolean;
+  depth: number;
+  updatedAt: string;
+  createdAt: string;
+  /** False when another live agent in the tenant answers to the same name; address those by id. */
+  nameIsUnique: boolean;
+}
+
 export interface AgentFamilyRosterEntry {
   sessionId: string;
   name: string;
@@ -255,6 +269,13 @@ export class Supervisor {
     source?: CommandEnvelope["source"];
     insideParentTurn?: boolean;
     agentProfile?: SessionAgentProfile;
+    /**
+     * Start the child from the parent's own conversation instead of an empty one. A number carries
+     * that many trailing messages; `true` carries a bounded default. Delegation stops meaning
+     * "re-explain everything you already know" - but the transcript is *copied*, never shared, so the
+     * child cannot rewrite the parent's history.
+     */
+    inheritConversation?: boolean | number;
   }): Promise<SessionSnapshot> {
     const parent = await this.getActor(input.parentSessionId);
     // Checked before any workspace is created: refusing after a git worktree exists leaves litter,
@@ -281,6 +302,12 @@ export class Supervisor {
         // Empty workspace remains a safe isolation fallback.
       }
     }
+    const inheritCount = input.inheritConversation === true
+      ? 40
+      : typeof input.inheritConversation === "number" ? Math.min(200, Math.max(1, Math.floor(input.inheritConversation))) : 0;
+    const inherited = inheritCount > 0
+      ? structuredClone(parent.state.messages.filter((message) => message.role !== "system").slice(-inheritCount))
+      : undefined;
     const child = await this.createSession({
       tenantId: parent.state.tenantId,
       name: input.name ?? `child-${childId.slice(0, 8)}`,
@@ -289,6 +316,7 @@ export class Supervisor {
       parentSessionId: parent.state.sessionId,
       ...((input.agentProfile ?? parent.state.agentProfile) ? { agentProfile: input.agentProfile ?? parent.state.agentProfile } : {}),
       ...(input.insideParentTurn ? { skipParentLink: true } : {}),
+      ...(inherited?.length ? { initialMessages: inherited } : {}),
     });
     if (input.insideParentTurn) await parent.linkChildFromCapability(child.sessionId);
     queueMicrotask(() => {
@@ -301,7 +329,7 @@ export class Supervisor {
         kind: "session.prompt",
         source: input.source ?? "agent",
         issuedAt: new Date().toISOString(),
-        payload: { text: input.task, isolation },
+        payload: { text: input.task, isolation, ...(inherited?.length ? { inheritedMessages: inherited.length } : {}) },
       });
     });
     return child;
@@ -404,7 +432,7 @@ export class Supervisor {
         generation: persisted.generation,
       });
     }
-    const order: Record<AgentMessageRelationship, number> = { parent: 0, sibling: 1, child: 2 };
+    const order: Record<AgentMessageRelationship, number> = { parent: 0, sibling: 1, child: 2, external: 3 };
     return entries.sort((left, right) => order[left.relationship] - order[right.relationship] || left.name.localeCompare(right.name));
   }
 
@@ -480,6 +508,17 @@ export class Supervisor {
     if (sender.status === "closed") throw new Error("Closed agents cannot send messages.");
     this.consumeAgentMessageRate(input.senderSessionId);
     const targets = await this.resolveMessageTargets(input);
+    return await this.deliverAgentMessages({ sender, targets, requestedMode: input.mode ?? "auto", text });
+  }
+
+  /** Shared delivery path for family and directed messages: one set of limits, one set of receipts. */
+  private async deliverAgentMessages(input: {
+    sender: SessionSnapshot;
+    targets: AgentFamilyRosterEntry[];
+    requestedMode: AgentMessageDeliveryMode;
+    text: string;
+  }): Promise<{ receipts: AgentMessageReceipt[] }> {
+    const { sender, targets, requestedMode, text } = input;
     const maxPending = this.options.agentMessageMaxPending ?? 20;
     for (const target of targets) {
       if (await this.agentInbox.pendingCount(target.sessionId) >= maxPending) {
@@ -487,7 +526,6 @@ export class Supervisor {
       }
     }
 
-    const requestedMode = input.mode ?? "auto";
     const records: AgentInboxMessage[] = [];
     for (const target of targets) {
       const busy = !["idle", "ready"].includes(target.status);
@@ -499,7 +537,7 @@ export class Supervisor {
         senderName: sender.name,
         targetSessionId: target.sessionId,
         targetName: target.name,
-        relationship: target.relationship === "parent" ? "child" : target.relationship === "child" ? "parent" : "sibling",
+        relationship: target.relationship === "parent" ? "child" : target.relationship === "child" ? "parent" : target.relationship === "external" ? "external" : "sibling",
         requestedMode,
         effectiveMode,
         text,
@@ -527,6 +565,96 @@ export class Supervisor {
     }
     const current = await Promise.all(records.map(async (record) => await this.agentInbox.get(record.id, record.targetSessionId) ?? record));
     return { receipts: current.map((record) => this.receipt(record)) };
+  }
+
+  /**
+   * Every agent in the tenant, family or not, with the facts a sender needs before choosing one:
+   * whether the name is unique, whether it is reachable by kinship, and whether it is still alive.
+   *
+   * A directory is not a grant. Being listed here says the agent exists, not that anyone may message
+   * it - crossing a family boundary is a separate, governed act.
+   */
+  async directory(tenantId: string, filter: { query?: string; includeClosed?: boolean; limit?: number } = {}): Promise<AgentDirectoryEntry[]> {
+    await this.loadCatalog();
+    const source = filter.query?.trim().toLowerCase();
+    const entries: AgentDirectoryEntry[] = [];
+    const nameCounts = new Map<string, number>();
+    for (const record of this.catalog) {
+      if (record.tenantId !== tenantId) continue;
+      if (source && !record.name.toLowerCase().includes(source) && !record.sessionId.startsWith(source)) continue;
+      const active = this.actors.get(record.sessionId)?.state;
+      const snapshot = active ?? await this.options.snapshotStore.load(record.sessionId);
+      if (!snapshot) continue;
+      if (!filter.includeClosed && snapshot.status === "closed") continue;
+      nameCounts.set(record.name, (nameCounts.get(record.name) ?? 0) + 1);
+      entries.push({
+        sessionId: record.sessionId,
+        name: record.name,
+        familyId: record.familyId,
+        status: snapshot.status,
+        busy: Boolean(snapshot.activeTurnId),
+        // "Loaded" means the actor is resident here; a session known only from disk is reachable but cold.
+        resident: Boolean(active),
+        depth: this.depthOf(record.sessionId),
+        updatedAt: snapshot.updatedAt,
+        nameIsUnique: true,
+        createdAt: record.createdAt,
+      });
+    }
+    for (const entry of entries) entry.nameIsUnique = (nameCounts.get(entry.name) ?? 0) === 1;
+    return entries
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .slice(0, Math.min(Math.max(1, Math.floor(filter.limit ?? 100)), 500));
+  }
+
+  /**
+   * Message a same-tenant agent outside family reach, addressed by session id or by unique name.
+   *
+   * The refusals are the design. A tenant boundary is never crossed. A name that matches two live
+   * agents is ambiguous and is refused rather than guessed at - "I sent it to the other one called
+   * builder" is not an acceptable outcome. Everything else - rate limit, pending-inbox cap, delivery
+   * receipts, uncertain-delivery handling - is the machinery family messages already use, because a
+   * second delivery path would be a second thing to get wrong.
+   */
+  async sendDirectedMessage(input: {
+    senderSessionId: string;
+    message: string;
+    targetSessionId?: string;
+    targetName?: string;
+    mode?: AgentMessageDeliveryMode;
+  }): Promise<{ receipts: AgentMessageReceipt[] }> {
+    const text = input.message.trim();
+    const maxChars = this.options.agentMessageMaxChars ?? 16_384;
+    if (!text || text.length > maxChars) throw new Error(`Agent message must contain 1 to ${maxChars} characters.`);
+    const sender = await this.getSession(input.senderSessionId);
+    if (sender.status === "closed") throw new Error("Closed agents cannot send messages.");
+    if (!input.targetSessionId && !input.targetName?.trim()) throw new Error("A targetSessionId or targetName is required.");
+
+    const directory = await this.directory(sender.tenantId, {});
+    const candidates = input.targetSessionId
+      ? directory.filter((entry) => entry.sessionId === input.targetSessionId)
+      : directory.filter((entry) => entry.name === input.targetName!.trim());
+    if (candidates.length === 0) throw new Error("No live agent in this tenant matches that id or name.");
+    if (candidates.length > 1) throw new Error(`The name ${JSON.stringify(input.targetName)} matches ${candidates.length} live agents; address it by session id.`);
+    const target = candidates[0]!;
+    if (target.sessionId === sender.sessionId) throw new Error("An agent cannot message itself.");
+
+    this.consumeAgentMessageRate(input.senderSessionId);
+    const roster = await this.familyRoster(sender.sessionId);
+    const kinship = roster.find((entry) => entry.sessionId === target.sessionId)?.relationship;
+    return await this.deliverAgentMessages({
+      sender,
+      targets: [{
+        sessionId: target.sessionId,
+        name: target.name,
+        status: target.status,
+        generation: 0,
+        // Kinship is reported when it exists, so a receipt never claims a family tie that is not there.
+        relationship: kinship ?? "external",
+      }],
+      requestedMode: input.mode ?? "auto",
+      text,
+    });
   }
 
   async listAgentInbox(sessionId: string, states?: AgentInboxMessage["state"][]): Promise<AgentInboxMessage[]> {
