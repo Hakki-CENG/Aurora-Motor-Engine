@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-20 — current milestone 1.61
+Updated: 2026-08-20 — current milestone 1.62
 
 ## Original 1.0 baseline (delivered)
 
@@ -431,6 +431,18 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] MCP Tasks extension: `tasks/get` polling with bounds, `tasks/update` input, failure surfaced
 - [x] MCP `subscriptions/listen` stream, abortable and bounded, invalidating only the named cache
 - [x] Per-request `logLevel` in `_meta`, tasks extension advertised, `serverInfo` captured
+
+### Peer parity round four, wave one (1.62) — source-level comparison
+
+- [x] `filesystem.glob` with base-relative patterns, newest-first ordering and bounded scanning
+- [x] `filesystem.grep` with include filters, context lines, binary skipping and truncation reporting
+- [x] Both refuse to follow symlinks out of the workspace and skip dependency/build directories
+- [x] `filesystem.patch`: unified diff, verified context, all-or-nothing application, dry run
+- [x] Verification recipe detection for Node, Python, Go, Rust, Maven, Gradle and Make
+- [x] Package manager chosen from the lockfile rather than assumed
+- [x] Verification runs through the sandbox with durable evidence and bounded output tails
+- [x] First-failure stopping, and `verified` requiring that a build or test phase actually ran
+- [x] `verify.recipe` / `verify.run` / `verify.evidence` plus REST and a Canvas verification row
 
 ## Required for full target parity
 

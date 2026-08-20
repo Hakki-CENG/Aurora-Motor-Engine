@@ -122,6 +122,8 @@ export * from "./capabilities/discovery.js";
 export * from "./capabilities/background-tasks.js";
 export * from "./capabilities/background-shell.js";
 export * from "./capabilities/auto-approval.js";
+export * from "./capabilities/verification.js";
+export * from "./harness/verification-service.js";
 export * from "./policy/auto-approval.js";
 export * from "./policy/session-budget.js";
 export * from "./capabilities/session-budget.js";

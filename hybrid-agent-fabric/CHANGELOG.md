@@ -1,5 +1,41 @@
 # Changelog
 
+## 1.62.0 - 2026-08-20
+
+Round-four audit (`docs/peer-system-gap-audit-round4.md`), done by **reading the peers' source** rather
+than their release notes: `OpenHands/software-agent-sdk`, `NousResearch/hermes-agent` and
+`PrimeIntellect-ai/prime-agent` were cloned and read. That method finds different things - the notes
+describe features, the tree describes primitives, and three of these are primitives every peer has had
+for years and nobody writes a release note about.
+
+- **`filesystem.glob` (S1).** Match files by pattern (`src/**/*.ts`), relative to the directory searched,
+  newest first with size and mtime. Dependency and build directories are skipped, symlinks are never
+  followed out of the workspace, the file count is bounded and truncation is reported.
+- **`filesystem.grep` (S1).** Search contents by regular expression with an optional include filter and
+  context lines, returning `path:line` with the matching text. Binary files are reported as skipped
+  rather than dumped into the transcript, and an invalid pattern is an error rather than zero results.
+  Aurora previously had `list`, `read` and a semantic search - the most common thing a coding agent does
+  had to be done the most expensive way.
+- **`filesystem.patch` (S2).** Apply a unified diff with every hunk's context verified against the file
+  on disk, **all files or none**: a patch that fails on the second file does not leave the first edited.
+  `dryRun` reports the same plan without writing. Stale context is refused rather than fuzzily matched,
+  because guessing is how an agent silently corrupts work, and paths stay workspace-confined.
+- **Project verification with durable evidence (S3).** `VerificationService` detects the project's own
+  commands - Node with the package manager its lockfile implies, Python with uv/poetry, Go, Rust, Maven,
+  Gradle, Make - runs build then test through the same sandbox as any other command, and stores the
+  command, exit code, duration and a bounded output tail.
+- Verification stops at the first failing phase (a test run against a build that did not compile answers
+  a question nobody asked), and **`verified` requires that a build or test phase actually ran**: a
+  project with no checks is `inconclusive`, never verified. Silence is not evidence.
+- Every recipe carries the files that produced it, so a wrong guess is a visible wrong guess.
+- Added `verify.recipe`, `verify.run` and `verify.evidence`, REST for both reading and running
+  verification, and a "Verified" row in the Canvas session inspector.
+- Added 9 tests (566 engine tests total) covering glob scoping and dependency-directory exclusion, grep
+  filters, context lines and binary skipping, patch apply and dry run, all-or-nothing refusal on stale
+  context, workspace escape refusal, recipe detection including package-manager choice, evidence
+  recording, the inconclusive verdict for a bare project, first-failure stopping, and the capability
+  surface end to end.
+
 ## 1.61.0 - 2026-08-20
 
 Round three closed: the three remaining P1 gaps - cross-family messaging, conversation-inheriting spawn,

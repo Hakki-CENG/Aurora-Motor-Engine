@@ -8,7 +8,7 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.61.0
+## Current milestone — 1.62.0
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -96,6 +96,8 @@ Implemented and tested:
 - Approval previews that cannot hide the command or destination, plus enforced session spend budgets
 - Tenant-wide agent directory with privileged cross-family messaging, and conversation-inheriting spawn
 - MCP 2026-07-28 in full: cache hints, named error codes, the Tasks extension and subscription streams
+- Workspace glob and grep primitives, all-or-nothing unified-diff patching
+- Project verification that runs the repository's own build and tests and keeps the evidence
 - Aurora autopilot: bounded unattended cadence with a durable run ledger
 - Aurora provenance explainer reconstructing why any artifact exists
 - Embedding-backed semantic memory recall
@@ -1054,6 +1056,20 @@ durable inbox.
 The agent can enter plan mode itself, because that only removes authority. Leaving requires approval
 *and* evidence: a plan id or a summary of what the exploration produced, so exploration earns execution
 rather than assuming it. A managed ceiling still caps where it can land.
+
+## Search, patch and proof
+
+`filesystem.glob` and `filesystem.grep` are the primitives a coding agent uses constantly: pattern match
+and content search, bounded, dependency directories skipped, symlinks never followed out, truncation
+reported, binary files named rather than dumped. `filesystem.patch` applies a unified diff with every
+hunk's context verified against disk and **all files or none** — stale context is refused, not fuzzily
+matched, because a half-applied patch is a silent corruption.
+
+`verify.run` executes the project's *own* build and test commands — detected from its lockfiles,
+manifests and script tables — and keeps the receipt: command, exit code, duration, output tail. It stops
+at the first failure, and `verified` requires that something was actually run: a project with no checks
+is `inconclusive`, never verified. `verify.evidence` is how an agent answers "prove it", and how a
+reviewer finds out that it cannot.
 
 ## Agent directory and cross-family messaging
 

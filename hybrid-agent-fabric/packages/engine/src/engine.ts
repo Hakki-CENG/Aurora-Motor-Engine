@@ -48,6 +48,8 @@ import { skillCapabilities } from "./capabilities/skills.js";
 import { processCapability } from "./capabilities/process.js";
 import { backgroundShellCapabilities } from "./capabilities/background-shell.js";
 import { autoApprovalCapabilities } from "./capabilities/auto-approval.js";
+import { verificationCapabilities } from "./capabilities/verification.js";
+import { VerificationService } from "./harness/verification-service.js";
 import { AutoApprovalService } from "./policy/auto-approval.js";
 import { SessionBudgetService } from "./policy/session-budget.js";
 import { sessionBudgetCapabilities } from "./capabilities/session-budget.js";
@@ -372,6 +374,7 @@ export class HybridAgentEngine {
   readonly backgroundShells: BackgroundShellService;
   readonly autoApprovals: AutoApprovalService;
   readonly sessionBudgets: SessionBudgetService;
+  readonly verification: VerificationService;
   readonly statelessMcp: StatelessMcpRegistry;
   readonly subagents: SubagentDefinitionService;
   readonly sessionLifecycle: SessionLifecycleService;
@@ -804,6 +807,9 @@ export class HybridAgentEngine {
     // A background shell is the same sandboxed execution path as `process.exec`; only the moment the
     // result arrives differs, so it reuses the factory rather than opening a second way to spawn.
     this.backgroundShells = new BackgroundShellService(sandboxFactory);
+    // Verification runs the project's own commands through the same sandbox as everything else.
+    this.verification = new VerificationService(dataRoot, sandboxFactory);
+    for (const capability of verificationCapabilities(this.verification)) this.capabilities.register(capability);
     for (const capability of backgroundShellCapabilities(this.backgroundShells)) this.capabilities.register(capability);
     for (const capability of autoApprovalCapabilities(this.autoApprovals)) this.capabilities.register(capability);
     for (const capability of sessionBudgetCapabilities({
