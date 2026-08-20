@@ -126,6 +126,8 @@ export class CognitiveOrchestrator {
       delegation?: (tenantId: string) => Promise<{ synced: number; updatedSteps: number; delegated: number; skipped: number; autoDelegate: boolean; harvested?: number; review?: number }>;
       /** Record decision outcomes derived from finished plans, so calibration reflects reality. */
       planFeedback?: (tenantId: string) => Promise<{ recorded: number; executedMarked: number }>;
+      /** Fold measured step durations into the estimation profile. */
+      estimation?: (tenantId: string) => Promise<{ ingested: number; skipped: number; samples: number }>;
     } = {},
   ) {
     this.store = new DurableJsonState<OrchestratorStateShape>(
@@ -465,7 +467,15 @@ export class CognitiveOrchestrator {
         }
         accumulator.signals.gaps = gaps;
         const pruned = await this.deps.harness.prune(tenantId);
-        return { status: "ok", summary: `Recorded ${gaps} friction signal(s); pruned ${pruned.length} stale harness entry(ies).`, detail: { gaps, pruned: pruned.length } };
+        // Estimating is a skill like any other: measured durations feed the profile every cycle.
+        let estimationSamples = 0;
+        let estimationIngested = 0;
+        if (this.hooks.estimation) {
+          const estimation = await this.hooks.estimation(tenantId);
+          estimationSamples = estimation.samples;
+          estimationIngested = estimation.ingested;
+        }
+        return { status: "ok", summary: `Recorded ${gaps} friction signal(s); pruned ${pruned.length} stale harness entry(ies); ingested ${estimationIngested} estimate sample(s).`, detail: { gaps, pruned: pruned.length, estimationIngested, estimationSamples } };
       }
       case "remember": {
         const sweep = await this.deps.memoryGraph.sweep(tenantId);

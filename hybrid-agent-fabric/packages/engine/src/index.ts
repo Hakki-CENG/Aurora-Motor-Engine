@@ -103,6 +103,7 @@ export * from "./aurora/execution-bridge.js";
 export * from "./aurora/role-authority-service.js";
 export * from "./aurora/outcome-harvester.js";
 export * from "./aurora/plan-feedback-service.js";
+export * from "./aurora/estimation-calibrator.js";
 export * from "./aurora/provenance-service.js";
 export * from "./aurora/workspace-checkpoint-service.js";
 export * from "./aurora/aurora-metrics.js";

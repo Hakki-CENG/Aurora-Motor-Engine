@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-20 — current milestone 1.48
+Updated: 2026-08-20 — current milestone 1.49
 
 ## Original 1.0 baseline (delivered)
 
@@ -282,6 +282,18 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] Criticality tie-break for unattended cross-plan delegation
 - [x] Reversible role probation keeping poor records away from high-risk steps
 - [x] Plan-feedback telemetry, expectation-drift alert, REST, Canvas, CLI and TUI surfaces
+
+### Aurora estimation calibration and advisories (1.49)
+
+- [x] Real elapsed duration recorded on plan steps from delegated society work
+- [x] Median-based, clamped, bucketed estimate correction with minimum samples and confidence
+- [x] Suggestions that explain untouched steps as clearly as corrected ones
+- [x] Correction applied as an auditable plan revision naming factor and sample count
+- [x] ACOS learn-phase sample ingestion
+- [x] Candidate replanning initiative on failed or badly missed expectations
+- [x] Coverage gap recorded when probation blocks high-risk work
+- [x] Probation report with benched roles and the steps they block
+- [x] Estimation telemetry, bias alert, REST, Canvas and CLI surfaces
 
 ## Required for full target parity
 

@@ -498,6 +498,8 @@ export class AuroraOutcomeHarvester {
       };
       state.policies.push(policy);
     }
+    // Forward migration for policies written before failure learning existed.
+    if (policy.learnFromFailures === undefined) policy.learnFromFailures = true;
     return policy;
   }
 }

@@ -79,6 +79,7 @@ and none of it can widen that runtime's authority.
 | Role authority | `RoleAuthorityService` | `society.authority.*` | `/v1/society/authority/*` | `aurora-role-authority.test.ts` |
 | Outcome harvesting | `AuroraOutcomeHarvester` | `plan.harvest*` | `/v1/delegations/harvest`, `/v1/harvest-review` | `aurora-outcome-harvest.test.ts` |
 | Plan feedback | `AuroraPlanFeedback` | `decision.feedback-*` | `/v1/decision-feedback/*` | `aurora-plan-feedback.test.ts` |
+| Estimation calibration | `AuroraEstimationCalibrator` | `plan.estimation-*` | `/v1/estimation/*` | `aurora-estimation.test.ts` |
 | Explainability | `ProvenanceService` | `aurora.explain` | `/v1/aurora/explain` | `aurora-reasoning.test.ts`, `aurora-end-to-end.test.ts` |
 | Anomaly detection | `StuckDetectorService` | `session.stuck.analyze` | `/v1/sessions/:id/stuck` | `aurora-acos.test.ts` |
 | Recovery | `WorkspaceCheckpointService` — bounded content-addressed snapshots, reversible restore | `checkpoint.*` | `/v1/checkpoints/*` | `aurora-operations.test.ts` |
@@ -114,6 +115,7 @@ acos/fleet.json            fleet enrollment, circuit-breaker state and the sweep
 planning/delegation.json   plan-step to society-task links, match evidence and delegation policy
 planning/harvest.json      outcome scorecards, review queue and harvesting policy
 planning/feedback.json     decision outcomes derived from finished plans, with evidence
+planning/estimation.json   measured estimate/actual pairs behind the correction factors
 checkpoints/state.json     workspace checkpoint manifests (content blobs live under checkpoints/blobs)
 cognitive/workspace.json   objects, goals, budgets, modes, intake ledger, allocation buckets
 constitution/state.json    principles, amendments, decision verdicts, identity core
@@ -172,4 +174,5 @@ predate newer fields, and writes atomically through a temporary file plus rename
 - let a delegated child session inherit more authority than its role's reviewed template grants;
 - score its own delegated work as a success without recorded evidence, or resolve an ambiguous outcome by guessing;
 - overwrite a human's recorded decision outcome, or claim a decision's result while its plan is still running;
-- hand high-risk work to a role whose own record says it should not have it.
+- hand high-risk work to a role whose own record says it should not have it;
+- silently rewrite an estimate: a correction is a revision that names its factor and its evidence.

@@ -1,4 +1,4 @@
-import { mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -201,5 +201,35 @@ describe("Aurora custom role authority templates", () => {
     const audit = await engine.roleAuthority.audit("tenant");
     expect(audit.findings.some((item) => item.code === "profile-drifted-above-template")).toBe(true);
     await engine.shutdown();
+  });
+});
+
+describe("Aurora policy forward migration", () => {
+  it("reads a delegation policy written before probation existed", async () => {
+    const homePath = await mkdtemp(join(tmpdir(), "haf-legacy-policy-"));
+    const dataRoot = join(homePath, "data");
+    await mkdir(join(dataRoot, "planning"), { recursive: true });
+    await writeFile(join(dataRoot, "planning", "delegation.json"), `${JSON.stringify({
+      schemaVersion: 1,
+      links: [],
+      policies: [{ tenantId: "tenant", autoDelegate: false, autoActivate: false, maxActiveTasksPerPlan: 3, maxTasksPerRun: 5, requireRoleMatch: true, updatedAt: new Date().toISOString() }],
+    }, null, 2)}\n`, "utf8");
+    await writeFile(join(dataRoot, "planning", "harvest.json"), `${JSON.stringify({
+      schemaVersion: 1,
+      assessments: [],
+      policies: [{ tenantId: "tenant", autoRecord: true, successAtOrAbove: 0.6, failBelow: 0.35, settleAfterMs: 60_000, maxPerRun: 25, updatedAt: new Date().toISOString() }],
+    }, null, 2)}\n`, "utf8");
+
+    const { AuroraExecutionBridge } = await import("../src/aurora/execution-bridge.js");
+    const { AuroraOutcomeHarvester } = await import("../src/aurora/outcome-harvester.js");
+    const stub = { list: async () => [], get: async () => { throw new Error("no plan"); }, progress: async () => ({ ready: [] }) } as any;
+    const society = { roles: async () => [], tasks: async () => [], budget: async () => ({ dailyTokenBudget: 0, usedTokens: 0, reservedTokens: 0, maxConcurrentTasks: 0 }) } as any;
+    const bridge = new AuroraExecutionBridge(dataRoot, { planning: stub, society });
+    const policy = await bridge.policy("tenant");
+    expect(policy.probation).toEqual({ minAttempts: 4, maxFailureRate: 0.5, riskFloor: 0.7 });
+    expect(await bridge.probationReport("tenant")).toMatchObject({ roles: [], blockedSteps: [] });
+
+    const harvester = new AuroraOutcomeHarvester(dataRoot, { bridge, society, sessions: {} as any, events: {} as any });
+    expect((await harvester.policy("tenant")).learnFromFailures).toBe(true);
   });
 });

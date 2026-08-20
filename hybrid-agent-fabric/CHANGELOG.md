@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.49.0 — 2026-08-20
+
+Three more loops closed inside existing subsystems: planning now learns how wrong its estimates
+usually are, a badly missed expectation raises a candidate replanning signal instead of disappearing
+into a metric, and a benched role becomes a visible, actionable capability gap.
+
+- **Measured durations.** Delegated work now records real elapsed time on the plan step when a society
+  task finishes — wall-clock from delegation to completion, taken from recorded task timestamps. Plan
+  estimate accuracy stops being an estimate about estimates.
+- **Estimation calibration.** `AuroraEstimationCalibrator` turns finished steps into a bounded,
+  explainable correction: the **median** actual/estimate ratio (so one catastrophic step cannot rewrite
+  a tenant's planning), clamped to a sane range, bucketed by plan tag with a fallback to the plan
+  horizon, requiring a minimum sample count, and reporting a confidence that saturates around twenty
+  samples. Suggestions list every unfinished step, including the ones deliberately left alone and why.
+- Applying a correction is an **auditable plan revision**: the reason names the factor and the sample
+  count, and each corrected step records where its new estimate came from, so a machine-adjusted
+  estimate never passes as a human's. The ACOS learn phase ingests new samples every cycle.
+- **Surprise-driven replanning advisories.** When a decision's plan fails, or reality lands far from
+  the expected value, plan feedback raises a *candidate* initiative — evidence-bound, with the expected
+  and observed values in the message — instead of quietly writing a number nobody reads. It stays
+  silent when the plan went roughly as expected, and it never replans by itself.
+- **Probation visibility.** A step blocked because every matching role is on probation now records a
+  deduplicated capability-gap observation naming the risk level and each role's failure record, so the
+  evolution pipeline hears about it. A new probation report lists benched roles with their record and
+  the ready high-risk steps they are currently blocking.
+- Added governed `plan.estimation-ingest|profile|suggest|apply|samples` and `society.probation`
+  capabilities, REST for all of them, Canvas cards for the estimation profile, probation status and a
+  per-plan "Apply calibration" control, two new CLI views, `haf_aurora_estimation` telemetry and an
+  `estimates-biased` alert.
+- Fixed forward compatibility: delegation and harvest policies written by earlier versions are migrated on read (probation and failure-learning defaults) instead of throwing after an upgrade — found by exercising the live server against pre-existing state.
+- Added 9 tests (432 engine tests total) covering factor learning and idempotent ingest, suggestion
+  rationale with and without history, auditable application, median resistance to a pathological
+  outlier, ACOS learn-phase ingestion with tenant scoping, advisory creation on failure, silence on an
+  expected outcome, and the probation report with its recorded coverage gap.
+
 ## 1.48.0 — 2026-08-20
 
 Another deepening release: the decision loop finally closes, delegation schedules like something that

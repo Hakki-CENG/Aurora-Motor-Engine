@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { AgentSocietyService, SocietyRole, SocietyTask } from "../society/agent-society-service.js";
+import type { SkillEvolutionService } from "../evolution/skill-evolution-service.js";
 import type { PlanRecord, PlanningService, PlanStep } from "./planning-service.js";
 import { auroraInteger, auroraOptionalText, auroraRound, auroraTags, auroraText, auroraUnit, DurableJsonState } from "../util/aurora-state.js";
 
@@ -98,7 +99,12 @@ export class AuroraExecutionBridge {
 
   constructor(
     rootPath: string,
-    private readonly deps: { planning: PlanningService; society: AgentSocietyService },
+    private readonly deps: {
+      planning: PlanningService;
+      society: AgentSocietyService;
+      /** Optional: record "no reliable role for this risk level" as an evidence-backed gap. */
+      evolution?: Pick<SkillEvolutionService, "observeGap">;
+    },
     private readonly now: () => number = Date.now,
   ) {
     this.store = new DurableJsonState<BridgeStateShape>(
@@ -246,6 +252,19 @@ export class AuroraExecutionBridge {
       const eligible = highRisk ? ranked.filter((item) => !item.onProbation) : ranked;
       if (highRisk && !eligible.length && ranked.length) {
         skipped.push({ stepKey: step.key, reason: `all-matching-roles-on-probation (risk ${step.riskLevel})` });
+        // The society has nobody trustworthy for work at this risk level. That is a capability gap,
+        // and recording it is how the evolution pipeline ever hears about it.
+        await this.deps.evolution?.observeGap({
+          tenantId: input.tenantId,
+          kind: "capability-gap",
+          description: `No reliable society role for high-risk work tagged "${tags.join(", ") || "untagged"}"`,
+          context: [
+            `Plan: ${plan.title} · step: ${step.key} (risk ${step.riskLevel})`,
+            `Candidates on probation: ${ranked.filter((item) => item.onProbation).map((item) => `${item.roleId} (${item.failedTasks}/${item.completedTasks + item.failedTasks} failed)`).join(", ")}`,
+          ].join("\n").slice(0, 5000),
+          severity: Math.min(1, step.riskLevel),
+          evidenceRefs: [plan.id, ...ranked.slice(0, 10).map((item) => item.roleId)],
+        }).catch(() => undefined);
         continue;
       }
       const best = eligible.find((item) => item.coverage >= 1) ?? eligible[0];
@@ -369,6 +388,44 @@ export class AuroraExecutionBridge {
       undelegatedReady: progress.ready.filter((key) => !delegatedKeys.has(key)),
       generatedAt: new Date(this.now()).toISOString(),
     };
+  }
+
+  /** Roles whose own record has put them on probation, and what that currently blocks. */
+  async probationReport(tenantId: string): Promise<{
+    tenantId: string; policy: DelegationPolicy["probation"];
+    roles: Array<{ roleId: string; name: string; completedTasks: number; failedTasks: number; failureRate: number; reputation: number; capabilityTags: string[] }>;
+    blockedSteps: Array<{ planId: string; planTitle: string; stepKey: string; riskLevel: number }>;
+    generatedAt: string;
+  }> {
+    const policy = await this.policy(tenantId);
+    const candidates = await this.candidates(tenantId, []);
+    const roles = await this.deps.society.roles(tenantId);
+    const onProbation = candidates.filter((item) => item.onProbation).map((item) => {
+      const role = roles.find((value) => value.id === item.roleId);
+      return {
+        roleId: item.roleId,
+        name: item.name,
+        completedTasks: item.completedTasks,
+        failedTasks: item.failedTasks,
+        failureRate: item.failureRate,
+        reputation: item.reputation,
+        capabilityTags: role?.capabilityTags ?? [],
+      };
+    });
+    const blockedSteps: Array<{ planId: string; planTitle: string; stepKey: string; riskLevel: number }> = [];
+    if (onProbation.length) {
+      const plans = await this.deps.planning.list(tenantId, { status: "active", limit: 100 });
+      for (const plan of plans) {
+        const progress = await this.deps.planning.progress(tenantId, plan.id);
+        for (const key of progress.ready) {
+          const step = plan.steps.find((item) => item.key === key);
+          if (step && step.riskLevel >= policy.probation.riskFloor) {
+            blockedSteps.push({ planId: plan.id, planTitle: plan.title, stepKey: step.key, riskLevel: step.riskLevel });
+          }
+        }
+      }
+    }
+    return { tenantId, policy: policy.probation, roles: onProbation, blockedSteps, generatedAt: new Date(this.now()).toISOString() };
   }
 
   /**
@@ -523,12 +580,18 @@ export class AuroraExecutionBridge {
     const target = this.stepStatusFor(task.status);
     if (!target || step.status === target) return undefined;
     if (["done", "skipped"].includes(step.status)) return undefined;
+    // Wall-clock from delegation to society completion is a recorded fact, and it is what makes
+    // estimate accuracy real instead of an estimate about estimates.
+    const elapsedMinutes = target === "done" || target === "failed"
+      ? Math.max(0, Math.round((Date.parse(task.updatedAt) - Date.parse(link.createdAt)) / 60_000))
+      : undefined;
     await this.deps.planning.updateStep({
       tenantId,
       planId: link.planId,
       stepKey: link.stepKey,
       status: target,
       taskId: task.id,
+      ...(elapsedMinutes !== undefined ? { actualMinutes: elapsedMinutes } : {}),
       ...(task.evidenceEventIds.length ? { evidenceRefs: task.evidenceEventIds.slice(0, 200) } : {}),
       ...(task.status === "failed" ? { note: `Society task ${task.id} failed; the step needs replanning or another owner.` } : {}),
     });
@@ -612,6 +675,9 @@ export class AuroraExecutionBridge {
       };
       state.policies.push(policy);
     }
+    // Forward migration: a policy written by an older version has no probation block. Defaulting it
+    // here keeps existing tenants working instead of throwing on the first read after an upgrade.
+    if (!policy.probation) policy.probation = { minAttempts: 4, maxFailureRate: 0.5, riskFloor: 0.7 };
     return policy;
   }
 }

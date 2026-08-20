@@ -3,6 +3,7 @@ import type { DecisionRecord, DecisionService } from "./decision-service.js";
 import type { PlanningService, PlanRecord } from "./planning-service.js";
 import type { AuroraExecutionBridge } from "./execution-bridge.js";
 import type { AuroraOutcomeHarvester } from "./outcome-harvester.js";
+import type { ProactiveInitiativeService } from "../initiative/proactive-initiative-service.js";
 import { auroraInteger, auroraRound, auroraText, DurableJsonState } from "../util/aurora-state.js";
 
 const MAX_RECORDS = 20_000;
@@ -22,6 +23,8 @@ export interface PlanFeedbackRecord {
   brierScore: number;
   evidenceRefs: string[];
   note: string;
+  /** Raised when reality landed far from the expectation, or the plan failed outright. */
+  advisory?: { initiativeId?: string; reason: string };
   at: string;
 }
 
@@ -71,8 +74,11 @@ export class AuroraPlanFeedback {
       decisions: DecisionService;
       bridge?: AuroraExecutionBridge;
       harvester?: AuroraOutcomeHarvester;
+      /** Optional: raise a candidate replanning initiative when a decision was badly wrong. */
+      initiative?: ProactiveInitiativeService;
     },
     private readonly now: () => number = Date.now,
+    private readonly options: { surpriseThreshold?: number } = {},
   ) {
     this.store = new DurableJsonState<FeedbackStateShape>(
       join(rootPath, "planning", "feedback.json"),
@@ -210,6 +216,8 @@ export class AuroraPlanFeedback {
         skipped.push({ planId: plan.id, reason: `decision-refused: ${(error as Error).message}`.slice(0, 300) });
         continue;
       }
+      const advisory = await this.advise(tenantId, plan, decision, record);
+      if (advisory) record.advisory = advisory;
       recorded.push(record);
     }
 
@@ -254,6 +262,47 @@ export class AuroraPlanFeedback {
       meanDoneRatio: mean(records.map((item) => item.doneRatio)),
       generatedAt: new Date(this.now()).toISOString(),
     };
+  }
+
+  /**
+   * A decision that missed badly is a signal, not a verdict: Aurora raises a candidate initiative so
+   * a human (or the initiative engine's own worthiness rules) can decide whether to replan. It never
+   * rewrites the plan by itself, and it never notifies about a plan that simply went as expected.
+   */
+  private async advise(
+    tenantId: string,
+    plan: PlanRecord,
+    decision: DecisionRecord,
+    record: PlanFeedbackRecord,
+  ): Promise<PlanFeedbackRecord["advisory"] | undefined> {
+    if (!this.deps.initiative) return undefined;
+    const threshold = this.options.surpriseThreshold ?? 0.4;
+    const badMiss = record.surprise >= threshold;
+    if (record.succeeded && !badMiss) return undefined;
+    const reason = record.succeeded
+      ? `Plan finished, but reality landed ${record.surprise} away from the expected value.`
+      : `Plan "${plan.title}" did not deliver what decision "${decision.title}" expected.`;
+    try {
+      const initiative = await this.deps.initiative.propose({
+        tenantId,
+        kind: record.succeeded ? "insight" : "risk",
+        title: `Review the plan behind "${decision.title}"`,
+        message: [
+          reason,
+          `Expected value ${decision.expectedValue}, observed ${record.observedValue} (${Math.round(record.doneRatio * 100)}% of steps finished).`,
+          "Consider replanning, revising the estimate, or recording why the expectation was wrong.",
+        ].join(" "),
+        importance: Math.min(1, 0.4 + record.surprise / 2),
+        urgency: record.succeeded ? 0.3 : 0.6,
+        impact: Math.min(1, 0.3 + record.surprise),
+        confidence: 0.9,
+        userRelevance: 0.6,
+        evidenceRefs: [plan.id, decision.id, ...record.evidenceRefs.slice(0, 20)],
+      });
+      return { initiativeId: initiative.id, reason };
+    } catch (error) {
+      return { reason: `${reason} (initiative not raised: ${(error as Error).message})`.slice(0, 500) };
+    }
   }
 
   private terminalState(plan: PlanRecord): "completed" | "abandoned" | "failed" | undefined {

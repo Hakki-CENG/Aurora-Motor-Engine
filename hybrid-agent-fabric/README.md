@@ -8,7 +8,7 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.48.0
+## Current milestone — 1.49.0
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -78,6 +78,7 @@ Implemented and tested:
 - Aurora role authority templates: least-privilege capability allowlists bound to society roles, with drift audit
 - Aurora outcome harvesting: delegated work scored from recorded events, with an explicit review band for ambiguity
 - Aurora plan feedback: decision outcomes derived from finished plans, so calibration reflects execution
+- Aurora estimation calibration: plan estimates corrected by measured durations, applied as auditable revisions
 - Aurora autopilot: bounded unattended cadence with a durable run ledger
 - Aurora provenance explainer reconstructing why any artifact exists
 - Embedding-backed semantic memory recall
@@ -1024,6 +1025,18 @@ work. It never overwrites a human verdict, never resolves a plan that is merely 
 marks the decision executed instead), and supports a dry run that shows exactly what would be written.
 Each record keeps its evidence, observed value, surprise and Brier score, so every calibration number
 traces back to the execution behind it.
+
+## Aurora estimation calibration
+
+Delegated work records how long it really took, so estimate accuracy is measured rather than assumed.
+The calibrator turns those pairs into a correction: the median actual/estimate ratio, clamped, bucketed
+by plan tag, gated on a minimum sample count and reported with a confidence. Applying it is a plan
+revision that names the factor and the sample count, so a machine-corrected estimate never passes as a
+human's — and a plan with no history is left exactly as written, with the reason stated.
+
+When a finished plan lands far from what its decision expected, Aurora raises a candidate replanning
+initiative with the expected and observed values attached. It never replans on its own, and it stays
+quiet when the plan went as expected.
 
 ## Aurora role authority
 

@@ -682,7 +682,7 @@ app.addHook("preHandler", async (request, reply) => {
   if (globalAdminPath && !identity.systemAdmin) {
     return await reply.code(403).send({ error: "system_admin_required" });
   }
-  const adminMutation = !methodIsSafe && /^\/v1\/(?:secrets|learning|agent-profiles|repositories|repository-providers|github-apps|model-oauth-sources|automation-git-sources|automation-responders|society|cognitive|memory-graph|world|multiworld|initiative|user-model|evolution|environment|constitution|harness|microagents|risk|acos|decisions|plans|experience|autopilot|checkpoints|aurora|delegations|delegation-policy|harvest-review|harvest-policy|decision-feedback|channel-routing-rules)/.test(request.url);
+  const adminMutation = !methodIsSafe && /^\/v1\/(?:secrets|learning|agent-profiles|repositories|repository-providers|github-apps|model-oauth-sources|automation-git-sources|automation-responders|society|cognitive|memory-graph|world|multiworld|initiative|user-model|evolution|environment|constitution|harness|microagents|risk|acos|decisions|plans|experience|autopilot|checkpoints|aurora|delegations|delegation-policy|harvest-review|harvest-policy|decision-feedback|estimation|channel-routing-rules)/.test(request.url);
   const required: Role = methodIsSafe ? "viewer" : adminMutation ? "admin" : "operator";
   if (!roleAllows(identityService.roleFor(identity, tenantId), required)) {
     return await reply.code(403).send({ error: "forbidden", tenantId, requiredRole: required });
@@ -1158,6 +1158,14 @@ app.get("/v1/decision-feedback/candidates", async (request) => { const q=auroraT
 app.post("/v1/decision-feedback/reconcile", async (request) => { const b=auroraTenant.extend({planId:z.string().max(300).optional(),dryRun:z.boolean().optional(),limit:z.number().int().min(1).max(200).optional()}).parse(request.body ?? {}); return await engine.planFeedback.reconcile(auroraInput(b)); });
 app.get("/v1/decision-feedback", async (request) => { const q=auroraTenant.extend({limit:z.coerce.number().int().min(1).max(1000).optional()}).parse(request.query); return { records: await engine.planFeedback.records(q.tenantId, q.limit ?? 50) }; });
 app.get("/v1/decision-feedback/summary", async (request) => { const q=auroraTenant.parse(request.query); return await engine.planFeedback.summary(q.tenantId); });
+
+// Aurora estimation calibration and society probation
+app.get("/v1/estimation/profile", async (request) => { const q=auroraTenant.parse(request.query); return await engine.estimation.profile(q.tenantId); });
+app.post("/v1/estimation/ingest", async (request) => { const b=auroraTenant.extend({planId:z.string().max(300).optional(),limit:z.number().int().min(1).max(1000).optional()}).parse(request.body ?? {}); return await engine.estimation.ingest(b.tenantId, auroraInput({ planId: b.planId, limit: b.limit })); });
+app.get("/v1/estimation/samples", async (request) => { const q=auroraTenant.extend({limit:z.coerce.number().int().min(1).max(1000).optional()}).parse(request.query); return { samples: await engine.estimation.samples(q.tenantId, q.limit ?? 100) }; });
+app.get("/v1/plans/:planId/estimation", async (request) => { const { planId } = z.object({ planId: z.string() }).parse(request.params); const q=auroraTenant.parse(request.query); return await engine.estimation.suggest(q.tenantId, planId); });
+app.post("/v1/plans/:planId/estimation/apply", async (request) => { const { planId } = z.object({ planId: z.string() }).parse(request.params); const b=auroraTenant.extend({minSamples:z.number().int().min(1).max(1000).optional()}).parse(request.body ?? {}); return await engine.estimation.apply(auroraInput({ tenantId: b.tenantId, planId, minSamples: b.minSamples })); });
+app.get("/v1/society/probation", async (request) => { const q=auroraTenant.parse(request.query); return await engine.delegation.probationReport(q.tenantId); });
 app.post("/v1/harvest-policy", async (request) => { const b=auroraTenant.extend({autoRecord:z.boolean().optional(),successAtOrAbove:z.number().min(0).max(1).optional(),failBelow:z.number().min(0).max(1).optional(),settleAfterMs:z.number().int().min(0).max(86_400_000).optional(),maxPerRun:z.number().int().min(1).max(200).optional(),learnFromFailures:z.boolean().optional()}).parse(request.body); return await engine.harvester.configure(auroraInput(b)); });
 
 // Aurora role authority — least-privilege capability allowlists for the society

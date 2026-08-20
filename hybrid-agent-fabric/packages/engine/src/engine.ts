@@ -129,13 +129,14 @@ import { AuroraExecutionBridge } from "./aurora/execution-bridge.js";
 import { RoleAuthorityService } from "./aurora/role-authority-service.js";
 import { AuroraOutcomeHarvester } from "./aurora/outcome-harvester.js";
 import { AuroraPlanFeedback } from "./aurora/plan-feedback-service.js";
+import { AuroraEstimationCalibrator } from "./aurora/estimation-calibrator.js";
 import { ProvenanceService } from "./aurora/provenance-service.js";
 import { WorkspaceCheckpointService } from "./aurora/workspace-checkpoint-service.js";
 import { AuroraMetricsCollector } from "./aurora/aurora-metrics.js";
 import { AuroraDataGovernanceService } from "./aurora/data-governance-service.js";
 import {
   auroraMetricsCapabilities, checkpointCapabilities, delegationCapabilities, fleetCapabilities, governanceCapabilities,
-  harvestCapabilities, planFeedbackCapabilities, roleAuthorityCapabilities,
+  estimationCapabilities, harvestCapabilities, planFeedbackCapabilities, probationCapabilities, roleAuthorityCapabilities,
 } from "./capabilities/aurora-operations.js";
 import {
   autopilotCapabilities, decisionCapabilities, distillerCapabilities, planningCapabilities, provenanceCapabilities,
@@ -309,6 +310,7 @@ export class HybridAgentEngine {
   readonly roleAuthority: RoleAuthorityService;
   readonly harvester: AuroraOutcomeHarvester;
   readonly planFeedback: AuroraPlanFeedback;
+  readonly estimation: AuroraEstimationCalibrator;
   readonly provenance: ProvenanceService;
   readonly checkpoints: WorkspaceCheckpointService;
   readonly auroraMetrics: AuroraMetricsCollector;
@@ -667,7 +669,7 @@ export class HybridAgentEngine {
     for (const capability of userModelCapabilities(this.userModel)) this.capabilities.register(capability);
     for (const capability of evolutionCapabilities(this.evolution)) this.capabilities.register(capability);
     for (const capability of environmentCapabilities(this.environment)) this.capabilities.register(capability);
-    this.delegation = new AuroraExecutionBridge(dataRoot, { planning: this.planning, society: this.society });
+    this.delegation = new AuroraExecutionBridge(dataRoot, { planning: this.planning, society: this.society, evolution: this.evolution });
     this.roleAuthority = new RoleAuthorityService({ capabilities: this.capabilities, profiles: this.agentProfiles, society: this.society }, Date.now, dataRoot);
     // ACOS is constructed last: it composes every governed Aurora service into one control loop.
     this.acos = new CognitiveOrchestrator(dataRoot, {
@@ -699,6 +701,7 @@ export class HybridAgentEngine {
         return stuck;
       },
       delegation: async (tenantId) => await this.harvester.runCycle(tenantId),
+      estimation: async (tenantId) => await this.estimation.ingest(tenantId),
       planFeedback: async (tenantId) => {
         const result = await this.planFeedback.reconcile({ tenantId });
         return { recorded: result.recorded.length, executedMarked: result.executedMarked.length };
@@ -736,7 +739,9 @@ export class HybridAgentEngine {
     });
     this.planFeedback = new AuroraPlanFeedback(dataRoot, {
       planning: this.planning, decisions: this.decisions, bridge: this.delegation, harvester: this.harvester,
+      initiative: this.initiative,
     });
+    this.estimation = new AuroraEstimationCalibrator(dataRoot, { planning: this.planning });
     this.autopilot = new AuroraAutopilot(dataRoot, { orchestrator: this.acos, initiative: this.initiative });
     this.auroraFleet = new AuroraFleetSupervisor(dataRoot, { autopilot: this.autopilot }, {
       ...(config.auroraFleet?.maxTenantsPerSweep !== undefined ? { maxTenantsPerSweep: config.auroraFleet.maxTenantsPerSweep } : {}),
@@ -761,13 +766,15 @@ export class HybridAgentEngine {
     for (const capability of roleAuthorityCapabilities(this.roleAuthority)) this.capabilities.register(capability);
     for (const capability of harvestCapabilities(this.harvester)) this.capabilities.register(capability);
     for (const capability of planFeedbackCapabilities(this.planFeedback)) this.capabilities.register(capability);
+    for (const capability of estimationCapabilities(this.estimation)) this.capabilities.register(capability);
+    for (const capability of probationCapabilities(this.delegation)) this.capabilities.register(capability);
     this.auroraMetrics = new AuroraMetricsCollector({
       cognitive: this.cognitive, memoryGraph: this.memoryGraph, worldModel: this.worldModel,
       initiative: this.initiative, society: this.society, evolution: this.evolution,
       environment: this.environment, decisions: this.decisions, planning: this.planning,
       constitution: this.constitution, autopilot: this.autopilot, fleet: this.auroraFleet, acos: this.acos,
       delegation: this.delegation, roleAuthority: this.roleAuthority, harvester: this.harvester,
-      planFeedback: this.planFeedback,
+      planFeedback: this.planFeedback, estimation: this.estimation,
     });
     this.dataGovernance = new AuroraDataGovernanceService({
       cognitive: this.cognitive, memoryGraph: this.memoryGraph, worldModel: this.worldModel,

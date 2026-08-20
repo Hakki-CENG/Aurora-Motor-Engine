@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { AuroraDataGovernanceService } from "../aurora/data-governance-service.js";
 import type { AuroraExecutionBridge } from "../aurora/execution-bridge.js";
+import type { AuroraEstimationCalibrator } from "../aurora/estimation-calibrator.js";
 import type { AuroraFleetSupervisor } from "../aurora/fleet-supervisor.js";
 import type { AuroraOutcomeHarvester } from "../aurora/outcome-harvester.js";
 import type { AuroraPlanFeedback } from "../aurora/plan-feedback-service.js";
@@ -312,6 +313,51 @@ export function planFeedbackCapabilities(service: AuroraPlanFeedback) {
       { id: "decision.feedback-summary", version: "1.0.0", description: "How well plan-derived expectations matched plan-derived reality.", risk: "pure", sideEffect: false, source: "core" },
       z.object({}),
       async (_input, ctx) => await service.summary(ctx.tenantId),
+    ),
+  ];
+}
+
+/**
+ * Estimation calibration: planning that learns how wrong it usually is, from measured durations only.
+ * Profiling and suggesting are pure; applying rewrites plan estimates as an auditable revision.
+ */
+export function estimationCapabilities(service: AuroraEstimationCalibrator) {
+  return [
+    defineCapability(
+      { id: "plan.estimation-ingest", version: "1.0.0", description: "Harvest finished steps with recorded durations into the estimation sample set.", risk: "workspace_write", sideEffect: true, source: "core" },
+      z.object({ planId: z.string().max(300).optional(), limit: z.number().int().min(1).max(1000).optional() }),
+      async (input, ctx) => await service.ingest(ctx.tenantId, auroraDefined(input)),
+    ),
+    defineCapability(
+      { id: "plan.estimation-profile", version: "1.0.0", description: "Measured estimating skill: median correction factor, error and confidence, overall and per bucket.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({}),
+      async (_input, ctx) => await service.profile(ctx.tenantId),
+    ),
+    defineCapability(
+      { id: "plan.estimation-suggest", version: "1.0.0", description: "Corrected estimates for a plan's unfinished steps, including the ones deliberately left alone.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({ planId: z.string().min(1).max(300) }),
+      async (input, ctx) => await service.suggest(ctx.tenantId, input.planId),
+    ),
+    defineCapability(
+      { id: "plan.estimation-apply", version: "1.0.0", description: "Apply measured corrections to a plan as a recorded revision naming the factor and sample count.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({ planId: z.string().min(1).max(300), minSamples: z.number().int().min(1).max(1000).optional() }),
+      async (input, ctx) => await service.apply(auroraDefined({ tenantId: ctx.tenantId, ...input })),
+    ),
+    defineCapability(
+      { id: "plan.estimation-samples", version: "1.0.0", description: "The measured estimate/actual pairs behind the correction factors.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({ limit: z.number().int().min(1).max(1000).optional() }),
+      async (input, ctx) => ({ samples: await service.samples(ctx.tenantId, input.limit ?? 100) }),
+    ),
+  ];
+}
+
+/** Which roles their own record has benched, and what that currently blocks. */
+export function probationCapabilities(service: AuroraExecutionBridge) {
+  return [
+    defineCapability(
+      { id: "society.probation", version: "1.0.0", description: "Roles on probation with their record, plus the ready high-risk steps this currently blocks.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({}),
+      async (_input, ctx) => await service.probationReport(ctx.tenantId),
     ),
   ];
 }

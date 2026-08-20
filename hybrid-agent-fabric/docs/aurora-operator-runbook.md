@@ -174,6 +174,23 @@ Always dry-run first when tuning: the response shows the exact observed value, s
 that would be written. A human-recorded outcome is never overwritten, and a plan that is only executing
 marks the decision executed rather than resolving it.
 
+**Estimation calibration.** Delegated work records its real duration, and the calibrator turns those
+pairs into a correction factor.
+
+```bash
+curl -H … -X POST $HAF/v1/estimation/ingest -d '{"tenantId":"acme"}'
+curl -H … "$HAF/v1/estimation/profile?tenantId=acme"            # factor, accuracy, confidence, buckets
+curl -H … "$HAF/v1/plans/$PLAN/estimation?tenantId=acme"        # per-step suggestions, with reasons
+curl -H … -X POST $HAF/v1/plans/$PLAN/estimation/apply -d '{"tenantId":"acme"}'
+curl -H … "$HAF/v1/society/probation?tenantId=acme"             # benched roles and what they block
+haf-client aurora estimation-profile
+haf-client aurora probation
+```
+
+A factor above 1 means the tenant under-estimates. Corrections need a minimum sample count and are
+clamped, so early history cannot distort planning; applying one is a plan revision, visible in the
+plan's own audit trail. If `estimates-biased` fires, run the apply step on the active plans.
+
 **Role authority.** Without a bound profile, a delegated child session inherits the parent's full
 capability set. Bring the society to least authority:
 
@@ -224,6 +241,7 @@ re-apply the template or justify the exception). A resolved template with a non-
 | `roles-inherit-authority` | Over half the roles have no least-authority profile | `POST /v1/society/authority/apply-all` |
 | `harvest-review-backlog` | Delegated outcomes are waiting for a human verdict | Work `/v1/harvest-review`; if the band is too wide, retune the thresholds |
 | `plan-expectations-off` | Finished plans keep landing far from what their decisions expected | Read `/v1/decision-feedback`; the planning estimates or the decision confidence are wrong |
+| `estimates-biased` | Measured durations say estimates are systematically off | `POST /v1/estimation/ingest`, then apply the calibration to active plans |
 | `acos-degraded` | Last cycle had degraded phases | The cycle report names the phase and the error |
 
 ---
