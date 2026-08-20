@@ -666,13 +666,7 @@ export class HybridAgentEngine {
     for (const capability of evolutionCapabilities(this.evolution)) this.capabilities.register(capability);
     for (const capability of environmentCapabilities(this.environment)) this.capabilities.register(capability);
     this.delegation = new AuroraExecutionBridge(dataRoot, { planning: this.planning, society: this.society });
-    this.roleAuthority = new RoleAuthorityService({ capabilities: this.capabilities, profiles: this.agentProfiles, society: this.society });
-    this.harvester = new AuroraOutcomeHarvester(dataRoot, {
-      bridge: this.delegation,
-      society: this.society,
-      sessions: { session: async (sessionId: string) => await this.supervisor.getSession(sessionId) },
-      events: this.events,
-    });
+    this.roleAuthority = new RoleAuthorityService({ capabilities: this.capabilities, profiles: this.agentProfiles, society: this.society }, Date.now, dataRoot);
     // ACOS is constructed last: it composes every governed Aurora service into one control loop.
     this.acos = new CognitiveOrchestrator(dataRoot, {
       cognitive: this.cognitive,
@@ -725,6 +719,14 @@ export class HybridAgentEngine {
       harness: this.harness,
       microagents: this.microagents,
       evolution: this.evolution,
+    });
+    this.harvester = new AuroraOutcomeHarvester(dataRoot, {
+      bridge: this.delegation,
+      society: this.society,
+      sessions: { session: async (sessionId: string) => await this.supervisor.getSession(sessionId) },
+      events: this.events,
+      evolution: this.evolution,
+      distiller: this.distiller,
     });
     this.autopilot = new AuroraAutopilot(dataRoot, { orchestrator: this.acos, initiative: this.initiative });
     this.auroraFleet = new AuroraFleetSupervisor(dataRoot, { autopilot: this.autopilot }, {

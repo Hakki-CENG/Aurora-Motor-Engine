@@ -131,6 +131,8 @@ with that evidence.
 | --- | --- | --- |
 | `skipped: no-role-matches` | No active role covers the required tags | Add tags to a role, pass `capabilityTags`, or relax `requireRoleMatch` |
 | `skipped: plan-concurrency-limit` | Plan already has its allowed tasks in flight | Raise `maxActiveTasksPerPlan` or wait |
+| `skipped: society-concurrency-exhausted` | The society is already running its maximum tasks | Raise `maxConcurrentTasks` via `/v1/society/budget` or wait |
+| `skipped: society-token-budget-exhausted` | The daily society token budget cannot cover the step | Raise the budget, lower the step estimate, or wait for the daily reset |
 | Link stuck in `posted` | Nomination or award failed; the reason is on the link's `note` | Usually society budget or concurrency — check `/v1/society/budget` |
 | Plan blocked after a failure | A delegated task failed, which fails the step | Replan the step, or detach and re-delegate to another role |
 
@@ -147,6 +149,10 @@ haf-client aurora harvest-review
 haf-client aurora harvest
 ```
 
+Failed and ambiguous outcomes also feed learning: each becomes a deduplicated capability gap
+(`/v1/evolution/gaps`) plus candidate lessons (`/v1/experience/proposals`). Both are candidates only.
+Disable with `learnFromFailures: false` on the harvest policy.
+
 Each assessment stores the five weighted criteria behind its score, so a disputed quality number can
 be recomputed rather than argued about. Widen `settleAfterMs` if work is being scored too eagerly;
 widen the gap between `failBelow` and `successAtOrAbove` to send more cases to human review, narrow it
@@ -162,6 +168,18 @@ curl -H … -X POST $HAF/v1/society/authority/apply-all -d '{"tenantId":"acme"}'
 curl -H … "$HAF/v1/society/authority/audit?tenantId=acme"
 haf-client aurora role-authority
 ```
+
+Tenants can add their own templates when the built-ins do not fit:
+
+```bash
+curl -H … -X POST $HAF/v1/society/authority/templates -d '{
+  "tenantId":"acme","id":"reporter","title":"Reporting specialist","rationale":"Read-only reporting.",
+  "allow":["aurora.metrics","aurora.alerts","plan.list"],"deny":[],"maxRisk":"pure"}'
+curl -H … -X DELETE "$HAF/v1/society/authority/templates/reporter?tenantId=acme"
+```
+
+Built-in ids are reserved, built-ins cannot be removed, and a template that resolves to no capability
+is rejected rather than stored.
 
 Audit findings: `role-inherits-full-authority` (bind a template), `role-profile-missing` (the profile
 was deleted — re-apply), `profile-drifted-above-template` (someone widened the allowlist by hand —

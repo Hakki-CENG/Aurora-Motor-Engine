@@ -519,7 +519,7 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
       setDelegationLinks(delegationResult.links); setDelegationPolicy(delegationPolicyResult);
       const [authorityAuditResult, authorityTemplateResult] = await Promise.all([
         api<any>("/v1/society/authority/audit?tenantId=local"),
-        api<any>("/v1/society/authority/templates"),
+        api<any>("/v1/society/authority/templates?tenantId=local"),
       ]);
       setAuthorityAudit(authorityAuditResult); setAuthorityTemplates(authorityTemplateResult.templates);
       const reviewResult = await api<any>("/v1/harvest-review?tenantId=local&limit=15");
@@ -555,6 +555,22 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
   const rejectProposal = async (id: string) => { try { await api(`/v1/experience/proposals/${id}/reject`, { method: "POST", body: JSON.stringify({ tenantId: "local", reason: "Rejected from Canvas." }) }); await load(); } catch (cause) { showError(cause); } };
   const toggleAutopilot = async (enabled: boolean) => { try { await api("/v1/autopilot", { method: "POST", body: JSON.stringify({ tenantId: "local", enabled }) }); await load(); } catch (cause) { showError(cause); } };
   const runAutopilot = async () => { try { await api("/v1/autopilot/run-due", { method: "POST", body: JSON.stringify({ tenantId: "local" }) }); await load(); } catch (cause) { showError(cause); } };
+  const defineAuthorityTemplate = async () => {
+    const id = window.prompt("New template id (lowercase, dashes):", "reporter");
+    if (!id?.trim()) return;
+    const allow = window.prompt("Allowed capability patterns (comma separated):", "aurora.metrics, aurora.alerts, plan.list");
+    if (!allow?.trim()) return;
+    const maxRisk = window.prompt("Risk ceiling (pure, workspace_read, workspace_write, process, network, external_side_effect):", "pure");
+    if (!maxRisk?.trim()) return;
+    try {
+      await api("/v1/society/authority/templates", { method: "POST", body: JSON.stringify({
+        tenantId: "local", id: id.trim(), title: `${id.trim()} role`, rationale: "Defined from Canvas.",
+        allow: allow.split(",").map(item => item.trim()).filter(Boolean), maxRisk: maxRisk.trim(),
+      }) });
+      await load();
+    } catch (cause) { showError(cause); }
+  };
+  const removeAuthorityTemplate = async (templateId: string) => { try { await api(`/v1/society/authority/templates/${encodeURIComponent(templateId)}?tenantId=local`, { method: "DELETE" }); await load(); } catch (cause) { showError(cause); } };
   const applyAllAuthority = async () => { try { await api("/v1/society/authority/apply-all", { method: "POST", body: JSON.stringify({ tenantId: "local" }) }); await load(); } catch (cause) { showError(cause); } };
   const applyAuthority = async (templateId: string) => { try { await api("/v1/society/authority/apply", { method: "POST", body: JSON.stringify({ tenantId: "local", templateId }) }); await load(); } catch (cause) { showError(cause); } };
   const harvestOutcomes = async () => { try { await api("/v1/delegations/harvest", { method: "POST", body: JSON.stringify({ tenantId: "local" }) }); await load(); } catch (cause) { showError(cause); } };
@@ -628,9 +644,9 @@ function AuroraPanel({ showError }: { showError: (cause: unknown) => void }) {
       <div className="task-toolbar"><small>{delegationLinks.filter(link=>!["completed","failed","cancelled","detached"].includes(link.status)).length} open · {delegationLinks.length} total · auto-delegate {delegationPolicy?.autoDelegate?"on":"off"} · auto-activate {delegationPolicy?.autoActivate?"on":"off"} · {delegationPolicy?.maxActiveTasksPerPlan ?? 0}/plan · root {delegationPolicy?.rootSessionId?.slice(0,8) ?? "—"}</small><button onClick={()=>void toggleAutoDelegate(!(delegationPolicy?.autoDelegate))}>{delegationPolicy?.autoDelegate?"Disable":"Enable"} auto-delegate</button><button onClick={syncDelegations}>Sync now</button><button onClick={harvestOutcomes}>Harvest outcomes</button></div>
       <div className="task-grid">
         {planList.filter(plan => plan.status === "active" || plan.status === "draft").map(plan => <article className="task-card" key={`delegate-${plan.id}`}><h3>plan · {plan.title}</h3><p>{Math.round(plan.progress*100)}% · {plan.steps.length} step(s)</p><div><button onClick={()=>void delegatePlan(plan.id)}>Delegate ready steps</button></div></article>)}
-        {authorityAudit && <article className={`task-card ${authorityAudit.findings?.some((item:any)=>item.severity==="critical")?"failed":""}`} key="authority-audit"><h3>role authority</h3><p>{authorityAudit.boundRoles}/{authorityAudit.roles} role(s) run with a least-authority profile · ratio {authorityAudit.leastAuthorityRatio}</p><small>{(authorityAudit.findings ?? []).slice(0,3).map((item:any)=>`${item.code}${item.roleId?` (${item.roleId})`:""}`).join(" · ")||"no findings"}</small><div><button onClick={applyAllAuthority}>Apply all templates</button></div></article>}
-        {authorityTemplates.map(template => <article className="task-card" key={template.id}><h3>template · {template.id}</h3><p>{template.title}</p><small>ceiling {template.maxRisk} · roles {template.roleIds.join(", ")}</small><div><button onClick={()=>void applyAuthority(template.id)}>Apply</button></div></article>)}
-        {harvestReview.map(item => <article className="task-card" key={item.id}><h3>needs verdict · {item.stepKey}</h3><p>{item.reason}</p><small>quality {item.quality} · {item.criteria.map((criterion:any)=>`${criterion.code} ${criterion.score}`).join(" · ")} · {item.evidenceEventIds.length} evidence event(s)</small><div><button onClick={()=>void resolveHarvest(item.id, true)}><CheckCircle2 size={13}/>Succeeded</button><button className="danger" onClick={()=>void resolveHarvest(item.id, false)}><XCircle size={13}/>Failed</button></div></article>)}
+        {authorityAudit && <article className={`task-card ${authorityAudit.findings?.some((item:any)=>item.severity==="critical")?"failed":""}`} key="authority-audit"><h3>role authority</h3><p>{authorityAudit.boundRoles}/{authorityAudit.roles} role(s) run with a least-authority profile · ratio {authorityAudit.leastAuthorityRatio}</p><small>{(authorityAudit.findings ?? []).slice(0,3).map((item:any)=>`${item.code}${item.roleId?` (${item.roleId})`:""}`).join(" · ")||"no findings"}</small><div><button onClick={applyAllAuthority}>Apply all templates</button><button onClick={defineAuthorityTemplate}>Define template</button></div></article>}
+        {authorityTemplates.map(template => <article className="task-card" key={template.id}><h3>template · {template.id}</h3><p>{template.title}</p><small>{template.builtin?"built-in":"custom"} · ceiling {template.maxRisk} · roles {template.roleIds.join(", ")||"none"}</small><div><button onClick={()=>void applyAuthority(template.id)}>Apply</button>{!template.builtin&&<button className="danger" onClick={()=>void removeAuthorityTemplate(template.id)}>Remove</button>}</div></article>)}
+        {harvestReview.map(item => <article className="task-card" key={item.id}><h3>needs verdict · {item.stepKey}</h3><p>{item.reason}</p><small>quality {item.quality} · {item.criteria.map((criterion:any)=>`${criterion.code} ${criterion.score}`).join(" · ")} · {item.evidenceEventIds.length} evidence event(s){item.learning?.gapId?` · gap recorded (x${item.learning.gapOccurrences ?? 1})`:""}{item.learning?.distilledProposals?` · ${item.learning.distilledProposals} lesson candidate(s)`:""}</small><div><button onClick={()=>void resolveHarvest(item.id, true)}><CheckCircle2 size={13}/>Succeeded</button><button className="danger" onClick={()=>void resolveHarvest(item.id, false)}><XCircle size={13}/>Failed</button></div></article>)}
         {delegationLinks.map(link => <article className={`task-card ${link.status==="failed"?"failed":link.status==="completed"?"done":""}`} key={link.id}><h3>{link.status} · {link.stepKey}</h3><p>{link.planTitle} → {link.assignedRoleId ?? link.nominatedRoleId ?? "unassigned"}</p><small>tags {link.requiredCapabilityTags.join(", ")||"none"}{link.match?` · coverage ${link.match.coverage} · reputation ${link.match.reputation} · score ${link.match.score}`:""}{link.outcome?` · quality ${link.outcome.quality} · ${link.outcome.evidenceEventIds.length} evidence event(s)`:""}{link.note?` · ${link.note}`:""}</small><div>{link.status==="assigned"&&<button onClick={()=>void activateDelegation(link.id)}>Activate</button>}{!["completed","failed","cancelled","detached"].includes(link.status)&&<button className="danger" onClick={()=>void detachDelegation(link.id)}>Detach</button>}</div></article>)}
       </div>
     </>}

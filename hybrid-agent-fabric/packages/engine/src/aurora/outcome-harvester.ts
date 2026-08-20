@@ -3,6 +3,8 @@ import type { AgentSocietyService, SocietyTask } from "../society/agent-society-
 import type { EventEnvelope, SessionSnapshot } from "../types.js";
 import { auroraInteger, auroraRound, auroraText, auroraUnit, DurableJsonState } from "../util/aurora-state.js";
 import type { AuroraExecutionBridge, DelegationLink } from "./execution-bridge.js";
+import type { ExperienceDistiller } from "./experience-distiller.js";
+import type { SkillEvolutionService } from "../evolution/skill-evolution-service.js";
 
 const MAX_ASSESSMENTS = 20_000;
 const MAX_EVENTS = 2_000;
@@ -31,6 +33,8 @@ export interface OutcomeAssessment {
   criteria: OutcomeCriterion[];
   evidenceEventIds: string[];
   reason: string;
+  /** What the failure taught the system, if anything. Candidate-only: nothing is auto-applied. */
+  learning?: { gapId?: string; gapOccurrences?: number; distilledProposals?: number; note?: string };
   at: string;
 }
 
@@ -45,6 +49,8 @@ export interface HarvestPolicy {
   /** How long a settled-but-not-closed child session must be quiet before it counts as finished. */
   settleAfterMs: number;
   maxPerRun: number;
+  /** Turn a failed delegation into an evidence-backed capability gap and candidate lessons. */
+  learnFromFailures: boolean;
   updatedAt: string;
 }
 
@@ -96,6 +102,9 @@ export class AuroraOutcomeHarvester {
       society: AgentSocietyService;
       sessions: { session(sessionId: string): Promise<SessionSnapshot> };
       events: { read(sessionId: string, afterSequence?: number, limit?: number): Promise<EventEnvelope[]> };
+      /** Optional learning sinks. Absent in tests and trimmed deployments; never required. */
+      evolution?: SkillEvolutionService;
+      distiller?: ExperienceDistiller;
     },
     private readonly now: () => number = Date.now,
   ) {
@@ -116,7 +125,7 @@ export class AuroraOutcomeHarvester {
 
   async configure(input: {
     tenantId: string; autoRecord?: boolean; successAtOrAbove?: number; failBelow?: number;
-    settleAfterMs?: number; maxPerRun?: number;
+    settleAfterMs?: number; maxPerRun?: number; learnFromFailures?: boolean;
   }): Promise<HarvestPolicy> {
     return await this.store.mutate((state) => {
       const policy = this.mutablePolicy(state, input.tenantId);
@@ -126,6 +135,7 @@ export class AuroraOutcomeHarvester {
       if (policy.failBelow > policy.successAtOrAbove) throw new Error("The failure threshold cannot sit above the success threshold.");
       if (input.settleAfterMs !== undefined) policy.settleAfterMs = auroraInteger(input.settleAfterMs, 0, 24 * 60 * 60_000, "Settle window");
       if (input.maxPerRun !== undefined) policy.maxPerRun = auroraInteger(input.maxPerRun, 1, 200, "Harvest limit");
+      if (input.learnFromFailures !== undefined) policy.learnFromFailures = input.learnFromFailures;
       policy.updatedAt = new Date(this.now()).toISOString();
       return structuredClone(policy);
     });
@@ -218,11 +228,13 @@ export class AuroraOutcomeHarvester {
         }
       }
 
+      const learning = await this.learn(input.tenantId, policy, link, scored, disposition, session.sessionId);
       const assessment: OutcomeAssessment = {
         id: `harvest-${task.id}-${events.length}-${Math.floor(this.now() / 1000)}`,
         ...scored,
         disposition,
         reason,
+        ...(learning ? { learning } : {}),
         at: new Date(this.now()).toISOString(),
       };
       assessments.push(assessment);
@@ -302,6 +314,62 @@ export class AuroraOutcomeHarvester {
     }
     const cycle = await this.deps.bridge.runCycle(tenantId);
     return { harvested, review, ...cycle };
+  }
+
+  /**
+   * A delegated failure is the cheapest lesson Aurora ever gets: the work is already done, the
+   * trajectory is already recorded, and the verdict is already evidence-bound. This turns it into a
+   * deduplicated capability-gap signal and candidate lessons — both governed, neither auto-applied.
+   */
+  private async learn(
+    tenantId: string,
+    policy: HarvestPolicy,
+    link: DelegationLink,
+    scored: Omit<OutcomeAssessment, "id" | "disposition" | "at">,
+    disposition: OutcomeAssessment["disposition"],
+    childSessionId: string,
+  ): Promise<OutcomeAssessment["learning"] | undefined> {
+    if (!policy.learnFromFailures) return undefined;
+    if (disposition === "skipped") return undefined;
+    // Successes teach nothing new here; the interesting signal is failure and genuine ambiguity.
+    if (disposition === "recorded" && scored.success) return undefined;
+
+    const learning: NonNullable<OutcomeAssessment["learning"]> = {};
+    const weakest = [...scored.criteria].sort((a, b) => a.score - b.score)[0];
+    if (this.deps.evolution) {
+      try {
+        const observation = await this.deps.evolution.observeGap({
+          tenantId,
+          kind: "friction",
+          description: `Delegated plan step "${link.stepKey}" did not succeed`,
+          context: [
+            `Plan: ${link.planTitle}`,
+            `Role: ${link.assignedRoleId ?? link.nominatedRoleId ?? "unassigned"}`,
+            `Quality: ${scored.quality} (${scored.reason})`,
+            weakest ? `Weakest criterion: ${weakest.code} at ${weakest.score} — ${weakest.detail}` : "",
+          ].filter(Boolean).join("\n").slice(0, 5000),
+          severity: Math.min(1, Math.max(0.1, 1 - scored.quality)),
+          evidenceRefs: [link.id, link.taskId, ...scored.evidenceEventIds.slice(0, 10)],
+        });
+        learning.gapId = observation.gap.id;
+        learning.gapOccurrences = observation.gap.occurrences;
+      } catch (error) {
+        learning.note = `Gap observation failed: ${(error as Error).message}`.slice(0, 300);
+      }
+    }
+    if (this.deps.distiller) {
+      try {
+        const report = await this.deps.distiller.distill({
+          tenantId,
+          sessionId: childSessionId,
+          objective: `${link.planTitle} · ${link.stepKey}`,
+        });
+        learning.distilledProposals = report.proposals.length;
+      } catch (error) {
+        learning.note = `${learning.note ? `${learning.note}; ` : ""}Distillation failed: ${(error as Error).message}`.slice(0, 300);
+      }
+    }
+    return Object.keys(learning).length ? learning : undefined;
   }
 
   private isSettled(session: SessionSnapshot, events: EventEnvelope[], policy: HarvestPolicy, force: boolean): { settled: boolean; why: string } {
@@ -425,6 +493,7 @@ export class AuroraOutcomeHarvester {
         failBelow: 0.35,
         settleAfterMs: 60_000,
         maxPerRun: 25,
+        learnFromFailures: true,
         updatedAt: new Date(this.now()).toISOString(),
       };
       state.policies.push(policy);

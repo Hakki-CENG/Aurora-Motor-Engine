@@ -190,6 +190,16 @@ export class AuroraExecutionBridge {
     const skipped: Array<{ stepKey: string; reason: string }> = [];
     let budget = Math.max(0, policy.maxActiveTasksPerPlan - liveForPlan);
 
+    // Society economics are consulted *before* posting rather than discovered at award time: a task
+    // that can never be awarded today is worse than no task, because it sits open and hides the
+    // real constraint. Both the daily token budget and the concurrency ceiling are respected, and
+    // this call's own commitments are counted as it goes.
+    const societyBudget = await this.deps.society.budget(input.tenantId);
+    const societyTasks = await this.deps.society.tasks(input.tenantId);
+    let remainingSlots = Math.max(0, societyBudget.maxConcurrentTasks
+      - societyTasks.filter((item) => ["assigned", "running"].includes(item.status)).length);
+    let remainingTokens = Math.max(0, societyBudget.dailyTokenBudget - societyBudget.usedTokens - societyBudget.reservedTokens);
+
     for (const stepKey of requested ?? progress.ready) {
       const step = plan.steps.find((item) => item.key === stepKey);
       if (!step) { skipped.push({ stepKey, reason: "step-not-found" }); continue; }
@@ -200,6 +210,13 @@ export class AuroraExecutionBridge {
       }
       if (created.length >= max) { skipped.push({ stepKey: step.key, reason: "run-limit-reached" }); continue; }
       if (budget <= 0) { skipped.push({ stepKey: step.key, reason: "plan-concurrency-limit" }); continue; }
+
+      const planned = Math.min(10_000_000, Math.max(100, step.estimateTokens || 100_000));
+      if (award && remainingSlots <= 0) { skipped.push({ stepKey: step.key, reason: "society-concurrency-exhausted" }); continue; }
+      if (award && remainingTokens < planned) {
+        skipped.push({ stepKey: step.key, reason: `society-token-budget-exhausted (needs ${planned}, ${remainingTokens} left today)` });
+        continue;
+      }
 
       const tags = await this.tagsFor(input.tenantId, plan, step, input.capabilityTags);
       const ranked = await this.candidates(input.tenantId, tags);
@@ -217,6 +234,10 @@ export class AuroraExecutionBridge {
       });
       created.push(link);
       budget--;
+      if (link.status === "assigned" || link.status === "running") {
+        remainingSlots--;
+        remainingTokens = Math.max(0, remainingTokens - planned);
+      }
     }
 
     return { planId: plan.id, created, skipped, generatedAt: new Date(this.now()).toISOString() };
@@ -333,8 +354,18 @@ export class AuroraExecutionBridge {
     let skipped = 0;
     if (policy.autoDelegate && policy.rootSessionId) {
       const plans = await this.deps.planning.list(tenantId, { status: "active", limit: 25 });
+      // Fairness across plans, same principle as the fleet: the plan that waited longest for
+      // delegation goes first, so one busy plan cannot monopolise the daily society budget.
+      const state = await this.store.read();
+      const lastDelegatedAt = new Map<string, string>();
+      for (const link of state.links.filter((item) => item.tenantId === tenantId)) {
+        const previous = lastDelegatedAt.get(link.planId);
+        if (!previous || link.createdAt > previous) lastDelegatedAt.set(link.planId, link.createdAt);
+      }
+      const ordered = [...plans].sort((a, b) =>
+        (lastDelegatedAt.get(a.id) ?? "").localeCompare(lastDelegatedAt.get(b.id) ?? "") || a.id.localeCompare(b.id));
       let budget = policy.maxTasksPerRun;
-      for (const plan of plans) {
+      for (const plan of ordered) {
         if (budget <= 0) break;
         try {
           const result = await this.delegate({ tenantId, planId: plan.id, rootSessionId: policy.rootSessionId, max: budget });

@@ -8,7 +8,7 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.46.0
+## Current milestone — 1.47.0
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -1003,6 +1003,11 @@ adherence — as a stored scorecard with fixed weights, so every quality number 
 the criteria that produced it. Nothing in flight is scored: a task is only judged once its session is
 closed, failed, or idle and quiet.
 
+A delegated failure is also the cheapest lesson the system ever gets: the work is done, the trajectory
+is recorded and the verdict is evidence-bound. Failures and ambiguous outcomes become deduplicated
+capability-gap observations and candidate lessons, with the weakest scoring criterion named. Successes
+teach nothing here, and nothing is auto-applied.
+
 Two refusals matter more than the scoring. A session that failed or produced no output is a failure
 outright, not partial credit. And anything landing between the failure and success thresholds is
 **not** recorded at all — it becomes a review item with a reason, because a system that guesses at its
@@ -1018,7 +1023,9 @@ declares allow patterns, deny patterns and a hard risk ceiling, and resolves aga
 capability catalog, so a template can never grant a capability that does not exist and never quietly
 misses a new one in its family. Everything the ceiling removes is reported, and a pattern that
 matches nothing is surfaced as drift. The guardian template is provably read-only: every capability
-it grants is side-effect free.
+it grants is side-effect free. Tenants can define their own templates too — validated, resolved
+against the same live catalog, rejected if they grant nothing, and audited for drift exactly like the
+built-ins, which stay immutable.
 
 ## Aurora fleet supervision
 
@@ -1030,6 +1037,10 @@ fleet as a whole by a daily sweep ceiling. A tenant whose autopilot throws is co
 the sweep continues, the failure is recorded, and three consecutive failing sweeps open a circuit
 breaker with an exponential pause that only an operator resume clears. The sweep ledger is durable,
 so cross-tenant background activity is reviewable after the fact.
+
+Delegation also respects the society's economics before it posts: the daily token budget and the
+concurrency ceiling are checked up front, so a task that could never be awarded today is never
+created, and the unattended path serves the plan that has waited longest first.
 
 Because the fleet is cross-tenant, its REST surface is system-admin only. A tenant's own agents can
 see and change only their own membership, through the tenant-scoped `aurora.fleet.*` capabilities.

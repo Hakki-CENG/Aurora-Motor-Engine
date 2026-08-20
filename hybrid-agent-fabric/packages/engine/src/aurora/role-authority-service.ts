@@ -1,13 +1,17 @@
 import type { AgentProfileRecord, AgentProfileRegistry } from "../profiles/agent-profile-registry.js";
 import type { AgentSocietyService } from "../society/agent-society-service.js";
+import { join } from "node:path";
 import type { CapabilityDescriptor, CapabilityRisk } from "../types.js";
-import { auroraRound, auroraText } from "../util/aurora-state.js";
+import { auroraRound, auroraText, DurableJsonState } from "../util/aurora-state.js";
 
 /** Ordered from least to most authority. A template can never resolve above its declared ceiling. */
 const RISK_ORDER: CapabilityRisk[] = ["pure", "workspace_read", "workspace_write", "process", "network", "external_side_effect", "privileged"];
 
 export interface RoleAuthorityTemplate {
   id: string;
+  /** Built-in templates ship with the engine and cannot be edited; custom ones belong to a tenant. */
+  builtin?: boolean;
+  tenantId?: string;
   title: string;
   /** Why this role needs exactly this much authority — the justification an auditor will read. */
   rationale: string;
@@ -39,6 +43,11 @@ export interface ResolvedTemplate {
   generatedAt: string;
 }
 
+interface RoleAuthorityStateShape {
+  schemaVersion: 1;
+  templates: RoleAuthorityTemplate[];
+}
+
 export interface RoleAuthorityFinding {
   severity: "info" | "warning" | "critical";
   code: string;
@@ -67,6 +76,8 @@ export interface RoleAuthorityFinding {
  *   drifted above their template.
  */
 export class RoleAuthorityService {
+  private readonly store: DurableJsonState<RoleAuthorityStateShape> | undefined;
+
   constructor(
     private readonly deps: {
       capabilities: { list(): CapabilityDescriptor[] };
@@ -74,21 +85,114 @@ export class RoleAuthorityService {
       society: AgentSocietyService;
     },
     private readonly now: () => number = Date.now,
-  ) {}
+    rootPath?: string,
+  ) {
+    // Custom templates are optional: without a data root the service still serves the built-ins.
+    this.store = rootPath
+      ? new DurableJsonState<RoleAuthorityStateShape>(
+        join(rootPath, "society", "authority-templates.json"),
+        () => ({ schemaVersion: 1, templates: [] }),
+        (value) => {
+          const state = value as RoleAuthorityStateShape;
+          return !!state && state.schemaVersion === 1 && Array.isArray(state.templates);
+        },
+        "Aurora role authority templates",
+      )
+      : undefined;
+  }
 
+  /** The built-in templates only. Synchronous, because they ship with the engine. */
   templates(): RoleAuthorityTemplate[] {
-    return BUILTIN_TEMPLATES.map((item) => structuredClone(item));
+    return BUILTIN_TEMPLATES.map((item) => structuredClone({ ...item, builtin: true }));
   }
 
   template(templateId: string): RoleAuthorityTemplate {
     const found = BUILTIN_TEMPLATES.find((item) => item.id === templateId.trim());
     if (!found) throw new Error(`Unknown role authority template "${templateId}".`);
-    return structuredClone(found);
+    return structuredClone({ ...found, builtin: true });
   }
 
-  /** Resolve a template against the live catalog without changing anything. */
+  /** Built-ins plus this tenant's own templates, built-ins first and always marked as such. */
+  async allTemplates(tenantId: string): Promise<RoleAuthorityTemplate[]> {
+    const custom = this.store
+      ? (await this.store.read()).templates.filter((item) => item.tenantId === tenantId).map((item) => structuredClone(item))
+      : [];
+    return [...this.templates(), ...custom.sort((a, b) => a.id.localeCompare(b.id))];
+  }
+
+  /**
+   * Define or replace a tenant template. Built-in ids are reserved, every pattern is validated, and
+   * a template that resolves to nothing is rejected rather than stored as a profile that grants zero
+   * capabilities and silently breaks a role.
+   */
+  async defineTemplate(input: {
+    tenantId: string; id: string; title: string; rationale: string; roleIds?: string[];
+    allow: string[]; deny?: string[]; maxRisk: CapabilityRisk;
+  }): Promise<{ template: RoleAuthorityTemplate; resolved: ResolvedTemplate }> {
+    if (!this.store) throw new Error("Custom role authority templates require a persistent data root.");
+    const tenantId = auroraText(input.tenantId, 200, "Tenant ID");
+    const id = auroraText(input.id, 60, "Template ID").toLowerCase();
+    if (!/^[a-z][a-z0-9-]{1,59}$/.test(id)) throw new Error("Template ID must be lowercase letters, digits and dashes.");
+    if (BUILTIN_TEMPLATES.some((item) => item.id === id)) throw new Error(`Template ID "${id}" is reserved by a built-in template.`);
+    if (!RISK_ORDER.includes(input.maxRisk)) throw new Error("Template risk ceiling is invalid.");
+    const patterns = (values: readonly string[] | undefined, label: string): string[] => {
+      const list = [...new Set((values ?? []).map((item) => item.trim()).filter(Boolean))];
+      if (list.length > 100) throw new Error(`${label} is limited to 100 patterns.`);
+      if (list.some((item) => !/^[a-zA-Z0-9_.:-]{1,200}\*?$/.test(item))) throw new Error(`${label} contains an invalid pattern.`);
+      return list;
+    };
+    const allow = patterns(input.allow, "Allow list");
+    if (!allow.length) throw new Error("A template needs at least one allow pattern.");
+
+    const template: RoleAuthorityTemplate = {
+      id,
+      builtin: false,
+      tenantId,
+      title: auroraText(input.title, 200, "Template title"),
+      rationale: auroraText(input.rationale, 2000, "Template rationale"),
+      roleIds: [...new Set((input.roleIds ?? []).map((item) => auroraText(item, 200, "Role ID")))].slice(0, 50),
+      allow,
+      deny: patterns(input.deny, "Deny list"),
+      maxRisk: input.maxRisk,
+    };
+
+    const resolved = this.resolveTemplate(template);
+    if (!resolved.capabilityIds.length) throw new Error(`Template "${id}" resolves to no capability in this deployment; refusing to store it.`);
+
+    await this.store.mutate((state) => {
+      const index = state.templates.findIndex((item) => item.tenantId === tenantId && item.id === id);
+      if (index >= 0) state.templates[index] = template;
+      else state.templates.push(template);
+      if (state.templates.length > 500) throw new Error("Role authority template limit reached.");
+    });
+    return { template, resolved };
+  }
+
+  async removeTemplate(tenantId: string, templateId: string): Promise<{ templateId: string; removed: boolean }> {
+    if (!this.store) return { templateId, removed: false };
+    if (BUILTIN_TEMPLATES.some((item) => item.id === templateId)) throw new Error("Built-in templates cannot be removed.");
+    return await this.store.mutate((state) => {
+      const index = state.templates.findIndex((item) => item.tenantId === tenantId && item.id === templateId);
+      if (index < 0) return { templateId, removed: false };
+      state.templates.splice(index, 1);
+      return { templateId, removed: true };
+    });
+  }
+
+  /** Resolve a built-in or tenant template against the live catalog without changing anything. */
+  async resolveFor(tenantId: string, templateId: string): Promise<ResolvedTemplate> {
+    const templates = await this.allTemplates(tenantId);
+    const template = templates.find((item) => item.id === templateId.trim());
+    if (!template) throw new Error(`Unknown role authority template "${templateId}".`);
+    return this.resolveTemplate(template);
+  }
+
+  /** Resolve a built-in template against the live catalog without changing anything. */
   resolve(templateId: string): ResolvedTemplate {
-    const template = this.template(templateId);
+    return this.resolveTemplate(this.template(templateId));
+  }
+
+  private resolveTemplate(template: RoleAuthorityTemplate): ResolvedTemplate {
     const catalog = this.deps.capabilities.list();
     const ceiling = RISK_ORDER.indexOf(template.maxRisk);
     const matched = new Set<string>();
@@ -133,8 +237,10 @@ export class RoleAuthorityService {
     templateId: string; profile: AgentProfileRecord; resolved: ResolvedTemplate; boundRoleIds: string[];
   }> {
     const tenantId = auroraText(input.tenantId, 200, "Tenant ID");
-    const resolved = this.resolve(input.templateId);
-    const template = this.template(input.templateId);
+    const templates = await this.allTemplates(tenantId);
+    const template = templates.find((item) => item.id === input.templateId.trim());
+    if (!template) throw new Error(`Unknown role authority template "${input.templateId}".`);
+    const resolved = this.resolveTemplate(template);
     if (!resolved.capabilityIds.length) throw new Error(`Template "${template.id}" resolves to no capability in this deployment; refusing to create an empty profile.`);
     const name = `aurora-${template.id}`;
     const instructions = [
@@ -177,7 +283,7 @@ export class RoleAuthorityService {
   /** Apply every built-in template. Used to bring a fresh tenant to least authority in one call. */
   async applyAll(tenantId: string): Promise<Array<{ templateId: string; profileId: string; capabilities: number; boundRoleIds: string[] }>> {
     const results: Array<{ templateId: string; profileId: string; capabilities: number; boundRoleIds: string[] }> = [];
-    for (const template of BUILTIN_TEMPLATES) {
+    for (const template of await this.allTemplates(tenantId)) {
       try {
         const applied = await this.apply({ tenantId, templateId: template.id });
         results.push({ templateId: template.id, profileId: applied.profile.id, capabilities: applied.resolved.capabilityIds.length, boundRoleIds: applied.boundRoleIds });
@@ -221,8 +327,9 @@ export class RoleAuthorityService {
 
     for (const profile of profiles) {
       const templateId = profile.name.toLowerCase().startsWith("aurora-") ? profile.name.slice("aurora-".length) : undefined;
-      if (!templateId || !BUILTIN_TEMPLATES.some((item) => item.id === templateId)) continue;
-      const resolved = this.resolve(templateId);
+      const known = templateId ? (await this.allTemplates(tenantId)).find((item) => item.id === templateId) : undefined;
+      if (!templateId || !known) continue;
+      const resolved = this.resolveTemplate(known);
       const extra = (profile.allowedCapabilityIds ?? []).filter((id) => !resolved.capabilityIds.includes(id));
       if (extra.length) {
         findings.push({

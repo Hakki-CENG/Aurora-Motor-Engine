@@ -194,14 +194,14 @@ export function delegationCapabilities(service: AuroraExecutionBridge) {
 export function roleAuthorityCapabilities(service: RoleAuthorityService) {
   return [
     defineCapability(
-      { id: "society.authority.templates", version: "1.0.0", description: "List the built-in least-authority role templates with their rationale and risk ceiling.", risk: "pure", sideEffect: false, source: "core" },
+      { id: "society.authority.templates", version: "1.1.0", description: "List the least-authority role templates — built-in and tenant-defined — with rationale and risk ceiling.", risk: "pure", sideEffect: false, source: "core" },
       z.object({}),
-      async () => ({ templates: service.templates() }),
+      async (_input, ctx) => ({ templates: await service.allTemplates(ctx.tenantId) }),
     ),
     defineCapability(
-      { id: "society.authority.resolve", version: "1.0.0", description: "Resolve a role template against the live capability catalog without changing anything.", risk: "pure", sideEffect: false, source: "core" },
+      { id: "society.authority.resolve", version: "1.1.0", description: "Resolve a role template against the live capability catalog without changing anything.", risk: "pure", sideEffect: false, source: "core" },
       z.object({ templateId: z.string().min(1).max(100) }),
-      async (input) => service.resolve(input.templateId),
+      async (input, ctx) => await service.resolveFor(ctx.tenantId, input.templateId),
     ),
     defineCapability(
       { id: "society.authority.apply", version: "1.0.0", description: "Create or update the agent profile for a role template and bind it to its roles.", risk: "privileged", sideEffect: true, source: "core" },
@@ -212,6 +212,22 @@ export function roleAuthorityCapabilities(service: RoleAuthorityService) {
       { id: "society.authority.apply-all", version: "1.0.0", description: "Bring the whole society to least authority by applying every built-in template.", risk: "privileged", sideEffect: true, source: "core" },
       z.object({}),
       async (_input, ctx) => ({ applied: await service.applyAll(ctx.tenantId) }),
+    ),
+    defineCapability(
+      { id: "society.authority.define", version: "1.0.0", description: "Define or replace a tenant's own least-authority template. Built-in ids are reserved and empty templates are rejected.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({
+        id: z.string().min(2).max(60), title: z.string().min(1).max(200), rationale: z.string().min(1).max(2000),
+        roleIds: z.array(z.string().min(1).max(200)).max(50).optional(),
+        allow: z.array(z.string().min(1).max(200)).min(1).max(100),
+        deny: z.array(z.string().min(1).max(200)).max(100).optional(),
+        maxRisk: z.enum(["pure", "workspace_read", "workspace_write", "process", "network", "external_side_effect", "privileged"]),
+      }),
+      async (input, ctx) => await service.defineTemplate(auroraDefined({ tenantId: ctx.tenantId, ...input })),
+    ),
+    defineCapability(
+      { id: "society.authority.remove", version: "1.0.0", description: "Remove a tenant-defined template. Built-in templates cannot be removed.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({ templateId: z.string().min(1).max(100) }),
+      async (input, ctx) => await service.removeTemplate(ctx.tenantId, input.templateId),
     ),
     defineCapability(
       { id: "society.authority.audit", version: "1.0.0", description: "Which roles still inherit full authority, which profiles are missing and which drifted above their template.", risk: "pure", sideEffect: false, source: "core" },

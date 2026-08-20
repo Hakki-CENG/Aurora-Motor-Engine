@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.47.0 — 2026-08-20
+
+This release deepens the three newest subsystems rather than adding a fourth: delegation now respects
+the society's real economics, failures now teach, and role authority is no longer limited to the
+templates that shipped with the engine.
+
+- **Budget-aware delegation.** The execution bridge consults the society's daily token budget and
+  concurrency ceiling *before* posting work, instead of discovering the limit at award time. A task
+  that could never be awarded today is never created: the step is skipped with a named reason
+  (`society-concurrency-exhausted`, `society-token-budget-exhausted (needs N, M left today)`), so the
+  real constraint is visible instead of hidden behind an orphan task sitting open in the marketplace.
+  Commitments made earlier in the same call are counted against the remaining budget, and the ceiling
+  is only applied when the caller actually intends to award.
+- **Fair unattended delegation across plans.** The autopilot path now serves the plan that has waited
+  longest for delegation first — the same fairness rule the fleet supervisor uses for tenants — so one
+  busy plan cannot consume a tenant's entire daily society budget.
+- **Failures now teach.** A delegated task that fails or lands in the ambiguous band is turned into a
+  deduplicated, evidence-backed capability-gap observation (severity derived from the measured
+  quality, evidence referencing the delegation, the society task and the child session's events) and
+  triggers candidate-only experience distillation on the child session trajectory. The weakest scoring
+  criterion is named in the gap context, so the lesson points at the actual weakness. Successes teach
+  nothing here, both sinks are optional, and the whole behaviour can be disabled with
+  `learnFromFailures: false`. Nothing is auto-applied: gaps and lessons remain candidates behind their
+  existing governed gates.
+- **Tenant-defined role authority templates.** Least authority is no longer limited to the eight
+  built-ins. A tenant can define its own template (allow patterns, deny patterns, risk ceiling) which
+  is validated, resolved against the live capability catalog, and rejected if it grants nothing.
+  Built-in ids are reserved and built-ins cannot be edited or removed. Custom templates take part in
+  application, binding, `applyAll` and the drift audit exactly like built-ins, and stay tenant-scoped.
+- Added `society.authority.define` and `society.authority.remove` capabilities, tenant-aware
+  `society.authority.templates`/`resolve` (v1.1.0), REST for defining and removing templates, and a
+  Canvas control to define or remove a template alongside the built-ins, plus learning provenance
+  (gap recorded, lesson candidates) shown on each review item.
+- Added 9 tests (414 engine tests total) covering the concurrency ceiling, the token shortfall message,
+  post-without-award, cross-plan fairness, gap creation with deduplication from a failing child
+  session, silence on success, custom template definition/resolution/application/removal, built-in
+  protection, empty-template rejection and tenant scoping.
+
 ## 1.46.0 — 2026-08-20
 
 - Added the **Aurora delegated-outcome harvester**: the last open link in the execution loop. Until now a finished child session still needed a human to declare the outcome, so completed delegated work looked like work in progress, plans stalled on finished steps and role reputation never moved.

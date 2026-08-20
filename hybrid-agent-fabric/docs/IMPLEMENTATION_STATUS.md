@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-20 — current milestone 1.46
+Updated: 2026-08-20 — current milestone 1.47
 
 ## Original 1.0 baseline (delivered)
 
@@ -261,6 +261,16 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] ACOS execute-phase harvesting with review-backlog recommendations
 - [x] Harvest telemetry, review-backlog alert, REST, Canvas queue and CLI/TUI surfaces
 - [x] Aurora panel in the interactive TUI
+
+### Aurora delegation economics and learning (1.47)
+
+- [x] Society token budget and concurrency consulted before posting work
+- [x] Named skip reasons instead of orphan tasks that can never be awarded
+- [x] Cross-plan fairness for unattended delegation
+- [x] Delegated failures become deduplicated, evidence-backed capability gaps
+- [x] Candidate-only distillation of failed delegation trajectories, disable-able
+- [x] Tenant-defined role authority templates with validation and empty-template rejection
+- [x] Built-in templates immutable and reserved; custom templates audited for drift
 
 ## Required for full target parity
 
