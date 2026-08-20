@@ -72,6 +72,8 @@ const PLAN_MODE_WRITE_ALLOWLIST = [
   "plan.", "decision.", "acos.journal", "cognitive.object.create", "cognitive.intake",
   "memory.propose", "memory.graph.remember", "multiworld.", "world.prediction.create",
   "experience.distill", "task.",
+  // The way out of plan mode must itself be reachable from inside plan mode, or the mode is a trap.
+  "session.plan.exit", "session.mode.set", "user.ask",
 ];
 
 const PERMISSION_MODES: PermissionMode[] = ["plan", "manual", "acceptEdits", "auto", "dontAsk", "bypass"];
@@ -267,7 +269,7 @@ export class SessionModeService {
       case "plan": {
         const planningWrite = PLAN_MODE_WRITE_ALLOWLIST.some((prefix) => capabilityId.startsWith(prefix));
         if (!sideEffect && ["pure", "workspace_read"].includes(risk)) return decision;
-        if (planningWrite && ["workspace_write", "pure", "workspace_read"].includes(risk)) return decision;
+        if (planningWrite) return decision;
         return { decision: "deny", reasonCode: "plan_mode_read_only", message: `Plan mode is read-only: ${capabilityId} would change something. Leave plan mode to execute.` };
       }
       case "dontAsk":

@@ -119,6 +119,7 @@ export * from "./runtime/user-questions.js";
 export * from "./mcp/stateless-mcp-client.js";
 export * from "./mcp/stateless-mcp-registry.js";
 export * from "./capabilities/discovery.js";
+export * from "./capabilities/background-tasks.js";
 export * from "./aurora/provenance-service.js";
 export * from "./aurora/workspace-checkpoint-service.js";
 export * from "./aurora/aurora-metrics.js";

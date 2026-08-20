@@ -30,8 +30,8 @@ a re-read of the old list.
 
 | # | Gap | Why it matters | Status |
 |---|---|---|---|
-| N4 | Background-task control surface: list running child work, stop one, message one, and have it resume | Aurora has children, an inbox and the society bus, but no single "what is running, stop that one" surface | Planned |
-| N5 | Model-callable mode transitions (`EnterPlanMode` / `ExitPlanMode` equivalents) | Aurora's modes are operator-set; the agent itself cannot propose "let me explore first" and then hand back | Planned |
+| N4 | Background-task control surface: list running child work, stop one, message one, and have it resume | Aurora has children, an inbox and the society bus, but no single "what is running, stop that one" surface | **Done in 1.58.0** |
+| N5 | Model-callable mode transitions (`EnterPlanMode` / `ExitPlanMode` equivalents) | Aurora's modes are operator-set; the agent itself cannot propose "let me explore first" and then hand back | **Done in 1.58.0** |
 | N6 | Long-running shell with retrievable output and a kill switch (`BashOutput` / `KillShell`) | Process execution is currently synchronous and bounded; a build or test run that outlives the call has nowhere to live | Planned |
 | N7 | Automated approval review (`--approve-for-me`): a policy that reviews and auto-answers a class of approvals with a recorded rationale | Aurora's `auto` mode is risk-class based; a reviewed-and-recorded auto-answer is a different, auditable thing | Planned |
 
@@ -61,7 +61,15 @@ allows it because asking a question changes nothing.
 verbatim `requestState`). `StatelessMcpRegistry` registers such a server's tools as governed capabilities
 and routes mid-call input requests to a human through the bounded question service.
 
-## 5. Next steps
+## 5. What 1.58.0 fixes
 
-N4 background-task control (`Monitor` / `TaskStop` / `SendMessage`), N5 model-callable mode transitions,
-N6 long-running shells with retrievable output, N7 reviewed automatic approvals.
+**N4 - Background tasks.** `tasks.monitor`, `tasks.stop` (cancel versus close, ungated but
+reach-bounded) and `tasks.resume` through the durable inbox.
+
+**N5 - Model-callable plan mode.** `session.plan.enter` is ungated because it only tightens;
+`session.plan.exit` is privileged and refuses to leave without a plan id or summary. Writing the test
+exposed that plan mode had denied its own exit - the escape hatch is now explicitly allowed.
+
+## 6. Next steps
+
+N6 long-running shells with retrievable output and a kill switch, N7 reviewed automatic approvals.

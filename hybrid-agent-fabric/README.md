@@ -8,7 +8,7 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.57.0
+## Current milestone — 1.58.0
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -89,6 +89,7 @@ Implemented and tested:
 - Signed artefact manifests with Ed25519 publisher keys, version pinning and per-agent lifecycle hooks
 - Layered settings with provenance and an immovable managed floor, plus structured questions to the human
 - MCP 2026-07-28 stateless client with server/discover, routing headers, cacheable listings and multi round-trip requests
+- Background task control (monitor, stop, resume) and model-callable plan mode with an evidence requirement
 - Aurora autopilot: bounded unattended cadence with a durable run ledger
 - Aurora provenance explainer reconstructing why any artifact exists
 - Embedding-backed semantic memory recall
@@ -1035,6 +1036,18 @@ work. It never overwrites a human verdict, never resolves a plan that is merely 
 marks the decision executed instead), and supports a dry run that shows exactly what would be written.
 Each record keeps its evidence, observed value, surprise and Brier score, so every calibration number
 traces back to the execution behind it.
+
+## Background tasks and model-callable plan mode
+
+`tasks.monitor` shows what is running within a session's family reach - status, whether a turn is in
+flight, usage, mode, effort and outstanding questions. `tasks.stop` separates `cancel` (end the turn)
+from `close` (end the agent) and is ungated on purpose: stopping only reduces activity, and needing an
+approval to halt a runaway agent would be backwards. `tasks.resume` sends a follow-up through the
+durable inbox.
+
+The agent can enter plan mode itself, because that only removes authority. Leaving requires approval
+*and* evidence: a plan id or a summary of what the exploration produced, so exploration earns execution
+rather than assuming it. A managed ceiling still caps where it can land.
 
 ## MCP 2026-07-28
 

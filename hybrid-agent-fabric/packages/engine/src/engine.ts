@@ -151,6 +151,7 @@ import {
   orchestratorCapabilities, riskCapabilities, stuckCapabilities,
 } from "./capabilities/aurora-core.js";
 import { discoveryCapabilities } from "./capabilities/discovery.js";
+import { backgroundTaskCapabilities, planModeCapabilities } from "./capabilities/background-tasks.js";
 import {
   effortCapabilities, lifecycleHookCapabilities, projectInstructionCapabilities, repositoryCommandCapabilities,
   reviewCapabilities, sessionLifecycleCapabilities, sessionModeCapabilities, settingsCapabilities,
@@ -912,6 +913,10 @@ export class HybridAgentEngine {
     for (const capability of worktreeCapabilities(this.worktrees)) this.capabilities.register(capability);
     for (const capability of userQuestionCapabilities(this.userQuestions)) this.capabilities.register(capability);
     for (const capability of settingsCapabilities(this.settings)) this.capabilities.register(capability);
+    for (const capability of backgroundTaskCapabilities({
+      supervisor: this.supervisor, modes: this.sessionModes, effort: this.sessionEffort, questions: this.userQuestions,
+    })) this.capabilities.register(capability);
+    for (const capability of planModeCapabilities(this.sessionModes)) this.capabilities.register(capability);
     for (const capability of sessionLifecycleCapabilities(this.sessionLifecycle)) this.capabilities.register(capability);
     // Registered last so the catalog it searches already contains everything else.
     for (const capability of discoveryCapabilities(() => this.capabilities.list())) this.capabilities.register(capability);

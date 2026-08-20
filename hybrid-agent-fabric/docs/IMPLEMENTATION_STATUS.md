@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-20 — current milestone 1.57
+Updated: 2026-08-20 — current milestone 1.58
 
 ## Original 1.0 baseline (delivered)
 
@@ -382,6 +382,16 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] Multi Round-Trip Requests with verbatim, bounded `requestState` and a stable request id
 - [x] Stateless servers registered as governed capabilities with the server's schema
 - [x] Mid-call input requests routed to a human, bounded rounds, no guessed answers
+
+### Peer parity round two, wave three (1.58)
+
+- [x] `tasks.monitor` over family reach with status, busy flag, usage, mode, effort and open questions
+- [x] `tasks.stop` separating cancel from close, ungated but reach-bounded and reason-recorded
+- [x] `tasks.resume` through the durable inbox with receipts
+- [x] `session.plan.enter` ungated (it only tightens)
+- [x] `session.plan.exit` privileged and evidence-required, landing in manual
+- [x] Plan-mode escape hatch reachable from inside plan mode
+- [x] Managed ceiling enforced against an agent's own exit request
 
 ## Required for full target parity
 

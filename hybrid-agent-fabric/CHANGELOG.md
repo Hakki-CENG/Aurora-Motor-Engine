@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.58.0 - 2026-08-20
+
+Round-two audit, N4 and N5: background-task control and model-callable plan mode.
+
+- **`tasks.monitor` (N4)** answers the question a supervising agent actually has: what is running under
+  me, how far along is it, and what is it waiting on? One view over machinery that already existed -
+  status, whether a turn is genuinely in flight, generation and sequence, token usage, open tasks, the
+  session's permission mode and effort level, and how many questions it has outstanding.
+- **`tasks.stop`** distinguishes what conflated verbs usually hide: `cancel` ends the current turn and
+  leaves the agent alive, `close` ends the agent. The reason is recorded on the target either way.
+  Deliberately **ungated**: stopping only ever reduces activity, and requiring an approval prompt to
+  halt a runaway agent would be exactly backwards. It is still bounded by family reach - the roster is
+  the authority, not a caller-supplied id - and a session cannot stop itself.
+- **`tasks.resume`** delivers a follow-up through the durable inbox, so a stopped or idle agent picks up
+  where it left off with the same reach rules and receipts as any other agent message.
+- **Model-callable plan mode (N5).** `session.plan.enter` needs no approval, because entering plan mode
+  only removes authority. `session.plan.exit` stays privileged, because leaving it grants authority -
+  and it **refuses to leave without naming what the exploration produced**, a plan id or a summary, so
+  "I explored" cannot quietly become "I am now allowed to write". Exiting lands in `manual` by default.
+- Fixed a real trap found by writing the test: plan mode denied `session.plan.exit` and
+  `session.mode.set` along with every other write, which made plan mode a room with no door. The escape
+  hatch, and `user.ask`, are now explicitly reachable from inside plan mode.
+- A managed permission ceiling still applies on the way out: an agent leaving plan mode cannot select a
+  mode above what an administrator allows.
+- Added REST for monitoring and stopping within a session's family reach.
+- Added 7 tests (517 engine tests total) covering the monitor view, cancel versus close with the close
+  evidenced on the child's own event stream, refusal to stop itself or an unreachable agent, resume
+  receipts, plan entry, refusal to exit without evidence, refusal to exit a mode it is not in, and the
+  managed ceiling holding against an agent's own exit request.
+
 ## 1.57.0 — 2026-08-20
 
 Round-two audit, N1: **the MCP 2026-07-28 stateless revision**, the largest change to the protocol since
