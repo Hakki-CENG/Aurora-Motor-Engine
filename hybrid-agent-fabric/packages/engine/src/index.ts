@@ -114,6 +114,8 @@ export * from "./repositories/working-tree-review.js";
 export * from "./repositories/worktree-service.js";
 export * from "./policy/session-effort.js";
 export * from "./security/manifest-trust.js";
+export * from "./policy/settings-resolver.js";
+export * from "./runtime/user-questions.js";
 export * from "./capabilities/discovery.js";
 export * from "./aurora/provenance-service.js";
 export * from "./aurora/workspace-checkpoint-service.js";

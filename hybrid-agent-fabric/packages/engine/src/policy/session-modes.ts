@@ -75,6 +75,8 @@ const PLAN_MODE_WRITE_ALLOWLIST = [
 ];
 
 const PERMISSION_MODES: PermissionMode[] = ["plan", "manual", "acceptEdits", "auto", "dontAsk", "bypass"];
+/** How much authority each mode grants, for ceiling comparisons. `dontAsk` grants less, not more. */
+const PERMISSION_STRENGTH: Record<PermissionMode, number> = { plan: 0, dontAsk: 1, manual: 2, acceptEdits: 3, auto: 4, bypass: 5 };
 const SANDBOX_MODES: SandboxMode[] = ["read-only", "workspace-write", "danger-full-access"];
 
 /**
@@ -98,6 +100,8 @@ const SANDBOX_MODES: SandboxMode[] = ["read-only", "workspace-write", "danger-fu
  */
 export class SessionModeService {
   private readonly store: DurableJsonState<ModeStateShape>;
+  /** Optional administrator floor: the highest permission mode a session may select. */
+  private ceiling: ((tenantId: string) => Promise<PermissionMode | undefined>) | undefined;
 
   constructor(
     rootPath: string,
@@ -113,6 +117,11 @@ export class SessionModeService {
       },
       "Aurora session modes",
     );
+  }
+
+  /** Bind the managed-settings ceiling. Called by the engine; absent in unit tests. */
+  bindCeiling(resolver: (tenantId: string) => Promise<PermissionMode | undefined>): void {
+    this.ceiling = resolver;
   }
 
   modes(): { permissionModes: Array<{ mode: PermissionMode; description: string }>; sandboxModes: Array<{ mode: SandboxMode; description: string }> } {
@@ -177,6 +186,13 @@ export class SessionModeService {
     const reason = auroraText(input.reason, 1000, "Mode change reason");
     const actor = auroraText(input.actor, 200, "Actor");
     const previous = await this.get(tenantId, sessionId);
+    // An administrator ceiling is a floor for everyone else: a session cannot climb above it, whatever
+    // the tenant default says and whoever is asking.
+    const ceiling = this.ceiling ? await this.ceiling(tenantId).catch(() => undefined) : undefined;
+    const requested = input.permissionMode ?? previous.permissionMode;
+    if (ceiling && PERMISSION_STRENGTH[requested] > PERMISSION_STRENGTH[ceiling]) {
+      throw new Error(`Permission mode "${requested}" exceeds the managed ceiling "${ceiling}".`);
+    }
 
     return await this.store.mutate((state) => {
       const defaults = this.mutableDefaults(state, tenantId);
@@ -255,6 +271,10 @@ export class SessionModeService {
         return { decision: "deny", reasonCode: "plan_mode_read_only", message: `Plan mode is read-only: ${capabilityId} would change something. Leave plan mode to execute.` };
       }
       case "dontAsk":
+        // A question is a prompt too: "never prompt me" has to mean it, or an unattended run hangs.
+        if (capabilityId === "user.ask") {
+          return { decision: "deny", reasonCode: "dont_ask_denied", message: `Mode "dontAsk" refuses to prompt the user: ${capabilityId}.` };
+        }
         return decision.decision === "require_approval"
           ? { decision: "deny", reasonCode: "dont_ask_denied", message: `Mode "dontAsk" refuses anything that would prompt: ${capabilityId}.` }
           : decision;

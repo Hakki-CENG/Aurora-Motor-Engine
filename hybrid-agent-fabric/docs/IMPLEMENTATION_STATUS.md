@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-20 — current milestone 1.55
+Updated: 2026-08-20 — current milestone 1.56
 
 ## Original 1.0 baseline (delivered)
 
@@ -360,6 +360,18 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] Agent profile id on the capability context
 - [x] Hook rules scoped to agent profiles
 - [x] Subagent files declaring their own lifecycle hooks
+
+### Peer parity round two, wave one (1.56)
+
+- [x] Six-layer settings resolution with per-key provenance and contribution history
+- [x] Managed layer as an absolute floor, with overridden values recorded not dropped
+- [x] Managed arrays replace rather than merge
+- [x] Managed permission-mode ceiling enforced by `session.mode.set`
+- [x] Managed capability deny list enforced as a policy layer
+- [x] Bounded, warning-tolerant project settings files
+- [x] Structured multiple-choice questions to the human with attributed answers
+- [x] Timeout without an invented answer; `dontAsk` denial; plan-mode allowance
+- [x] Outstanding questions cancelled when a session closes
 
 ## Required for full target parity
 

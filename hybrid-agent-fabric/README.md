@@ -8,7 +8,7 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.55.0
+## Current milestone — 1.56.0
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -87,6 +87,7 @@ Implemented and tested:
 - Deterministic working-tree review and declarative subagent files resolved onto profiles and roles
 - Per-session effort levels that move both provider reasoning and harness budgets, and deliberate git worktrees
 - Signed artefact manifests with Ed25519 publisher keys, version pinning and per-agent lifecycle hooks
+- Layered settings with provenance and an immovable managed floor, plus structured questions to the human
 - Aurora autopilot: bounded unattended cadence with a durable run ledger
 - Aurora provenance explainer reconstructing why any artifact exists
 - Embedding-backed semantic memory recall
@@ -1033,6 +1034,19 @@ work. It never overwrites a human verdict, never resolves a plan that is merely 
 marks the decision executed instead), and supports a dry run that shows exactly what would be written.
 Each record keeps its evidence, observed value, surprise and Brier score, so every calibration number
 traces back to the execution behind it.
+
+## Managed settings and asking the human
+
+Settings merge through six published layers — defaults, user, project, project-local, runtime, managed —
+and every effective value reports the layer that produced it *and* every layer that had an opinion. The
+managed layer is an absolute floor: what it sets is locked, a lower layer's override is recorded as
+overridden rather than dropped, and a managed array replaces instead of merging so an administrator's
+deny list cannot be widened or narrowed from below. Two enforcement points prove it is not advisory: a
+permission-mode ceiling `session.mode.set` refuses to exceed, and a deny list applied as a policy layer.
+
+`user.ask` lets an uncertain agent ask rather than guess: two to six options, bounded outstanding
+questions, opt-in free text, attributed answers, and a timeout that returns `timedOut` instead of an
+invented choice. `dontAsk` denies it; plan mode allows it, because asking changes nothing.
 
 ## Supply-chain trust
 

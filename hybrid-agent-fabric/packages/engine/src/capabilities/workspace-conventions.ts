@@ -7,6 +7,7 @@ import type { SessionLifecycleService } from "../runtime/session-lifecycle.js";
 import type { SubagentDefinitionService } from "../knowledge/subagent-definitions.js";
 import type { SessionEffortService } from "../policy/session-effort.js";
 import type { WorktreeService } from "../repositories/worktree-service.js";
+import type { UserQuestionService } from "../runtime/user-questions.js";
 import { reviewVerdict, type WorkingTreeReviewService } from "../repositories/working-tree-review.js";
 import { auroraDefined } from "../util/aurora-state.js";
 import { defineCapability } from "./schema.js";
@@ -263,6 +264,50 @@ export function worktreeCapabilities(service: WorktreeService) {
       { id: "worktree.remove", version: "1.0.0", description: "Remove a worktree inside the engine workspace root. A session can never remove the tree it runs in.", risk: "privileged", sideEffect: true, source: "core" },
       z.object({ path: z.string().min(1).max(4096), force: z.boolean().optional() }),
       async (input, ctx) => await service.remove(auroraDefined({ workspacePath: ctx.workspacePath, path: input.path, force: input.force, signal: ctx.signal })),
+    ),
+  ];
+}
+
+/** Structured questions to the human: bounded, attributed, and never answered by default. */
+export function userQuestionCapabilities(service: UserQuestionService) {
+  return [
+    defineCapability(
+      { id: "user.ask", version: "1.0.0", description: "Ask the human a bounded multiple-choice question and wait for the answer. A timeout returns timedOut, never a guessed answer.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({
+        question: z.string().min(1).max(2000),
+        context: z.string().max(10_000).optional(),
+        options: z.array(z.object({ label: z.string().min(1).max(200), description: z.string().max(1000).optional() })).min(2).max(6),
+        allowFreeText: z.boolean().optional(),
+        timeoutMs: z.number().int().min(5000).max(1_800_000).optional(),
+      }),
+      async (input, ctx) => {
+        const asked = await service.ask(auroraDefined({ tenantId: ctx.tenantId, sessionId: ctx.sessionId, ...input }));
+        const chosen = asked.answer?.optionId ? asked.options.find((item) => item.id === asked.answer?.optionId) : undefined;
+        return {
+          questionId: asked.id,
+          status: asked.status,
+          timedOut: asked.status === "timed-out",
+          ...(chosen ? { chosen: { id: chosen.id, label: chosen.label } } : {}),
+          ...(asked.answer?.text ? { text: asked.answer.text } : {}),
+          answeredBy: asked.answer?.answeredBy ?? null,
+        };
+      },
+    ),
+    defineCapability(
+      { id: "user.questions", version: "1.0.0", description: "List questions asked in this session and their answers.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({ pendingOnly: z.boolean().optional(), limit: z.number().int().min(1).max(500).optional() }),
+      async (input, ctx) => ({ questions: service.list(auroraDefined({ tenantId: ctx.tenantId, sessionId: ctx.sessionId, ...input })) }),
+    ),
+  ];
+}
+
+/** Layered settings: what is effective, which layer produced it, and what an administrator locked. */
+export function settingsCapabilities(service: { effective(input: { tenantId: string; workspacePath?: string }): Promise<unknown> }) {
+  return [
+    defineCapability(
+      { id: "settings.effective", version: "1.0.0", description: "The effective settings for this session with per-key provenance, plus the keys an administrator locked.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({}),
+      async (_input, ctx) => await service.effective({ tenantId: ctx.tenantId, workspacePath: ctx.workspacePath }),
     ),
   ];
 }

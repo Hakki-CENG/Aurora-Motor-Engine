@@ -153,8 +153,8 @@ import {
 import { discoveryCapabilities } from "./capabilities/discovery.js";
 import {
   effortCapabilities, lifecycleHookCapabilities, projectInstructionCapabilities, repositoryCommandCapabilities,
-  reviewCapabilities, sessionLifecycleCapabilities, sessionModeCapabilities, subagentCapabilities,
-  worktreeCapabilities,
+  reviewCapabilities, sessionLifecycleCapabilities, sessionModeCapabilities, settingsCapabilities,
+  subagentCapabilities, userQuestionCapabilities, worktreeCapabilities,
 } from "./capabilities/workspace-conventions.js";
 import { LifecycleHookService } from "./policy/lifecycle-hooks.js";
 import { SessionModePolicyEngine, SessionModeService } from "./policy/session-modes.js";
@@ -165,6 +165,8 @@ import { WorkingTreeReviewService } from "./repositories/working-tree-review.js"
 import { WorktreeService } from "./repositories/worktree-service.js";
 import { SessionEffortService } from "./policy/session-effort.js";
 import { ManifestTrustService } from "./security/manifest-trust.js";
+import { SettingsResolver } from "./policy/settings-resolver.js";
+import { UserQuestionService } from "./runtime/user-questions.js";
 import { SessionLifecycleService } from "./runtime/session-lifecycle.js";
 import { memoryGraphCapabilities } from "./capabilities/memory-graph.js";
 import { multiWorldCapabilities, worldModelCapabilities } from "./capabilities/world-model.js";
@@ -195,6 +197,8 @@ export interface EngineConfig {
   experienceDistillation?: { onSessionClose?: boolean };
   /** Deterministic operator hooks at the capability boundary and session lifecycle. Enabled by default. */
   lifecycleHooks?: { enabled?: boolean };
+  /** Absolute enterprise settings floor. Anything it sets cannot be relaxed from below. */
+  managedSettingsPath?: string;
   /** Default per-session effort level; sessions may still set their own. */
   effort?: { defaultLevel?: "low" | "medium" | "high" | "xhigh" | "max" };
   /** Named permission and sandbox modes per session, with the tenant default and bypass switch. */
@@ -350,6 +354,8 @@ export class HybridAgentEngine {
   readonly worktrees: WorktreeService;
   readonly sessionEffort: SessionEffortService;
   readonly manifestTrust: ManifestTrustService;
+  readonly settings: SettingsResolver;
+  readonly userQuestions: UserQuestionService;
   readonly subagents: SubagentDefinitionService;
   readonly sessionLifecycle: SessionLifecycleService;
 
@@ -436,11 +442,27 @@ export class HybridAgentEngine {
     });
     this.projectInstructions = new ProjectInstructionService(Date.now, config.projectInstructions ?? {});
     this.sessionEffort = new SessionEffortService(dataRoot, Date.now, config.effort ?? {});
+    this.settings = new SettingsResolver({ managedPath: config.managedSettingsPath ?? process.env.HAF_MANAGED_SETTINGS });
+    this.userQuestions = new UserQuestionService();
     this.repositoryCommands = new RepositoryCommandService();
     const policyLayers: PolicyEngine[] = [localPolicy];
     if (config.opa) policyLayers.push(new OpaPolicyEngine(config.opa));
     if (config.lifecycleHooks?.enabled !== false) policyLayers.push(this.lifecycleHooks.policyLayer());
     if (this.auroraPolicy) policyLayers.push(this.auroraPolicy);
+    policyLayers.push({
+      decide: async (input) => {
+        try {
+          const denied = await this.settings.value<string[]>({ tenantId: input.context.tenantId, key: "deniedCapabilities", workspacePath: input.context.workspacePath });
+          const list = Array.isArray(denied.value) ? denied.value : [];
+          if (list.includes(input.descriptor.id)) {
+            return { decision: "deny", reasonCode: "managed_denied_capability", message: `${input.descriptor.id} is denied by ${denied.locked ? "managed" : denied.layer} settings.` };
+          }
+        } catch {
+          // Unreadable settings must never widen authority; they simply add no denial.
+        }
+        return { decision: "allow", reasonCode: "managed_settings_allow", message: "No managed denial applies." };
+      },
+    });
     const layered = policyLayers.length > 1 ? new LayeredPolicyEngine(policyLayers) : localPolicy;
     // The mode dial wraps the whole stack: it may tighten anything, and may relax only base-policy
     // approval requirements — never a governance decision.
@@ -448,6 +470,15 @@ export class HybridAgentEngine {
       ...(config.sessionModes?.defaultPermissionMode ? { defaultPermissionMode: config.sessionModes.defaultPermissionMode } : {}),
       ...(config.sessionModes?.defaultSandboxMode ? { defaultSandboxMode: config.sessionModes.defaultSandboxMode } : {}),
       ...(config.sessionModes?.allowBypass !== undefined ? { allowBypass: config.sessionModes.allowBypass } : {}),
+    });
+    // Managed settings are an administrator floor: a permission ceiling sessions cannot exceed, and a
+    // deny list nothing below the managed layer can shrink.
+    this.sessionModes.bindCeiling(async (tenantId) => {
+      const resolved = await this.settings.value<string>({ tenantId, key: "permissionModeCeiling" });
+      const value = resolved.value;
+      return value && ["plan", "manual", "acceptEdits", "auto", "dontAsk", "bypass"].includes(value)
+        ? value as "plan" | "manual" | "acceptEdits" | "auto" | "dontAsk" | "bypass"
+        : undefined;
     });
     const policy = new SessionModePolicyEngine(layered, this.sessionModes);
     this.capabilities = new CapabilityBroker(policy, this.approvals, effects, this.hooks);
@@ -608,6 +639,7 @@ export class HybridAgentEngine {
       },
       onSessionClose: async (sessionId) => {
         await this.kernels.close(sessionId);
+        this.userQuestions.cancelForSession(sessionId, "session closed");
         try {
           const closing = await this.supervisor.getSession(sessionId);
           await this.lifecycleHooks.run({ tenantId: closing.tenantId, event: "session.stop", subject: sessionId });
@@ -851,6 +883,8 @@ export class HybridAgentEngine {
     for (const capability of subagentCapabilities(this.subagents)) this.capabilities.register(capability);
     for (const capability of effortCapabilities(this.sessionEffort)) this.capabilities.register(capability);
     for (const capability of worktreeCapabilities(this.worktrees)) this.capabilities.register(capability);
+    for (const capability of userQuestionCapabilities(this.userQuestions)) this.capabilities.register(capability);
+    for (const capability of settingsCapabilities(this.settings)) this.capabilities.register(capability);
     for (const capability of sessionLifecycleCapabilities(this.sessionLifecycle)) this.capabilities.register(capability);
     // Registered last so the catalog it searches already contains everything else.
     for (const capability of discoveryCapabilities(() => this.capabilities.list())) this.capabilities.register(capability);

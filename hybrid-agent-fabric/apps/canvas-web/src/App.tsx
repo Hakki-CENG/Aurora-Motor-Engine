@@ -74,6 +74,7 @@ export function App() {
   const [sessionMode, setSessionMode] = useState<any>(null);
   const [sessionCost, setSessionCost] = useState<any>(null);
   const [sessionEffort, setSessionEffort] = useState<any>(null);
+  const [questions, setQuestions] = useState<any[]>([]);
   const [tab, setTab] = useState<Tab>("chat");
   const [prompt, setPrompt] = useState("");
   const [promptImages, setPromptImages] = useState<Array<{path:string;mimeType:string;sha256:string;fileName:string}>>([]);
@@ -143,7 +144,11 @@ export function App() {
     try { setSessionMode(await api<any>(`/v1/sessions/${id}/mode`)); } catch { setSessionMode(null); }
     try { setSessionCost(await api<any>(`/v1/sessions/${id}/cost`)); } catch { setSessionCost(null); }
     try { setSessionEffort(await api<any>(`/v1/sessions/${id}/effort`)); } catch { setSessionEffort(null); }
+    try { setQuestions((await api<any>(`/v1/questions?tenantId=local&sessionId=${id}&pendingOnly=true`)).questions); } catch { setQuestions([]); }
   }, [activeId]);
+  const answerQuestion = useCallback(async (questionId: string, optionId: string) => {
+    try { await api(`/v1/questions/${encodeURIComponent(questionId)}/answer`, { method: "POST", body: JSON.stringify({ optionId, answeredBy: "canvas-operator" }) }); await loadSessionMode(activeId); } catch (cause) { showError(cause); }
+  }, [activeId, showError]);
   const changeEffort = useCallback(async (level: string) => {
     if (!activeId) return;
     try { await api(`/v1/sessions/${activeId}/effort`, { method: "POST", body: JSON.stringify({ level, actor: "canvas-operator" }) }); await loadSessionMode(activeId); } catch (cause) { showError(cause); }
@@ -323,6 +328,7 @@ export function App() {
       </>}
     </main>
     <aside className="inspector">
+      <section><h3>Questions</h3>{questions.length ? questions.map((item) => <div className="approval" key={item.id}><b>{item.question}</b><small>{item.context ?? "waiting for an answer"}</small><div>{item.options.map((option:any)=><button key={option.id} onClick={() => void answerQuestion(item.id, option.id)}>{option.label}</button>)}</div></div>) : <p className="muted">No open questions.</p>}</section>
       <section><h3>Approvals</h3>{approvals.length ? approvals.map((item) => <div className="approval" key={item.id}><b>{item.capabilityId}</b><small>{item.risk}</small><pre>{JSON.stringify(item.argumentsPreview,null,2)}</pre><div><button onClick={() => resolveApproval(item.id,"approve_once")}><CheckCircle2 size={13}/>Once</button><button onClick={() => resolveApproval(item.id,"deny")} className="danger"><XCircle size={13}/>Deny</button></div></div>) : <p className="muted">No pending approvals.</p>}</section>
       <section><h3>Agent family</h3>{roster.length ? <>{roster.map((item) => <button className="child" key={item.sessionId} onClick={() => setActiveId(item.sessionId)}><Bot size={14}/><span><b>{item.name}</b><small>{item.relationship} · {item.status}</small></span></button>)}<div className="family-composer"><select value={familyTarget} onChange={e=>setFamilyTarget(e.target.value)}>{roster.map(item=><option key={item.sessionId} value={item.sessionId}>{item.relationship}: {item.name}</option>)}</select><select value={familyMode} onChange={e=>setFamilyMode(e.target.value)}><option value="auto">Auto</option><option value="steer">Steer</option><option value="follow_up">Follow up</option></select><textarea value={familyMessage} onChange={e=>setFamilyMessage(e.target.value)} placeholder="Message a reachable agent…"/><button onClick={sendFamilyMessage} disabled={!familyMessage.trim()||!familyTarget}><Send size={13}/>Send</button></div></> : <p className="muted">No directly reachable agents.</p>}{inbox.length>0&&<p className="inbox-warning"><MessageSquare size={13}/>{inbox.length} queued or uncertain messages</p>}</section>
       <section><h3>Runtime</h3><dl><dt>Profile</dt><dd>{session?.agentProfile?`${session.agentProfile.name} v${session.agentProfile.version}`:"none"}</dd><dt>Model</dt><dd>{session?.modelName ?? "default"}</dd><dt>Fallbacks</dt><dd>{session?.modelFallbacks?.length ?? 0}</dd><dt>Open tasks</dt><dd>{session?.tasks?.filter(task=>!["done","cancelled"].includes(task.status)).length ?? 0}</dd><dt>Sequence</dt><dd>{session?.lastSequence ?? 0}</dd><dt>Fleet events</dt><dd>{metrics?.eventsTotal ?? 0}</dd></dl></section>

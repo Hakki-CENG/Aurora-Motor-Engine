@@ -1,0 +1,60 @@
+# Peer-system gap audit, round two — 2026-08-20
+
+The first audit (`peer-system-gap-audit-2026-08-20.md`) is closed: all twelve gaps were implemented in
+1.50.0 – 1.55.0. This is a **fresh** comparison against what the peers shipped most recently, rather than
+a re-read of the old list.
+
+## 1. What changed on the other side since the first audit
+
+| Peer | Recent capability | Source |
+|---|---|---|
+| OpenAI Codex | Opt-in **MCP 2026-07-28** support: paginated discovery, multi-round requests, non-blocking server startup (0.147.0) | Codex release notes, Aug 2026 |
+| MCP spec | **Stateless-first revision**: `initialize` handshake and `Mcp-Session-Id` removed, `server/discover` added, elicitation replaced by Multi Round-Trip Requests, mandatory `MCP-Protocol-Version` / `Mcp-Method` / `Mcp-Name` headers, cacheable listings | MCP 2026-07-28 specification |
+| Claude Code | **Managed settings** as an absolute enterprise floor (file, MDM plist, HKLM), `allowManagedMcpServersOnly`, `allowManagedDomainsOnly`, settings-source reporting in `/status` | Claude Code docs, enterprise guides |
+| Claude Code | **`AskUserQuestion`** as a first-class tool, explicitly denied under `dontAsk` | Claude Code subagent docs |
+| Claude Code | Background-task control surface: `Monitor`, `TaskStop`, `SendMessage`, `BashOutput`, `KillShell`, auto-resume of a subagent that receives a message | Claude Code tool reference |
+| Claude Code | `EnterPlanMode` / `ExitPlanMode` as tools the model itself can call mid-session | Claude Code tool reference |
+| Codex | Automated approvals (`--approve-for-me`), agent plugins searchable across local/personal/workspace/remote catalogs | Codex release notes |
+
+## 2. Gaps, ranked
+
+### P0
+
+| # | Gap | Why it matters | Status |
+|---|---|---|---|
+| N1 | **MCP 2026-07-28 stateless client**: `server/discover`, routing headers, cacheable listings, Multi Round-Trip Requests, no session id | The ecosystem's servers are migrating now. A client stuck on the handshake revision loses access to new servers, and MRTR is how mid-call confirmation works without a held-open stream | Planned (next) |
+| N2 | **Managed settings floor with provenance**: a layered settings tree where an enterprise layer cannot be relaxed by any lower layer or flag, and every effective value reports which layer produced it | This is the difference between "approved for use" and "blocked by security" in procurement. Aurora has strong per-tenant governance but no immovable admin floor and no answer to "why is this setting what it is?" | **Done in 1.56.0** |
+| N3 | **Structured user questions**: an agent asking the human a bounded question with options and waiting for the answer | Aurora can request *approval* for an action, but it cannot ask "which of these three?" — so an uncertain agent either guesses or stops | **Done in 1.56.0** |
+
+### P1
+
+| # | Gap | Why it matters | Status |
+|---|---|---|---|
+| N4 | Background-task control surface: list running child work, stop one, message one, and have it resume | Aurora has children, an inbox and the society bus, but no single "what is running, stop that one" surface | Planned |
+| N5 | Model-callable mode transitions (`EnterPlanMode` / `ExitPlanMode` equivalents) | Aurora's modes are operator-set; the agent itself cannot propose "let me explore first" and then hand back | Planned |
+| N6 | Long-running shell with retrievable output and a kill switch (`BashOutput` / `KillShell`) | Process execution is currently synchronous and bounded; a build or test run that outlives the call has nowhere to live | Planned |
+| N7 | Automated approval review (`--approve-for-me`): a policy that reviews and auto-answers a class of approvals with a recorded rationale | Aurora's `auto` mode is risk-class based; a reviewed-and-recorded auto-answer is a different, auditable thing | Planned |
+
+### P2 — considered and rejected
+
+- Voice input, MDM plist/registry transports, cloud execution farms: distribution and product surface, not engine capability. The managed-settings *file* layer is implemented; the OS-specific transports are packaging.
+- Deprecated MCP features (Roots, Sampling, Logging, HTTP+SSE, dynamic client registration): the spec gives them twelve months and advises against new adoption.
+
+## 3. What 1.56.0 fixes
+
+**N2 — Managed settings with provenance.** `SettingsResolver` merges six layers in a fixed order —
+`defaults`, `user`, `project` (`.aurora/settings.json`), `project-local` (`.aurora/settings.local.json`),
+`runtime`, `managed` — and returns every effective value **with the layer that produced it**. The managed
+layer is an absolute floor: any key it sets is marked `locked` and cannot be overridden by a lower layer,
+a project file or a runtime flag. Two enforcement points make it real rather than advisory: a permission
+ceiling that `session.mode.set` cannot exceed, and a managed deny list applied as a policy layer.
+
+**N3 — Structured user questions.** `user.ask` poses a bounded question with two to six options, waits
+for an answer with an explicit timeout, and returns the human's choice. A timeout returns `timedOut`
+rather than a guess; `dontAsk` denies the capability outright, matching the peer semantics, and plan mode
+allows it because asking a question changes nothing.
+
+## 4. Next steps
+
+N1 (MCP 2026-07-28 client), then N4 background-task control, N5 model-callable mode transitions, N6
+long-running shells, N7 reviewed automatic approvals.

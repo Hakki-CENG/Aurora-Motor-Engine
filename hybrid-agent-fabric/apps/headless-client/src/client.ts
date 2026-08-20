@@ -59,6 +59,8 @@ export const AURORA_VIEWS = {
   "trust-publishers": "/v1/trust/publishers",
   "trust-pins": "/v1/trust/pins",
   "trust-decisions": "/v1/trust/decisions",
+  settings: "/v1/settings/effective",
+  questions: "/v1/questions",
   "delegation-policy": "/v1/delegation-policy",
   fleet: "/v1/aurora/fleet",
   "fleet-members": "/v1/aurora/fleet/members",

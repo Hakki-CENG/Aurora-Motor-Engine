@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.56.0 — 2026-08-20
+
+A **fresh** peer comparison ([`docs/peer-system-gap-audit-round2.md`](docs/peer-system-gap-audit-round2.md))
+against what Claude Code, Codex and the MCP specification shipped most recently — not a re-read of the
+closed list. It found seven new gaps; this release closes the two that were self-contained, and the
+first (the stateless MCP revision) is scheduled next.
+
+- **Managed settings with provenance (N2).** `SettingsResolver` merges six layers in a published order
+  — `defaults`, `user`, `project` (`.aurora/settings.json`), `project-local`, `runtime`, `managed` — and
+  returns every effective value together with the layer that produced it **and every layer that had an
+  opinion**. "Why is this setting what it is?" is now answered from data instead of from source code.
+- The managed layer is an **absolute floor**: a key it sets is `locked` and cannot be relaxed by a lower
+  layer, a project file or a runtime flag. A developer's overridden value is *recorded as overridden*
+  rather than dropped silently, because someone whose setting is being ignored deserves to see that.
+  Arrays concatenate across lower layers but a managed array **replaces**: an administrator's deny list
+  must be neither extendable nor shrinkable from below.
+- Two enforcement points make it real rather than advisory: `permissionModeCeiling` is a ceiling
+  `session.mode.set` refuses to exceed (tested against a tenant that had enabled `bypass`), and
+  `deniedCapabilities` becomes a policy layer that denies with the layer named in the message.
+- Project settings are treated as the untrusted repository content they are: bounded size, bounded key
+  count, invalid key names ignored, and a malformed file becomes a warning rather than a broken session.
+- **Structured user questions (N3).** `user.ask` poses a bounded multiple-choice question and waits.
+  Aurora could always ask for *approval* of a chosen action; it could not ask "which of these three?",
+  so an uncertain agent had to guess or stop.
+- The refusals are the point: two to six options (a single option is not a question), at most three
+  outstanding per session, free text only when the question offered it, and a timeout that returns
+  `timedOut` **without inventing an answer**. Answers are attributed and timestamped. `dontAsk` denies
+  the capability outright, matching the peer semantics, while plan mode allows it because asking changes
+  nothing. Closing a session cancels its outstanding questions instead of leaving them hanging.
+- Added governed `user.ask`, `user.questions` and `settings.effective` capabilities, REST for questions
+  and effective settings, a Canvas inspector panel that answers a question with one click, and two CLI
+  views.
+- Added 12 tests (501 engine tests total) covering layer precedence and provenance, array concatenation,
+  the managed floor with recorded overrides, malformed-settings tolerance, the governed settings path,
+  question answering, timeout without a guess, all four refusals, subscriber notification with session
+  scoping, `dontAsk` denial versus plan-mode allowance, the managed permission ceiling and the managed
+  capability denial.
+
 ## 1.55.0 — 2026-08-20
 
 The peer-gap audit is now closed: G10 (signed manifests with version pinning) lands, and G9 is finished

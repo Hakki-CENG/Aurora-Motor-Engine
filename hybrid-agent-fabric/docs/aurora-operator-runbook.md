@@ -289,6 +289,34 @@ positive — it means the artefact moved.
 
 ---
 
+## 2f. Managed settings and questions
+
+```bash
+# Point the engine at an enterprise floor (or set HAF_MANAGED_SETTINGS)
+cat /etc/aurora/managed-settings.json
+{ "permissionModeCeiling": "acceptEdits", "allowBypass": false, "deniedCapabilities": ["process.exec"] }
+
+curl -H … "$HAF/v1/settings/effective?tenantId=acme&sessionId=$SESSION"
+haf-client aurora settings
+```
+
+Read `provenance` before changing anything: each key names the layer that produced it and every layer
+that tried. `locked` lists what the managed floor owns — those keys will not move for a project file, a
+personal override or a flag, and `session.mode.set` refuses a mode above `permissionModeCeiling`.
+
+Open questions from agents:
+
+```bash
+curl -H … "$HAF/v1/questions?tenantId=acme&pendingOnly=true"
+curl -H … -X POST $HAF/v1/questions/$ID/answer -d '{"optionId":"option-2","answeredBy":"alice"}'
+```
+
+A question that times out returns `timedOut` to the agent — it does **not** pick a default. If agents
+are timing out often, either nobody is watching the queue or the questions are being asked at the wrong
+moment.
+
+---
+
 ## 3. Alert playbook
 
 | Alert | Meaning | First action |
