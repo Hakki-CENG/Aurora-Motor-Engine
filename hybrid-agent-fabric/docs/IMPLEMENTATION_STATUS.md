@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-20 — current milestone 1.54
+Updated: 2026-08-20 — current milestone 1.55
 
 ## Original 1.0 baseline (delivered)
 
@@ -349,6 +349,17 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] Deliberate git worktrees for the main session, confined to the engine workspace root
 - [x] Validated git references, confined removal, no self-removal
 - [x] Worktree creation that can bind a new session in one call
+
+### Peer parity, wave six (1.55) — audit closed
+
+- [x] Ed25519 publisher registry with keys refused at registration if unusable
+- [x] Signatures over kind:artifactId:version:sha256 with four distinct outcome states
+- [x] Version and digest pinning, with drift refused despite a valid signature
+- [x] Opt-in enforcement per tenant, with verdicts recorded while still advisory
+- [x] Skills hub gated before download
+- [x] Agent profile id on the capability context
+- [x] Hook rules scoped to agent profiles
+- [x] Subagent files declaring their own lifecycle hooks
 
 ## Required for full target parity
 

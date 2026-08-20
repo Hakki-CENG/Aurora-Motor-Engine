@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.55.0 — 2026-08-20
+
+The peer-gap audit is now closed: G10 (signed manifests with version pinning) lands, and G9 is finished
+with per-agent lifecycle hooks.
+
+- **Supply-chain trust (G10).** The skills hub already checked a bundle's SHA-256 against its index
+  entry, which proves the bytes match what the index said and nothing about who wrote the index.
+  `ManifestTrustService` adds the missing half: Ed25519 publisher keys registered by an administrator,
+  signatures over `kind:artifactId:version:sha256`, and per-artefact version pins.
+- Outcomes are reported separately rather than collapsed into "failed": a signature can be `valid`,
+  `invalid`, `absent` or from an `unknown-publisher`, and a pin can be `matched`, `mismatched` or
+  `absent`. A **valid signature over a different version is still refused** — that combination is
+  precisely what a supply-chain attack looks like, and the test proves it is caught.
+- Enforcement is opt-in per tenant (`requireSignature`, `requirePin`) and defaults to off, because
+  switching it on without a key registry would break every existing install. Until it is on, the verdict
+  is still computed and recorded, so an operator can see exactly what *would* be refused before flipping
+  the switch. Non-Ed25519 keys are refused at registration rather than at install time, and the
+  publisher listing exposes a key digest, never the key.
+- The skills hub consults the gate **before downloading a byte**: a refused artefact is never fetched,
+  let alone extracted.
+- **Per-agent lifecycle hooks (G9 complete).** `CapabilityContext` now carries the agent profile a call
+  runs under, hook rules accept `agentProfileIds`, and a subagent file can declare
+  `hooks: tool.pre:deny:filesystem.write`. Materialising the agent creates those rules scoped to its
+  profile, so they bite for that subagent and are inert for every other session — verified by a test
+  that denies the write under the profile and allows it without.
+- Added REST for publishers, pins, policy, verdicts and ad-hoc evaluation, plus three CLI views.
+- Added 7 tests (489 engine tests total) covering signature verification and forgery rejection, the four
+  distinct signature states, pin drift refused despite a valid signature, verdict recording with no key
+  leakage, non-Ed25519 and malformed-digest refusals, the enforcement wrapper, and profile-scoped hooks.
+
 ## 1.54.0 — 2026-08-20
 
 Peer-gap audit, wave five: G11 (per-session effort) and G12 (worktrees for the main session).

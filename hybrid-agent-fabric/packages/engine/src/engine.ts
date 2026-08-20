@@ -164,6 +164,7 @@ import { SubagentDefinitionService } from "./knowledge/subagent-definitions.js";
 import { WorkingTreeReviewService } from "./repositories/working-tree-review.js";
 import { WorktreeService } from "./repositories/worktree-service.js";
 import { SessionEffortService } from "./policy/session-effort.js";
+import { ManifestTrustService } from "./security/manifest-trust.js";
 import { SessionLifecycleService } from "./runtime/session-lifecycle.js";
 import { memoryGraphCapabilities } from "./capabilities/memory-graph.js";
 import { multiWorldCapabilities, worldModelCapabilities } from "./capabilities/world-model.js";
@@ -348,6 +349,7 @@ export class HybridAgentEngine {
   readonly worktreeReview: WorkingTreeReviewService;
   readonly worktrees: WorktreeService;
   readonly sessionEffort: SessionEffortService;
+  readonly manifestTrust: ManifestTrustService;
   readonly subagents: SubagentDefinitionService;
   readonly sessionLifecycle: SessionLifecycleService;
 
@@ -460,7 +462,8 @@ export class HybridAgentEngine {
     });
     this.memory = new MemoryStore(dataRoot);
     this.skills = new SkillRegistry(dataRoot);
-    this.skillsHub = new SkillsHub(dataRoot, this.skills);
+    this.manifestTrust = new ManifestTrustService(dataRoot);
+    this.skillsHub = new SkillsHub(dataRoot, this.skills, this.manifestTrust);
     this.learning = new LearningGovernor(dataRoot, this.memory, this.skills, this.knowledgeIndex);
     this.refinements = new RefinementService(dataRoot, this.learning, this.events);
     const externalMemoryProvider = config.externalMemory?.provider === "honcho"
@@ -628,7 +631,9 @@ export class HybridAgentEngine {
       defaultModel: () => modelName ?? this.models.list()[0],
     });
     this.society = new AgentSocietyService(dataRoot, this.supervisor, this.agentProfiles, this.events);
-    this.subagents = new SubagentDefinitionService({ capabilities: this.capabilities, profiles: this.agentProfiles, society: this.society });
+    this.subagents = new SubagentDefinitionService({
+      capabilities: this.capabilities, profiles: this.agentProfiles, society: this.society, hooks: this.lifecycleHooks,
+    });
     this.cognitive = new CognitiveWorkspaceService(dataRoot);
     this.worldModel = new WorldModelService(dataRoot);
     this.multiWorld = new MultiWorldModelService(dataRoot);

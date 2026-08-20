@@ -270,6 +270,25 @@ sessions refuse everything except `session.close`; restore before resuming work.
 
 ---
 
+## 2e. Supply-chain trust
+
+```bash
+curl -H … -X POST $HAF/v1/trust/publishers \
+  -d '{"id":"acme","name":"Acme Tools","publicKey":"-----BEGIN PUBLIC KEY-----…"}'
+curl -H … -X POST $HAF/v1/trust/pins \
+  -d '{"kind":"skill","artifactId":"hub:formatter","version":"1.2.0","sha256":"…"}'
+curl -H … "$HAF/v1/trust/decisions?limit=20"     # what would be refused, before you enforce
+curl -H … -X POST $HAF/v1/trust/policy -d '{"tenantId":"acme","requireSignature":true,"requirePin":true}'
+haf-client aurora trust-decisions
+```
+
+Roll it out in that order: register keys, pin what you already run, read the recorded verdicts until
+they are all `allowed`, then turn enforcement on. Turning `requireSignature` on first will refuse every
+unsigned artefact you already depend on. A `mismatched` pin with a `valid` signature is not a false
+positive — it means the artefact moved.
+
+---
+
 ## 3. Alert playbook
 
 | Alert | Meaning | First action |

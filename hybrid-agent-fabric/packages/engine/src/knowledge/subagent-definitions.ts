@@ -31,6 +31,8 @@ export interface SubagentDefinition {
   permissionMode?: (typeof PERMISSION_MODES)[number];
   maxTurns?: number;
   roleId?: string;
+  /** `event:action:capabilityGlob` triples, materialised as hook rules scoped to this agent. */
+  hooks: Array<{ event: string; action: string; capabilityIds: string[] }>;
   digest: string;
   screened: boolean;
   screeningFindings: string[];
@@ -71,6 +73,14 @@ export class SubagentDefinitionService {
       capabilities: { list(): CapabilityDescriptor[] };
       profiles: AgentProfileRegistry;
       society: AgentSocietyService;
+      /** Optional: materialise per-agent lifecycle hooks alongside the profile. */
+      hooks?: {
+        define(input: {
+          tenantId: string; id?: string; event: "session.start" | "session.stop" | "prompt.submit" | "tool.pre" | "tool.post";
+          description: string; action: "allow" | "warn" | "require_approval" | "deny"; reason: string;
+          capabilityIds?: string[]; agentProfileIds?: string[];
+        }): Promise<{ id: string }>;
+      };
     },
     private readonly now: () => number = Date.now,
   ) {}
@@ -145,7 +155,7 @@ export class SubagentDefinitionService {
    * re-materialising updates the profile in place instead of accumulating duplicates.
    */
   async materialize(input: { tenantId: string; workspacePath: string; name: string; bindRole?: boolean }): Promise<{
-    definition: SubagentDefinition; resolved: ResolvedSubagent; profile: AgentProfileRecord; boundRoleId?: string;
+    definition: SubagentDefinition; resolved: ResolvedSubagent; profile: AgentProfileRecord; boundRoleId?: string; hookIds?: string[];
   }> {
     const tenantId = auroraText(input.tenantId, 200, "Tenant ID");
     const definition = await this.definition(input.workspacePath, input.name);
@@ -192,7 +202,32 @@ export class SubagentDefinitionService {
       }
     }
 
-    return { definition, resolved, profile, ...(boundRoleId ? { boundRoleId } : {}) };
+    // Per-agent hooks: scoped to this profile, so they are inert for every other session.
+    const hookIds: string[] = [];
+    if (this.deps.hooks) {
+      const events = new Set(["session.start", "session.stop", "prompt.submit", "tool.pre", "tool.post"]);
+      const actions = new Set(["allow", "warn", "require_approval", "deny"]);
+      for (const [index, hook] of definition.hooks.entries()) {
+        if (!events.has(hook.event) || !actions.has(hook.action)) continue;
+        try {
+          const created = await this.deps.hooks.define({
+            tenantId,
+            id: `agent-${definition.name}-${index + 1}`,
+            event: hook.event as "tool.pre",
+            description: `Declared by subagent "${definition.name}" (${definition.path}).`,
+            action: hook.action as "deny",
+            reason: `Subagent "${definition.name}" declares this rule.`,
+            ...(hook.capabilityIds.length ? { capabilityIds: hook.capabilityIds } : {}),
+            agentProfileIds: [profile.id],
+          });
+          hookIds.push(created.id);
+        } catch {
+          // A malformed hook line disables itself; it never blocks materialising the agent.
+        }
+      }
+    }
+
+    return { definition, resolved, profile, ...(boundRoleId ? { boundRoleId } : {}), ...(hookIds.length ? { hookIds } : {}) };
   }
 
   /** Materialise every screened definition in the workspace. Failures are skipped, never fatal. */
@@ -272,7 +307,7 @@ function parseAgentFile(raw: string, fileName: string): Omit<SubagentDefinition,
     .filter(Boolean)
     .slice(0, 100);
 
-  const known = new Set(["name", "description", "tools", "disallowedtools", "model", "permissionmode", "maxturns", "role", "roleid"]);
+  const known = new Set(["name", "description", "tools", "disallowedtools", "model", "permissionmode", "maxturns", "role", "roleid", "hooks"]);
   const unsupportedFields = [...fields.keys()].filter((key) => !known.has(key));
   const permission = (fields.get("permissionmode") ?? "").trim() as (typeof PERMISSION_MODES)[number];
   const maxTurns = Number(fields.get("maxturns"));
@@ -287,6 +322,10 @@ function parseAgentFile(raw: string, fileName: string): Omit<SubagentDefinition,
     ...(PERMISSION_MODES.includes(permission) ? { permissionMode: permission } : {}),
     ...(Number.isInteger(maxTurns) && maxTurns > 0 ? { maxTurns: auroraInteger(maxTurns, 1, 1000, "Max turns") } : {}),
     ...(fields.get("roleid") ?? fields.get("role") ? { roleId: (fields.get("roleid") ?? fields.get("role"))!.trim() } : {}),
+    hooks: listOf(fields.get("hooks")).map((entry) => {
+      const [event, action, ...globs] = entry.split(":").map((part) => part.trim()).filter(Boolean);
+      return { event: event ?? "", action: action ?? "", capabilityIds: globs };
+    }).filter((entry) => entry.event && entry.action),
     unsupportedFields,
   };
 }

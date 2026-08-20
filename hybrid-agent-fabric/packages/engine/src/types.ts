@@ -204,6 +204,8 @@ export interface CapabilityContext {
   source: InputSource;
   workspacePath: string;
   allowedCapabilityIds?: string[];
+  /** The agent profile this call runs under, so a hook can be scoped to one subagent. */
+  agentProfileId?: string;
   signal?: AbortSignal;
   idempotencyKey: string;
 }

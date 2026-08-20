@@ -20,6 +20,8 @@ export interface LifecycleHookRule {
   capabilityIds: string[];
   /** Bounded regular expression tested against the JSON-serialised arguments or prompt text. */
   argumentPattern?: string;
+  /** When present, the rule only applies to calls running under one of these agent profiles. */
+  agentProfileIds?: string[];
   action: LifecycleAction;
   reason: string;
   /**
@@ -131,7 +133,8 @@ export class LifecycleHookService {
 
   async define(input: {
     tenantId: string; event: LifecycleEvent; description: string; action: LifecycleAction; reason: string;
-    capabilityIds?: string[]; argumentPattern?: string; runCapability?: { capabilityId: string; input?: Record<string, unknown> };
+    capabilityIds?: string[]; argumentPattern?: string; agentProfileIds?: string[];
+    runCapability?: { capabilityId: string; input?: Record<string, unknown> };
     priority?: number; enabled?: boolean; id?: string;
   }): Promise<LifecycleHookRule> {
     const tenantId = auroraText(input.tenantId, 200, "Tenant ID");
@@ -149,6 +152,9 @@ export class LifecycleHookService {
         description: auroraText(input.description, 500, "Hook description"),
         capabilityIds: [...new Set((input.capabilityIds ?? []).map((item) => auroraText(item, 200, "Capability pattern")))].slice(0, 50),
         ...(pattern ? { argumentPattern: pattern } : {}),
+        ...(input.agentProfileIds?.length
+          ? { agentProfileIds: [...new Set(input.agentProfileIds.map((item) => auroraText(item, 200, "Agent profile ID")))].slice(0, 50) }
+          : {}),
         action: input.action,
         reason: auroraText(input.reason, 500, "Hook reason"),
         ...(input.runCapability
@@ -208,7 +214,7 @@ export class LifecycleHookService {
   }
 
   /** Evaluate an event. Returns the strongest action across matching rules and records every firing. */
-  async run(input: { tenantId: string; event: LifecycleEvent; subject: string; payload?: unknown }): Promise<LifecycleRunResult> {
+  async run(input: { tenantId: string; event: LifecycleEvent; subject: string; payload?: unknown; agentProfileId?: string }): Promise<LifecycleRunResult> {
     const config = await this.config(input.tenantId);
     const timestamp = new Date(this.now()).toISOString();
     if (!config.enabled) {
@@ -226,6 +232,8 @@ export class LifecycleHookService {
 
     for (const rule of rules) {
       if (!matchesCapability(rule.capabilityIds, input.subject)) continue;
+      // A profile-scoped rule is inert for every other agent, and for calls with no profile at all.
+      if (rule.agentProfileIds?.length && (!input.agentProfileId || !rule.agentProfileIds.includes(input.agentProfileId))) continue;
       if (rule.argumentPattern && !compilePattern(rule.argumentPattern).test(serialized)) continue;
 
       const firing: LifecycleFiring = {
@@ -272,6 +280,7 @@ export class LifecycleHookService {
             event: "tool.pre",
             subject: input.descriptor.id,
             payload: input.arguments,
+            ...(input.context.agentProfileId ? { agentProfileId: input.context.agentProfileId } : {}),
           });
           if (!result.matched.length) return { decision: "allow", reasonCode: "lifecycle_hook_no_match", message: "No lifecycle hook matched this call." };
           const strongestRule = result.matched.find((item) => item.action === result.decision) ?? result.matched[0]!;

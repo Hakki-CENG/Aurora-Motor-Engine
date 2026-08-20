@@ -790,6 +790,7 @@ export class SessionActor {
           ...(this.snapshot.agentProfile?.allowedCapabilityIds
             ? { allowedCapabilityIds: [...this.snapshot.agentProfile.allowedCapabilityIds] }
             : {}),
+          ...(this.snapshot.agentProfile?.id ? { agentProfileId: this.snapshot.agentProfile.id } : {}),
           signal: this.activeAbort.signal,
           idempotencyKey: `${command.commandId}:${call.id}`,
         };

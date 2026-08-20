@@ -8,7 +8,7 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.54.0
+## Current milestone — 1.55.0
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -86,6 +86,7 @@ Implemented and tested:
 - Session archive/restore with an honest cost surface, and repository command templates
 - Deterministic working-tree review and declarative subagent files resolved onto profiles and roles
 - Per-session effort levels that move both provider reasoning and harness budgets, and deliberate git worktrees
+- Signed artefact manifests with Ed25519 publisher keys, version pinning and per-agent lifecycle hooks
 - Aurora autopilot: bounded unattended cadence with a durable run ledger
 - Aurora provenance explainer reconstructing why any artifact exists
 - Embedding-backed semantic memory recall
@@ -1032,6 +1033,16 @@ work. It never overwrites a human verdict, never resolves a plan that is merely 
 marks the decision executed instead), and supports a dry run that shows exactly what would be written.
 Each record keeps its evidence, observed value, surprise and Brier score, so every calibration number
 traces back to the execution behind it.
+
+## Supply-chain trust
+
+A digest check proves the bytes match the index; it says nothing about who wrote the index. Publishers
+register Ed25519 keys, sign `kind:artifactId:version:sha256`, and tenants pin the exact version and
+digest they approved. A valid signature over a *different* version is still refused, because that is
+what a supply-chain attack looks like. Signature and pin states are reported separately — `valid`,
+`invalid`, `absent`, `unknown-publisher`; `matched`, `mismatched`, `absent` — and enforcement is opt-in
+per tenant, with verdicts recorded even while it is off so an operator can see what would be refused
+before switching it on. The skills hub consults the gate before downloading anything.
 
 ## Effort and worktrees
 
