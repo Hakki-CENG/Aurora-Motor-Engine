@@ -13,10 +13,12 @@ export interface AuroraContextBudget {
   knowledgeChars?: number;
   /** Recalled Aurora memory-graph entries. */
   memoryChars?: number;
+  /** Repository instruction files (AGENTS.md, CLAUDE.md, …). */
+  instructionChars?: number;
 }
 
 export interface AuroraContextSection {
-  section: "constitution" | "harness" | "knowledge" | "memory";
+  section: "constitution" | "harness" | "knowledge" | "memory" | "instructions";
   characters: number;
   items: number;
   omitted: number;
@@ -35,6 +37,8 @@ export interface AuroraContextRequest {
   sessionId?: string;
   query?: string;
   touchedPaths?: string[];
+  /** When present, repository instruction files are discovered from this workspace. */
+  workspacePath?: string;
 }
 
 const DEFAULTS: Required<AuroraContextBudget> = {
@@ -42,6 +46,7 @@ const DEFAULTS: Required<AuroraContextBudget> = {
   harnessChars: 2500,
   knowledgeChars: 3500,
   memoryChars: 2000,
+  instructionChars: 4000,
 };
 
 /**
@@ -64,6 +69,8 @@ export class AuroraContextComposer {
       harness: ContinualHarnessService;
       microagents: MicroagentRegistry;
       memoryGraph: MemoryGraphService;
+      /** Optional: repository instruction files for the session's workspace. */
+      instructions?: { project(input: { workspacePath: string; characterBudget?: number }): Promise<{ text: string; characters: number; files: Array<{ path: string }>; omitted: string[]; quarantined: Array<{ path: string }> }> };
     },
     private readonly budget: AuroraContextBudget = {},
     private readonly now: () => number = Date.now,
@@ -75,9 +82,29 @@ export class AuroraContextComposer {
       harnessChars: auroraInteger(this.budget.harnessChars ?? DEFAULTS.harnessChars, 0, 40_000, "Harness budget"),
       knowledgeChars: auroraInteger(this.budget.knowledgeChars ?? DEFAULTS.knowledgeChars, 0, 40_000, "Knowledge budget"),
       memoryChars: auroraInteger(this.budget.memoryChars ?? DEFAULTS.memoryChars, 0, 40_000, "Memory budget"),
+      instructionChars: auroraInteger(this.budget.instructionChars ?? DEFAULTS.instructionChars, 0, 40_000, "Instruction budget"),
     };
     const parts: string[] = [];
     const sections: AuroraContextSection[] = [];
+
+    // Repository instructions come first: they are the user's own house rules, and everything after
+    // them is Aurora's own state. They are still untrusted input and cannot grant authority.
+    if (budget.instructionChars >= 200 && request.workspacePath && this.deps.instructions) {
+      try {
+        const projection = await this.deps.instructions.project({ workspacePath: request.workspacePath, characterBudget: budget.instructionChars });
+        if (projection.text) {
+          parts.push(projection.text);
+          sections.push({
+            section: "instructions",
+            characters: projection.characters,
+            items: projection.files.length,
+            omitted: projection.omitted.length + projection.quarantined.length,
+          });
+        }
+      } catch {
+        // A missing or unreadable workspace must never block a turn.
+      }
+    }
 
     if (budget.constitutionChars >= 200) {
       try {

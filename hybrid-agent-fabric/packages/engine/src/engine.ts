@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { rm } from "node:fs/promises";
 import type { CommandEnvelope, CommandResult, EventEnvelope, ModelProvider, SessionSnapshot } from "./types.js";
@@ -149,6 +150,10 @@ import {
   constitutionCapabilities, harnessCapabilities, insightCapabilities, microagentCapabilities,
   orchestratorCapabilities, riskCapabilities, stuckCapabilities,
 } from "./capabilities/aurora-core.js";
+import { discoveryCapabilities } from "./capabilities/discovery.js";
+import { lifecycleHookCapabilities, projectInstructionCapabilities } from "./capabilities/workspace-conventions.js";
+import { LifecycleHookService } from "./policy/lifecycle-hooks.js";
+import { ProjectInstructionService } from "./knowledge/project-instructions.js";
 import { memoryGraphCapabilities } from "./capabilities/memory-graph.js";
 import { multiWorldCapabilities, worldModelCapabilities } from "./capabilities/world-model.js";
 import { initiativeCapabilities } from "./capabilities/initiative.js";
@@ -159,7 +164,7 @@ import { environmentCapabilities } from "./capabilities/environment.js";
 export interface EngineConfig {
   homePath: string;
   /** Aurora prompt context block: constitution, harness, microagent knowledge and memory recall. */
-  auroraContext?: { enabled?: boolean; constitutionChars?: number; harnessChars?: number; knowledgeChars?: number; memoryChars?: number };
+  auroraContext?: { enabled?: boolean; constitutionChars?: number; harnessChars?: number; knowledgeChars?: number; memoryChars?: number; instructionChars?: number };
   /** Unattended ACOS cadence. Disabled unless explicitly enabled; bounded by the autopilot ledger. */
   autopilot?: { enabled?: boolean; tenantId?: string; driverIntervalMs?: number };
   /**
@@ -176,6 +181,10 @@ export interface EngineConfig {
   auroraGovernance?: { enabled?: boolean } & AuroraPolicyOptions;
   /** Automatic candidate-only lesson extraction when a session closes. Enabled by default. */
   experienceDistillation?: { onSessionClose?: boolean };
+  /** Deterministic operator hooks at the capability boundary and session lifecycle. Enabled by default. */
+  lifecycleHooks?: { enabled?: boolean };
+  /** Discovery bounds for AGENTS.md / CLAUDE.md style repository instruction files. */
+  projectInstructions?: { maxFiles?: number; maxFileBytes?: number; maxTotalBytes?: number; maxDepth?: number };
   kernelServerScript: string;
   sandboxBackend: SandboxBackendKind;
   sshSandbox?: SshSandboxOptions;
@@ -316,6 +325,9 @@ export class HybridAgentEngine {
   readonly auroraMetrics: AuroraMetricsCollector;
   readonly dataGovernance: AuroraDataGovernanceService;
   readonly auroraPolicy: AuroraPolicyEngine | undefined;
+  readonly lifecycleHooks: LifecycleHookService;
+  private readonly hookWorkspaceRoot: string;
+  readonly projectInstructions: ProjectInstructionService;
 
   constructor(readonly config: EngineConfig) {
     const dataRoot = resolve(config.homePath, "data");
@@ -392,8 +404,16 @@ export class HybridAgentEngine {
           ...(config.auroraGovernance?.recordDecisions !== undefined ? { recordDecisions: config.auroraGovernance.recordDecisions } : {}),
         },
       );
+    // Deterministic operator hooks join the same escalation-only stack: they can add scrutiny to a
+    // capability call, never remove it. Actions run through the broker, so they stay governed.
+    this.hookWorkspaceRoot = workspaceRoot;
+    this.lifecycleHooks = new LifecycleHookService(dataRoot, {
+      execute: async (call) => await this.runHookCapability(call),
+    });
+    this.projectInstructions = new ProjectInstructionService(Date.now, config.projectInstructions ?? {});
     const policyLayers: PolicyEngine[] = [localPolicy];
     if (config.opa) policyLayers.push(new OpaPolicyEngine(config.opa));
+    if (config.lifecycleHooks?.enabled !== false) policyLayers.push(this.lifecycleHooks.policyLayer());
     if (this.auroraPolicy) policyLayers.push(this.auroraPolicy);
     const policy = policyLayers.length > 1 ? new LayeredPolicyEngine(policyLayers) : localPolicy;
     this.capabilities = new CapabilityBroker(policy, this.approvals, effects, this.hooks);
@@ -431,12 +451,13 @@ export class HybridAgentEngine {
     this.auroraContextComposer = config.auroraContext?.enabled === false
       ? undefined
       : new AuroraContextComposer(
-        { constitution: this.constitution, harness: this.harness, microagents: this.microagents, memoryGraph: this.memoryGraph },
+        { constitution: this.constitution, harness: this.harness, microagents: this.microagents, memoryGraph: this.memoryGraph, instructions: this.projectInstructions },
         {
           ...(config.auroraContext?.constitutionChars !== undefined ? { constitutionChars: config.auroraContext.constitutionChars } : {}),
           ...(config.auroraContext?.harnessChars !== undefined ? { harnessChars: config.auroraContext.harnessChars } : {}),
           ...(config.auroraContext?.knowledgeChars !== undefined ? { knowledgeChars: config.auroraContext.knowledgeChars } : {}),
           ...(config.auroraContext?.memoryChars !== undefined ? { memoryChars: config.auroraContext.memoryChars } : {}),
+          ...(config.auroraContext?.instructionChars !== undefined ? { instructionChars: config.auroraContext.instructionChars } : {}),
         },
       );
     const context = new ContextManager(this.memory, this.skills, this.learning, contextMaxChars, this.hooks, rollingCompactor, this.externalMemory, this.auroraContextComposer);
@@ -548,6 +569,12 @@ export class HybridAgentEngine {
       ...(config.modelFallbacks?.length ? { modelFallbacks: config.modelFallbacks } : {}),
       onSessionClose: async (sessionId) => {
         await this.kernels.close(sessionId);
+        try {
+          const closing = await this.supervisor.getSession(sessionId);
+          await this.lifecycleHooks.run({ tenantId: closing.tenantId, event: "session.stop", subject: sessionId });
+        } catch {
+          // A hook must never keep a session from closing.
+        }
         // Closed sessions are where lessons are cheapest to extract. Distillation only ever produces
         // candidates, so this is safe to run unattended; failures must never block session closure.
         if (this.config.experienceDistillation?.onSessionClose === false) return;
@@ -767,6 +794,10 @@ export class HybridAgentEngine {
     for (const capability of harvestCapabilities(this.harvester)) this.capabilities.register(capability);
     for (const capability of planFeedbackCapabilities(this.planFeedback)) this.capabilities.register(capability);
     for (const capability of estimationCapabilities(this.estimation)) this.capabilities.register(capability);
+    for (const capability of projectInstructionCapabilities(this.projectInstructions)) this.capabilities.register(capability);
+    for (const capability of lifecycleHookCapabilities(this.lifecycleHooks)) this.capabilities.register(capability);
+    // Registered last so the catalog it searches already contains everything else.
+    for (const capability of discoveryCapabilities(() => this.capabilities.list())) this.capabilities.register(capability);
     for (const capability of probationCapabilities(this.delegation)) this.capabilities.register(capability);
     this.auroraMetrics = new AuroraMetricsCollector({
       cognitive: this.cognitive, memoryGraph: this.memoryGraph, worldModel: this.worldModel,
@@ -956,6 +987,25 @@ export class HybridAgentEngine {
     this.scheduler.start();
     this.otlp?.start();
     this.outboundChannels.startAll();
+  }
+
+  /**
+   * Run a lifecycle-hook action through the normal capability path. Hook side effects are governed
+   * like everything else: policy, approval and the effect journal all apply, and the synthetic
+   * context is clearly labelled so an audit can tell hook traffic from agent traffic.
+   */
+  private async runHookCapability(call: { tenantId: string; capabilityId: string; input: Record<string, unknown>; reason: string }): Promise<unknown> {
+    const callId = randomUUID();
+    return await this.capabilities.execute(call.capabilityId, call.input, {
+      tenantId: call.tenantId,
+      sessionId: callId,
+      familyId: callId,
+      turnId: callId,
+      toolCallId: callId,
+      source: "scheduler",
+      workspacePath: this.hookWorkspaceRoot,
+      idempotencyKey: `lifecycle-hook:${call.capabilityId}:${callId}`,
+    });
   }
 
   async shutdown(): Promise<void> {

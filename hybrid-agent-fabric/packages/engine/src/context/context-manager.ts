@@ -9,12 +9,14 @@ import { injectExternalMemoryContext, type ExternalMemoryProviderManager, type E
 
 /** Optional Aurora context source: constitution, harness, microagent knowledge and memory recall. */
 export interface AuroraContextSource {
-  compose(request: { tenantId: string; sessionId?: string; query?: string }): Promise<{ text: string; digest: string; characters: number; sections: Array<{ section: string; characters: number; items: number; omitted: number }> }>;
+  compose(request: { tenantId: string; sessionId?: string; query?: string; workspacePath?: string }): Promise<{ text: string; digest: string; characters: number; sections: Array<{ section: string; characters: number; items: number; omitted: number }> }>;
 }
 
 export interface FrozenSessionContext {
   tenantId?: string;
   sessionId?: string;
+  /** Needed so repository instruction files can be discovered for this session's workspace. */
+  workspacePath?: string;
   basePrompt: string;
   memorySnapshot: string;
   skillIndex: string;
@@ -49,7 +51,7 @@ export class ContextManager {
     private readonly auroraContext?: AuroraContextSource,
   ) {}
 
-  async freeze(tenantId: string, sessionId: string, profile?: SessionAgentProfile): Promise<FrozenSessionContext> {
+  async freeze(tenantId: string, sessionId: string, profile?: SessionAgentProfile, workspacePath?: string): Promise<FrozenSessionContext> {
     const localMemorySnapshot = await this.memory.frozenSnapshot(tenantId, sessionId);
     let providerMemorySnapshot = "";
     if (this.hooks) {
@@ -68,6 +70,7 @@ export class ContextManager {
     return {
       tenantId,
       sessionId,
+      ...(workspacePath ? { workspacePath } : {}),
       basePrompt: [
         "You are Hybrid Agent Fabric, a durable and policy-governed software agent.",
         "Use only the capabilities presented to you. Never claim an external action succeeded without a tool result.",
@@ -112,6 +115,7 @@ export class ContextManager {
           tenantId: frozen.tenantId,
           ...(frozen.sessionId ? { sessionId: frozen.sessionId } : {}),
           ...(latestUserText ? { query: latestUserText } : {}),
+          ...(frozen.workspacePath ? { workspacePath: frozen.workspacePath } : {}),
         });
         if (block.text) {
           systemPrompt = `${baseSystemPrompt}\n\n${block.text}`;

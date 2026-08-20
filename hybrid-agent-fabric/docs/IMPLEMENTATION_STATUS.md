@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-20 — current milestone 1.49
+Updated: 2026-08-20 — current milestone 1.50
 
 ## Original 1.0 baseline (delivered)
 
@@ -294,6 +294,18 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] Coverage gap recorded when probation blocks high-risk work
 - [x] Probation report with benched roles and the steps they block
 - [x] Estimation telemetry, bias alert, REST, Canvas and CLI surfaces
+
+### Peer parity, wave one (1.50)
+
+- [x] Repository instruction discovery (AGENTS.md, CLAUDE.md, AURORA.md, .cursorrules, copilot-instructions)
+- [x] Bounded, symlink-refusing, dependency-skipping discovery with per-file digests
+- [x] Injection screening with quarantine instead of silent injection
+- [x] Explicit precedence and budgeted projection with reported truncation
+- [x] Deterministic lifecycle hooks on session start/stop, prompt submit and tool pre/post
+- [x] Escalation-only `tool.pre` policy layer with the rule named in the refusal
+- [x] Hook actions restricted to allowlisted governed capabilities, with a recursion guard
+- [x] Durable hook firing ledger
+- [x] Tool search, describe and catalog overview for progressive disclosure
 
 ## Required for full target parity
 

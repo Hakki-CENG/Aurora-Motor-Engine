@@ -8,7 +8,7 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.49.0
+## Current milestone — 1.50.0
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -79,6 +79,9 @@ Implemented and tested:
 - Aurora outcome harvesting: delegated work scored from recorded events, with an explicit review band for ambiguity
 - Aurora plan feedback: decision outcomes derived from finished plans, so calibration reflects execution
 - Aurora estimation calibration: plan estimates corrected by measured durations, applied as auditable revisions
+- Repository instruction files (AGENTS.md/CLAUDE.md) with injection screening, precedence and budgeting
+- Deterministic lifecycle hooks that can deny at the capability boundary and only run governed actions
+- Tool search over the capability catalog for progressive disclosure
 - Aurora autopilot: bounded unattended cadence with a durable run ledger
 - Aurora provenance explainer reconstructing why any artifact exists
 - Embedding-backed semantic memory recall
@@ -1025,6 +1028,25 @@ work. It never overwrites a human verdict, never resolves a plan that is merely 
 marks the decision executed instead), and supports a dry run that shows exactly what would be written.
 Each record keeps its evidence, observed value, surprise and Brier score, so every calibration number
 traces back to the execution behind it.
+
+## Repository instructions, hooks and tool search
+
+Aurora reads the instruction file a repository ships — `AGENTS.md`, `CLAUDE.md`, `AURORA.md`,
+`.cursorrules`, `.github/copilot-instructions.md` — because that file is the user's house rules. It
+reads them defensively: bounded discovery, no symlinks, no dependency directories, injection screening
+with quarantine, explicit precedence and a character budget that includes its own framing.
+
+Deterministic hooks cover what a model must not be trusted to remember. Rules on session start/stop,
+prompt submission and tool use can warn, require approval or deny, and the `tool.pre` half joins the
+policy stack as an escalation-only layer. A hook never shells out: its action invokes an allowlisted
+governed capability, so hook effects are policed and audited like everything else.
+
+With 275 capabilities, pushing the whole catalog at a model is wasteful, so `tool.search` ranks it
+deterministically with risk and side-effect filters and `tool.describe` returns a full schema only for
+the capability actually chosen.
+
+A full comparison against Claude Code, Codex CLI, OpenHands, Hermes and Prime — including the gaps
+still open and their order — is in [`docs/peer-system-gap-audit-2026-08-20.md`](docs/peer-system-gap-audit-2026-08-20.md).
 
 ## Aurora estimation calibration
 

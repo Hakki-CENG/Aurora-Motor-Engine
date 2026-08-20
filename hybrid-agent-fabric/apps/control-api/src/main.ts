@@ -9,6 +9,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
+import { searchCapabilities } from "@haf/engine";
 import { dashboardHtml } from "./dashboard.js";
 import { IdentityService, roleAllows, type Identity, type Role } from "./auth/identity-service.js";
 import { allowlisted, PlatformJwtVerifier, verifyDiscordSignature, verifyFeishuSignature, verifyLineSignature, verifySharedSecret, verifySlackSignature, verifyWhatsAppSignature } from "./platforms/verification.js";
@@ -682,7 +683,7 @@ app.addHook("preHandler", async (request, reply) => {
   if (globalAdminPath && !identity.systemAdmin) {
     return await reply.code(403).send({ error: "system_admin_required" });
   }
-  const adminMutation = !methodIsSafe && /^\/v1\/(?:secrets|learning|agent-profiles|repositories|repository-providers|github-apps|model-oauth-sources|automation-git-sources|automation-responders|society|cognitive|memory-graph|world|multiworld|initiative|user-model|evolution|environment|constitution|harness|microagents|risk|acos|decisions|plans|experience|autopilot|checkpoints|aurora|delegations|delegation-policy|harvest-review|harvest-policy|decision-feedback|estimation|channel-routing-rules)/.test(request.url);
+  const adminMutation = !methodIsSafe && /^\/v1\/(?:secrets|learning|agent-profiles|repositories|repository-providers|github-apps|model-oauth-sources|automation-git-sources|automation-responders|society|cognitive|memory-graph|world|multiworld|initiative|user-model|evolution|environment|constitution|harness|microagents|risk|acos|decisions|plans|experience|autopilot|checkpoints|aurora|delegations|delegation-policy|harvest-review|harvest-policy|decision-feedback|estimation|hooks|channel-routing-rules)/.test(request.url);
   const required: Role = methodIsSafe ? "viewer" : adminMutation ? "admin" : "operator";
   if (!roleAllows(identityService.roleFor(identity, tenantId), required)) {
     return await reply.code(403).send({ error: "forbidden", tenantId, requiredRole: required });
@@ -1166,6 +1167,17 @@ app.get("/v1/estimation/samples", async (request) => { const q=auroraTenant.exte
 app.get("/v1/plans/:planId/estimation", async (request) => { const { planId } = z.object({ planId: z.string() }).parse(request.params); const q=auroraTenant.parse(request.query); return await engine.estimation.suggest(q.tenantId, planId); });
 app.post("/v1/plans/:planId/estimation/apply", async (request) => { const { planId } = z.object({ planId: z.string() }).parse(request.params); const b=auroraTenant.extend({minSamples:z.number().int().min(1).max(1000).optional()}).parse(request.body ?? {}); return await engine.estimation.apply(auroraInput({ tenantId: b.tenantId, planId, minSamples: b.minSamples })); });
 app.get("/v1/society/probation", async (request) => { const q=auroraTenant.parse(request.query); return await engine.delegation.probationReport(q.tenantId); });
+
+// Peer parity — repository instruction files, deterministic hooks and tool discovery
+app.get("/v1/capabilities/search", async (request) => { const q=z.object({query:z.string().min(1).max(200),risk:z.string().max(50).optional(),sideEffect:z.coerce.boolean().optional(),source:z.string().max(20).optional(),limit:z.coerce.number().int().min(1).max(50).optional()}).parse(request.query); const results = searchCapabilities(engine.capabilities.list(), auroraInput(q)); return { query: q.query, catalogSize: engine.capabilities.list().length, results }; });
+app.get("/v1/sessions/:sessionId/instructions", async (request) => { const { sessionId } = z.object({ sessionId: z.string() }).parse(request.params); const snapshot = await engine.session(sessionId); return await engine.projectInstructions.scan(snapshot.workspacePath); });
+app.get("/v1/hooks", async (request) => { const q=auroraTenant.extend({event:z.enum(["session.start","session.stop","prompt.submit","tool.pre","tool.post"]).optional()}).parse(request.query); return { rules: await engine.lifecycleHooks.rules(q.tenantId, q.event) }; });
+app.post("/v1/hooks", async (request, reply) => { const b=auroraTenant.extend({id:z.string().max(100).optional(),event:z.enum(["session.start","session.stop","prompt.submit","tool.pre","tool.post"]),description:z.string().min(1).max(500),action:z.enum(["allow","warn","require_approval","deny"]),reason:z.string().min(1).max(500),capabilityIds:z.array(z.string().min(1).max(200)).max(50).optional(),argumentPattern:z.string().max(500).optional(),runCapability:z.object({capabilityId:z.string().min(1).max(200),input:z.record(z.unknown()).optional()}).optional(),priority:z.number().int().min(1).max(1000).optional(),enabled:z.boolean().optional()}).parse(request.body); const { runCapability, ...rest } = b; return await reply.code(201).send(await engine.lifecycleHooks.define(auroraInput({ ...rest, ...(runCapability ? { runCapability: { capabilityId: runCapability.capabilityId, input: (runCapability.input ?? {}) as Record<string, unknown> } } : {}) }))); });
+app.post("/v1/hooks/:ruleId/enabled", async (request) => { const { ruleId } = z.object({ ruleId: z.string() }).parse(request.params); const b=auroraTenant.extend({enabled:z.boolean()}).parse(request.body); return await engine.lifecycleHooks.setEnabled(b.tenantId, ruleId, b.enabled); });
+app.delete("/v1/hooks/:ruleId", async (request) => { const { ruleId } = z.object({ ruleId: z.string() }).parse(request.params); const q=auroraTenant.parse(request.query); return await engine.lifecycleHooks.remove(q.tenantId, ruleId); });
+app.get("/v1/hooks/firings", async (request) => { const q=auroraTenant.extend({limit:z.coerce.number().int().min(1).max(1000).optional()}).parse(request.query); return { firings: await engine.lifecycleHooks.firings(q.tenantId, q.limit ?? 50) }; });
+app.get("/v1/hooks/config", async (request) => { const q=auroraTenant.parse(request.query); return await engine.lifecycleHooks.config(q.tenantId); });
+app.post("/v1/hooks/config", async (request) => { const b=auroraTenant.extend({enabled:z.boolean().optional(),allowCapabilityActions:z.boolean().optional(),actionAllowlist:z.array(z.string().min(1).max(200)).max(50).optional()}).parse(request.body); return await engine.lifecycleHooks.configure(auroraInput(b)); });
 app.post("/v1/harvest-policy", async (request) => { const b=auroraTenant.extend({autoRecord:z.boolean().optional(),successAtOrAbove:z.number().min(0).max(1).optional(),failBelow:z.number().min(0).max(1).optional(),settleAfterMs:z.number().int().min(0).max(86_400_000).optional(),maxPerRun:z.number().int().min(1).max(200).optional(),learnFromFailures:z.boolean().optional()}).parse(request.body); return await engine.harvester.configure(auroraInput(b)); });
 
 // Aurora role authority — least-privilege capability allowlists for the society

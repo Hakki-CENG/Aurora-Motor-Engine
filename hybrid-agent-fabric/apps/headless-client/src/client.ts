@@ -48,6 +48,8 @@ export const AURORA_VIEWS = {
   "decision-feedback-summary": "/v1/decision-feedback/summary",
   "estimation-profile": "/v1/estimation/profile",
   probation: "/v1/society/probation",
+  hooks: "/v1/hooks",
+  "hook-firings": "/v1/hooks/firings",
   "delegation-policy": "/v1/delegation-policy",
   fleet: "/v1/aurora/fleet",
   "fleet-members": "/v1/aurora/fleet/members",

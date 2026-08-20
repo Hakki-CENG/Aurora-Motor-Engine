@@ -1,5 +1,44 @@
 # Changelog
 
+## 1.50.0 — 2026-08-20
+
+Aurora was audited against the systems it competes with — Claude Code, OpenAI Codex CLI, OpenHands,
+Hermes Agent and Prime Agent — and the result is recorded in
+[`docs/peer-system-gap-audit-2026-08-20.md`](docs/peer-system-gap-audit-2026-08-20.md): where Aurora
+leads, twelve ranked gaps where it does not, and the order they will be closed in. This release closes
+the first three, which were genuinely missing primitives rather than shallower versions of something.
+
+- **Repository instruction files (G1).** `AGENTS.md`, `CLAUDE.md`, `AURORA.md`, `.cursorrules` and
+  `.github/copilot-instructions.md` are discovered from the session workspace and projected into the
+  prompt. Every peer reads one of these; ignoring them meant ignoring the user's own house rules.
+- Discovery is bounded (file count, per-file size, total size, directory depth), skips dependency and
+  build directories, confines every path to the workspace root and **refuses symlinks**, so a link
+  cannot pull a sibling tenant's workspace or `/etc/passwd` into a prompt.
+- Each file is screened for prompt injection with the same vocabulary as the microagent registry. A
+  suspicious file is **quarantined with its findings** instead of being injected — an instruction file
+  is untrusted input that happens to look authoritative. Precedence is explicit: deeper files are more
+  specific and come last, and the projection is character-budgeted (framing included) with per-file
+  digests and reported truncation.
+- **Deterministic lifecycle hooks (G2).** Operators can define rules on `session.start`,
+  `session.stop`, `prompt.submit`, `tool.pre` and `tool.post` that warn, require approval or deny,
+  matched by capability-id globs and a bounded argument pattern. A `tool.pre` rule joins the layered
+  policy stack as an **escalation-only** layer: it can add scrutiny, never grant authority another
+  layer withheld — proven by a test where an "allow" hook fails to enable disabled process execution.
+- Unlike the peers, **a hook cannot shell out**. Its optional action invokes an allowlisted *governed
+  capability*, so hook side effects pass policy, approval, the effect journal and the audit trail like
+  anything else. Actions are inert until a tenant enables them and allowlists the capability, and a
+  recursion guard stops a hook from triggering itself. Every firing is recorded with its outcome.
+- **Tool search (G3).** `tool.search`, `tool.describe` and `tool.catalog` give progressive disclosure
+  over a 275-capability catalog: deterministic lexical ranking (exact id, prefix, token overlap) with
+  risk, side-effect and source filters, and full schemas fetched only for the capability chosen.
+- Added REST for all three (`/v1/capabilities/search`, `/v1/sessions/:id/instructions`, `/v1/hooks*`),
+  a Canvas hook panel with enable/disable/remove and the firing ledger, and two new CLI views.
+- Added 14 tests (446 engine tests total) covering discovery and precedence, dependency-directory
+  exclusion, injection quarantine, symlink and size refusal, budgeted projection with truncation,
+  prompt integration, hook denial with the rule named, escalation-only composition, approval
+  escalation, governed and allowlisted hook actions, recursion prevention, session lifecycle firing,
+  tenant scoping, and tool-search ranking against both a fixture and the live catalog.
+
 ## 1.49.0 — 2026-08-20
 
 Three more loops closed inside existing subsystems: planning now learns how wrong its estimates

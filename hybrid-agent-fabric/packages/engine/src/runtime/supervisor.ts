@@ -588,7 +588,7 @@ export class Supervisor {
   }
 
   private async buildActor(snapshot: SessionSnapshot, _recovered: boolean): Promise<SessionActor> {
-    const frozenContext = await this.options.context.freeze(snapshot.tenantId, snapshot.sessionId, snapshot.agentProfile);
+    const frozenContext = await this.options.context.freeze(snapshot.tenantId, snapshot.sessionId, snapshot.agentProfile, snapshot.workspacePath);
     return new SessionActor({
       snapshot,
       eventStore: this.options.eventStore,
