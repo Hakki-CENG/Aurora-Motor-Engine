@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { LifecycleHookService } from "../policy/lifecycle-hooks.js";
+import type { SessionModeService } from "../policy/session-modes.js";
 import type { ProjectInstructionService } from "../knowledge/project-instructions.js";
 import { auroraDefined } from "../util/aurora-state.js";
 import { defineCapability } from "./schema.js";
@@ -77,6 +78,51 @@ export function lifecycleHookCapabilities(service: LifecycleHookService) {
       async (input, ctx) => Object.keys(input).length
         ? await service.configure(auroraDefined({ tenantId: ctx.tenantId, ...input }))
         : await service.config(ctx.tenantId),
+    ),
+  ];
+}
+
+const permissionMode = z.enum(["plan", "manual", "acceptEdits", "auto", "dontAsk", "bypass"]);
+const sandboxMode = z.enum(["read-only", "workspace-write", "danger-full-access"]);
+
+/**
+ * Session permission and sandbox modes: the single named dial over the enforcement Aurora already had.
+ * Reading a mode is pure; changing one changes what the session may do, so it is privileged and every
+ * change records an actor and a reason.
+ */
+export function sessionModeCapabilities(service: SessionModeService) {
+  return [
+    defineCapability(
+      { id: "session.modes", version: "1.0.0", description: "List the available permission and sandbox modes with what each one means.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({}),
+      async () => service.modes(),
+    ),
+    defineCapability(
+      { id: "session.mode", version: "1.0.0", description: "The effective permission and sandbox mode for this session.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({}),
+      async (_input, ctx) => await service.get(ctx.tenantId, ctx.sessionId),
+    ),
+    defineCapability(
+      { id: "session.mode.set", version: "1.0.0", description: "Change this session's permission or sandbox mode. Leaving plan mode is how execution starts.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({
+        permissionMode: permissionMode.optional(),
+        sandboxMode: sandboxMode.optional(),
+        reason: z.string().min(1).max(1000),
+        note: z.string().max(1000).optional(),
+      }),
+      async (input, ctx) => await service.set(auroraDefined({ tenantId: ctx.tenantId, sessionId: ctx.sessionId, actor: "agent", ...input })),
+    ),
+    defineCapability(
+      { id: "session.mode.history", version: "1.0.0", description: "Who changed this session's mode, when, and why.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({ limit: z.number().int().min(1).max(1000).optional() }),
+      async (input, ctx) => ({ transitions: await service.transitions(ctx.tenantId, auroraDefined({ sessionId: ctx.sessionId, limit: input.limit })) }),
+    ),
+    defineCapability(
+      { id: "session.mode.defaults", version: "1.0.0", description: "Read or change the tenant's default permission and sandbox mode, and whether bypass is allowed.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({ permissionMode: permissionMode.optional(), sandboxMode: sandboxMode.optional(), allowBypass: z.boolean().optional() }),
+      async (input, ctx) => Object.keys(input).length
+        ? await service.setDefaults(auroraDefined({ tenantId: ctx.tenantId, ...input }))
+        : await service.defaults(ctx.tenantId),
     ),
   ];
 }

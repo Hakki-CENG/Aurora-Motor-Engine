@@ -50,6 +50,8 @@ export const AURORA_VIEWS = {
   probation: "/v1/society/probation",
   hooks: "/v1/hooks",
   "hook-firings": "/v1/hooks/firings",
+  "session-modes": "/v1/session-modes",
+  "mode-defaults": "/v1/session-modes/defaults",
   "delegation-policy": "/v1/delegation-policy",
   fleet: "/v1/aurora/fleet",
   "fleet-members": "/v1/aurora/fleet/members",

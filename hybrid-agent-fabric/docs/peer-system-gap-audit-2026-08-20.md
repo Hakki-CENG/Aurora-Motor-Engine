@@ -30,8 +30,8 @@ Ranked by (value to a real user) × (risk of not having it), with the peer that 
 | G1 | **Project instruction files** (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `.github/copilot-instructions.md`) discovered from the workspace and injected with precedence | Codex (`AGENTS.md` is an open standard), Claude Code (`CLAUDE.md`) | Every repository in the world now ships one of these. Ignoring them means ignoring the user's house rules | **Done in 1.50.0** |
 | G2 | **Deterministic lifecycle hooks** the operator configures (pre/post tool use, session start/stop, prompt submit) that can block, warn or run an action | Claude Code (31 events), Codex (5 events) | Formatters, secret scrubbing, build gates and "never touch prod" rules must fire *deterministically*, not when a model remembers | **Done in 1.50.0** |
 | G3 | **Tool search / progressive tool disclosure** | Claude Code `ToolSearch` | HAF exposes 275+ capabilities. Pushing all of them at a model wastes context and degrades selection | **Done in 1.50.0** |
-| G4 | **Permission modes** as a first-class session concept (`plan`/read-only, `acceptEdits`, `auto`, `dontAsk`, `bypass`) with matching sandbox modes (`read-only`, `workspace-write`, `danger-full-access`) | Codex sandbox modes + approval policy; Claude Code permission modes | HAF has the enforcement machinery but no single named dial. Operators currently compose four flags | Planned |
-| G5 | **Plan mode** — read-only exploration that produces a plan and then asks to execute | Claude Code, Codex `/plan` | HAF has a rich planner but no "explore without touching anything, then propose" session mode | Planned |
+| G4 | **Permission modes** as a first-class session concept (`plan`/read-only, `acceptEdits`, `auto`, `dontAsk`, `bypass`) with matching sandbox modes (`read-only`, `workspace-write`, `danger-full-access`) | Codex sandbox modes + approval policy; Claude Code permission modes | HAF has the enforcement machinery but no single named dial. Operators currently compose four flags | **Done in 1.51.0** |
+| G5 | **Plan mode** — read-only exploration that produces a plan and then asks to execute | Claude Code, Codex `/plan` | HAF has a rich planner but no "explore without touching anything, then propose" session mode | **Done in 1.51.0** |
 
 ### P1 — present but shallower than the bar
 
@@ -71,8 +71,20 @@ a recursion guard so a hook cannot trigger itself. Every firing is recorded.
 description, with risk, side-effect and source filters, returning compact entries; `tool.describe`
 returns the full schema for a chosen id. This is progressive disclosure for a 275-capability catalog.
 
-## 4. Next steps
+## 4. What 1.51.0 fixes
 
-In order: G4 permission modes (single named dial over the existing enforcement), G5 plan mode on top of
-it, then G7 session archive plus cost surface, G6 repo-local commands, G8 working-tree review, and G9
-subagent declaration files.
+**G4 — Permission and sandbox modes.** `SessionModeService` stores one named dial per session, with a
+tenant default: permission mode (`plan`, `manual`, `acceptEdits`, `auto`, `dontAsk`, `bypass`) and
+sandbox mode (`read-only`, `workspace-write`, `danger-full-access`). `SessionModePolicyEngine` wraps the
+layered stack so a mode can tighten anything and relax only a base-policy approval requirement, for the
+risk classes it names. Denials are never reversed, governance decisions are never weakened, `bypass` is
+gated per tenant, and every transition records an actor and a reason.
+
+**G5 — Plan mode.** Read-only exploration that may still write planning artefacts: plans, decisions,
+cognitive intake and memory proposals. Anything that would touch the world is refused with an
+instruction to leave plan mode, which is the same explore-then-execute shape the peers ship.
+
+## 5. Next steps
+
+In order: G7 session archive plus a cost and rate-limit surface, G6 repo-local slash commands, G8
+working-tree review mode, G9 subagent declaration files, then G10-G12.

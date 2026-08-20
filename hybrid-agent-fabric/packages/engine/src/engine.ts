@@ -151,8 +151,9 @@ import {
   orchestratorCapabilities, riskCapabilities, stuckCapabilities,
 } from "./capabilities/aurora-core.js";
 import { discoveryCapabilities } from "./capabilities/discovery.js";
-import { lifecycleHookCapabilities, projectInstructionCapabilities } from "./capabilities/workspace-conventions.js";
+import { lifecycleHookCapabilities, projectInstructionCapabilities, sessionModeCapabilities } from "./capabilities/workspace-conventions.js";
 import { LifecycleHookService } from "./policy/lifecycle-hooks.js";
+import { SessionModePolicyEngine, SessionModeService } from "./policy/session-modes.js";
 import { ProjectInstructionService } from "./knowledge/project-instructions.js";
 import { memoryGraphCapabilities } from "./capabilities/memory-graph.js";
 import { multiWorldCapabilities, worldModelCapabilities } from "./capabilities/world-model.js";
@@ -183,6 +184,8 @@ export interface EngineConfig {
   experienceDistillation?: { onSessionClose?: boolean };
   /** Deterministic operator hooks at the capability boundary and session lifecycle. Enabled by default. */
   lifecycleHooks?: { enabled?: boolean };
+  /** Named permission and sandbox modes per session, with the tenant default and bypass switch. */
+  sessionModes?: { defaultPermissionMode?: "plan" | "manual" | "acceptEdits" | "auto" | "dontAsk" | "bypass"; defaultSandboxMode?: "read-only" | "workspace-write" | "danger-full-access"; allowBypass?: boolean };
   /** Discovery bounds for AGENTS.md / CLAUDE.md style repository instruction files. */
   projectInstructions?: { maxFiles?: number; maxFileBytes?: number; maxTotalBytes?: number; maxDepth?: number };
   kernelServerScript: string;
@@ -326,6 +329,7 @@ export class HybridAgentEngine {
   readonly dataGovernance: AuroraDataGovernanceService;
   readonly auroraPolicy: AuroraPolicyEngine | undefined;
   readonly lifecycleHooks: LifecycleHookService;
+  readonly sessionModes: SessionModeService;
   private readonly hookWorkspaceRoot: string;
   readonly projectInstructions: ProjectInstructionService;
 
@@ -415,7 +419,15 @@ export class HybridAgentEngine {
     if (config.opa) policyLayers.push(new OpaPolicyEngine(config.opa));
     if (config.lifecycleHooks?.enabled !== false) policyLayers.push(this.lifecycleHooks.policyLayer());
     if (this.auroraPolicy) policyLayers.push(this.auroraPolicy);
-    const policy = policyLayers.length > 1 ? new LayeredPolicyEngine(policyLayers) : localPolicy;
+    const layered = policyLayers.length > 1 ? new LayeredPolicyEngine(policyLayers) : localPolicy;
+    // The mode dial wraps the whole stack: it may tighten anything, and may relax only base-policy
+    // approval requirements — never a governance decision.
+    this.sessionModes = new SessionModeService(dataRoot, Date.now, {
+      ...(config.sessionModes?.defaultPermissionMode ? { defaultPermissionMode: config.sessionModes.defaultPermissionMode } : {}),
+      ...(config.sessionModes?.defaultSandboxMode ? { defaultSandboxMode: config.sessionModes.defaultSandboxMode } : {}),
+      ...(config.sessionModes?.allowBypass !== undefined ? { allowBypass: config.sessionModes.allowBypass } : {}),
+    });
+    const policy = new SessionModePolicyEngine(layered, this.sessionModes);
     this.capabilities = new CapabilityBroker(policy, this.approvals, effects, this.hooks);
     this.wasiPlugins = config.wasiPlugins
       ? new WasiPluginManager(this.capabilities, this.hooks, { rootPath: dataRoot, ...config.wasiPlugins })
@@ -796,6 +808,7 @@ export class HybridAgentEngine {
     for (const capability of estimationCapabilities(this.estimation)) this.capabilities.register(capability);
     for (const capability of projectInstructionCapabilities(this.projectInstructions)) this.capabilities.register(capability);
     for (const capability of lifecycleHookCapabilities(this.lifecycleHooks)) this.capabilities.register(capability);
+    for (const capability of sessionModeCapabilities(this.sessionModes)) this.capabilities.register(capability);
     // Registered last so the catalog it searches already contains everything else.
     for (const capability of discoveryCapabilities(() => this.capabilities.list())) this.capabilities.register(capability);
     for (const capability of probationCapabilities(this.delegation)) this.capabilities.register(capability);

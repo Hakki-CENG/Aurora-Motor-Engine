@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-20 — current milestone 1.50
+Updated: 2026-08-20 — current milestone 1.51
 
 ## Original 1.0 baseline (delivered)
 
@@ -306,6 +306,17 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] Hook actions restricted to allowlisted governed capabilities, with a recursion guard
 - [x] Durable hook firing ledger
 - [x] Tool search, describe and catalog overview for progressive disclosure
+
+### Peer parity, wave two (1.51)
+
+- [x] Named permission modes: plan, manual, acceptEdits, auto, dontAsk, bypass
+- [x] Sandbox modes: read-only, workspace-write, danger-full-access
+- [x] Plan mode as read-only exploration that may still write plans and decisions
+- [x] Mode engine that wraps the policy stack, tightening freely and relaxing only base policy
+- [x] Governance decisions (Aurora, OPA, hooks, explicit denials) never relaxed by a mode
+- [x] `dontAsk` fail-fast for unattended runs; `bypass` gated per tenant
+- [x] Recorded mode transitions with actor and reason
+- [x] Tenant defaults, REST, Canvas selectors and CLI views
 
 ## Required for full target parity
 

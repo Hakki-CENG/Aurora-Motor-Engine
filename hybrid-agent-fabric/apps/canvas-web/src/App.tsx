@@ -71,6 +71,7 @@ export function App() {
   const [githubWebhookSecretId, setGithubWebhookSecretId] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [sessionMode, setSessionMode] = useState<any>(null);
   const [tab, setTab] = useState<Tab>("chat");
   const [prompt, setPrompt] = useState("");
   const [promptImages, setPromptImages] = useState<Array<{path:string;mimeType:string;sha256:string;fileName:string}>>([]);
@@ -134,7 +135,18 @@ export function App() {
     if (!githubAppId) { setGithubInstallations([]); setGithubInstallationId(""); return; }
     void api<any>(`/v1/github-apps/installations?tenantId=local&appConfigId=${encodeURIComponent(githubAppId)}`).then(body=>{const items=body.installations??[];setGithubInstallations(items);setGithubInstallationId(current=>items.some((item:any)=>item.id===current)?current:(items.find((item:any)=>item.status==="active")?.id??items[0]?.id??""))}).catch(showError);
   }, [githubAppId]);
-  useEffect(() => { if (activeId) { void loadSession(activeId); void loadSideData(); } }, [activeId]);
+  useEffect(() => { if (activeId) { void loadSession(activeId); void loadSideData(); void loadSessionMode(activeId); } }, [activeId]);
+  const loadSessionMode = useCallback(async (id = activeId) => {
+    if (!id) return;
+    try { setSessionMode(await api<any>(`/v1/sessions/${id}/mode`)); } catch { setSessionMode(null); }
+  }, [activeId]);
+  const changeSessionMode = useCallback(async (patch: { permissionMode?: string; sandboxMode?: string }) => {
+    if (!activeId) return;
+    try {
+      await api(`/v1/sessions/${activeId}/mode`, { method: "POST", body: JSON.stringify({ ...patch, reason: "Changed from Canvas.", actor: "canvas-operator" }) });
+      await loadSessionMode(activeId);
+    } catch (cause) { showError(cause); }
+  }, [activeId, showError]);
   useEffect(() => { if (!roster.some(item=>item.sessionId===familyTarget)) setFamilyTarget(roster[0]?.sessionId??""); }, [roster, familyTarget]);
   useEffect(() => {
     streamAbort.current?.abort();
@@ -271,7 +283,7 @@ export function App() {
     <nav className="tabs">{tabs.map(([id, Icon, label]) => <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)} disabled={!session}><Icon size={16}/>{label}</button>)}</nav>
     <main className="workspace">
       {!session ? <div className="welcome"><Bot size={52}/><h1>Durable agent control center</h1><p>Create or select an agent to open conversation, terminal, files, changes, browser and automation panels.</p></div> : <>
-        <div className="session-head"><div><h2>{session.name}</h2><p>{session.status} · generation {session.generation} · {session.totalUsage.inputTokens + session.totalUsage.outputTokens} tokens</p></div><code>{session.workspacePath}</code><div className="export-actions"><a className="export-link" href={`/v1/sessions/${session.sessionId}/export?format=markdown`} download><Download size={14}/>Markdown</a><a className="export-link" href={`/v1/sessions/${session.sessionId}/export?format=trajectory`} download><Code2 size={14}/>Trajectory</a></div></div>
+        <div className="session-head"><div><h2>{session.name}</h2><p>{session.status} · generation {session.generation} · {session.totalUsage.inputTokens + session.totalUsage.outputTokens} tokens</p></div><code>{session.workspacePath}</code><div className="mode-actions"><select value={sessionMode?.permissionMode ?? "manual"} onChange={e=>void changeSessionMode({ permissionMode: e.target.value })} title="Permission mode">{["plan","manual","acceptEdits","auto","dontAsk","bypass"].map(mode=><option key={mode} value={mode}>{mode}</option>)}</select><select value={sessionMode?.sandboxMode ?? "workspace-write"} onChange={e=>void changeSessionMode({ sandboxMode: e.target.value })} title="Sandbox mode">{["read-only","workspace-write","danger-full-access"].map(mode=><option key={mode} value={mode}>{mode}</option>)}</select></div><div className="export-actions"><a className="export-link" href={`/v1/sessions/${session.sessionId}/export?format=markdown`} download><Download size={14}/>Markdown</a><a className="export-link" href={`/v1/sessions/${session.sessionId}/export?format=trajectory`} download><Code2 size={14}/>Trajectory</a></div></div>
         {tab === "chat" && <ChatPanel session={session} prompt={prompt} setPrompt={setPrompt} images={promptImages} setImages={setPromptImages} send={sendPrompt} busy={busy} showError={showError}/>} 
         {tab === "terminal" && <TerminalPanel sessionId={session.sessionId} showError={showError}/>} 
         {tab === "files" && <FilesPanel sessionId={session.sessionId} showError={showError}/>} 

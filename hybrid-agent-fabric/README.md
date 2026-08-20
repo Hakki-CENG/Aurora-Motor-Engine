@@ -8,7 +8,7 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.50.0
+## Current milestone — 1.51.0
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -82,6 +82,7 @@ Implemented and tested:
 - Repository instruction files (AGENTS.md/CLAUDE.md) with injection screening, precedence and budgeting
 - Deterministic lifecycle hooks that can deny at the capability boundary and only run governed actions
 - Tool search over the capability catalog for progressive disclosure
+- Named permission modes (plan, manual, acceptEdits, auto, dontAsk, bypass) and sandbox modes per session
 - Aurora autopilot: bounded unattended cadence with a durable run ledger
 - Aurora provenance explainer reconstructing why any artifact exists
 - Embedding-backed semantic memory recall
@@ -1028,6 +1029,19 @@ work. It never overwrites a human verdict, never resolves a plan that is merely 
 marks the decision executed instead), and supports a dry run that shows exactly what would be written.
 Each record keeps its evidence, observed value, surprise and Brier score, so every calibration number
 traces back to the execution behind it.
+
+## Session modes
+
+One word instead of four flags: `plan`, `manual`, `acceptEdits`, `auto`, `dontAsk`, `bypass`, plus a
+sandbox mode of `read-only`, `workspace-write` or `danger-full-access`. Plan mode is genuine read-only
+exploration that can still write plans and decisions, so a session can propose real work and then be
+switched out of plan mode to do it.
+
+The dial wraps the policy stack rather than joining it, which is what lets it both tighten and relax.
+Relaxation is deliberately narrow: only a base-policy approval requirement, only for the risk classes
+the mode names. A denial is never reversed, and a decision that came from Aurora governance, OPA or a
+lifecycle hook is never weakened — a mode is a preference, governance is not. `bypass` must be enabled
+per tenant, and every change of mode is recorded with an actor and a reason.
 
 ## Repository instructions, hooks and tool search
 

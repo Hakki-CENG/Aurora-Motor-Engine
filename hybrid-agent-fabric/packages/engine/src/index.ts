@@ -106,6 +106,7 @@ export * from "./aurora/plan-feedback-service.js";
 export * from "./aurora/estimation-calibrator.js";
 export * from "./knowledge/project-instructions.js";
 export * from "./policy/lifecycle-hooks.js";
+export * from "./policy/session-modes.js";
 export * from "./capabilities/discovery.js";
 export * from "./aurora/provenance-service.js";
 export * from "./aurora/workspace-checkpoint-service.js";

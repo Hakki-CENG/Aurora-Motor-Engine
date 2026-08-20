@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.51.0 — 2026-08-20
+
+Continuing down the peer-gap audit: G4 (permission and sandbox modes) and G5 (plan mode) are closed.
+
+- **Session permission modes.** Aurora had every enforcement mechanism a peer has but no single named
+  dial, so "this session may explore but not touch anything" took four separate flags. It is now one
+  word: `plan`, `manual`, `acceptEdits`, `auto`, `dontAsk` or `bypass`, using the vocabulary the rest of
+  the industry settled on so a team switching does not have to relearn it.
+- **Sandbox modes** follow the Codex naming — `read-only`, `workspace-write`, `danger-full-access` —
+  mapped onto Aurora's existing risk classes. A read-only sandbox refuses side effects regardless of the
+  permission mode, so the two dials cannot contradict each other into permissiveness.
+- **Plan mode (G5)** is read-only exploration that can still write *plans*: planning, decision,
+  cognitive-intake and memory-proposal capabilities remain available so a session can produce a real
+  Aurora plan and then be switched out of plan mode to execute it. Everything else is refused with
+  "Plan mode is read-only: leave plan mode to execute".
+- The dial is applied by `SessionModePolicyEngine`, which **wraps** the layered stack rather than
+  joining it, because the layered engine only ever takes the strongest decision — correct for
+  governance, wrong for an operator saying "stop asking me about file edits". Two rules keep it honest:
+  a mode may tighten anything, and may relax **only** a base-policy approval requirement for the risk
+  classes it names. A denial is never reversed, and a decision from Aurora governance, OPA, a lifecycle
+  hook or an explicit capability denial is never weakened — proven by tests that put a session in
+  `bypass` and watch governance hold.
+- `dontAsk` converts every approval requirement into a refusal, so an unattended run fails fast instead
+  of hanging on a prompt nobody will answer. `bypass` must be enabled per tenant and is refused
+  otherwise. Every mode change is a recorded transition with an actor and a reason, because "who put
+  this session in bypass?" has to be answerable.
+- Added governed `session.mode`, `session.mode.set`, `session.modes`, `session.mode.history` and
+  `session.mode.defaults` capabilities, REST for all of them, two Canvas selectors in the session
+  header, and two CLI views.
+- Added 11 tests (457 engine tests total) covering plan-mode reads/planning/refusal and the switch to
+  execution, `acceptEdits` scope, `dontAsk` fail-fast, read-only sandbox overriding `bypass`, the bypass
+  gate, recorded transitions, tenant defaults, and an exhaustive unit sweep of the adjustment rules
+  (denials never reversed, governance never relaxed, each mode confined to its own risk classes).
+
 ## 1.50.0 — 2026-08-20
 
 Aurora was audited against the systems it competes with — Claude Code, OpenAI Codex CLI, OpenHands,

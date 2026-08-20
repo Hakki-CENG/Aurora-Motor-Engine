@@ -221,6 +221,34 @@ re-apply the template or justify the exception). A resolved template with a non-
 
 ---
 
+## 2c. Session modes
+
+One dial per session, with a tenant default:
+
+```bash
+curl -H … "$HAF/v1/session-modes"                                   # what each mode means
+curl -H … "$HAF/v1/sessions/$SESSION/mode"
+curl -H … -X POST $HAF/v1/sessions/$SESSION/mode \
+  -d '{"permissionMode":"plan","reason":"Explore before touching anything."}'
+curl -H … -X POST $HAF/v1/session-modes/defaults \
+  -d '{"tenantId":"acme","permissionMode":"manual","sandboxMode":"workspace-write","allowBypass":false}'
+curl -H … "$HAF/v1/sessions/$SESSION/mode/history"                  # who changed it, when and why
+```
+
+| Mode | Use it when |
+| --- | --- |
+| `plan` | You want exploration and a real plan, with nothing touched |
+| `manual` | Default: ask before anything consequential |
+| `acceptEdits` | A trusted editing session; stop prompting for file writes |
+| `auto` | Edits and test runs proceed; network and external effects still ask |
+| `dontAsk` | Unattended runs: fail fast instead of waiting on a prompt |
+| `bypass` | Rare, gated per tenant; governance still applies |
+
+A mode never overrides governance. If a call is denied with an `aurora_*`, `lifecycle_hook_*` or `opa_*`
+reason code, changing the mode will not help — fix the rule or the call.
+
+---
+
 ## 3. Alert playbook
 
 | Alert | Meaning | First action |
