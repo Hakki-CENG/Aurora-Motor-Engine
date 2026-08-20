@@ -39,8 +39,8 @@ Ranked by (value to a real user) × (risk of not having it), with the peer that 
 |---|---|---|---|---|
 | G6 | Custom slash commands / prompt templates stored in the repo | Claude Code `.claude/commands`, Codex prompts | Skills hub exists; no repo-local command files | **Done in 1.52.0** |
 | G7 | Session archive / delete lifecycle, per-session cost and rate-limit view | Codex `/archive`, `/usage`, `/status` | Usage is tracked; no archive state, no cost rollup surface | **Done in 1.52.0** |
-| G8 | Code review mode (`/review`) over the working tree or against a base branch | Codex, Claude Code | Hosted review provider exists (PR-level); no local working-tree review flow | Planned |
-| G9 | Subagent declaration files with per-agent tools/model/hooks/memory/isolation | Claude Code subagent frontmatter | Agent profiles + society roles cover most fields; no single declarative file format, no per-agent hooks | Planned |
+| G8 | Code review mode (`/review`) over the working tree or against a base branch | Codex, Claude Code | Hosted review provider exists (PR-level); no local working-tree review flow | **Done in 1.53.0** |
+| G9 | Subagent declaration files with per-agent tools/model/hooks/memory/isolation | Claude Code subagent frontmatter | Agent profiles + society roles cover most fields; no single declarative file format, no per-agent hooks | **Done in 1.53.0** (per-agent hooks still open) |
 | G10 | Plugin/skill marketplace with signed manifests and version pinning | Claude Code plugins, Codex agent plugins | Skills hub and plugin registry exist; no signing or pinning | Planned |
 | G11 | Effort/verbosity control per turn (`/reasoning`, effort levels) | Codex, Claude Code | Only Codex-provider reasoning effort | Planned |
 | G12 | Worktree ergonomics for the main session (`/worktree`) | Codex, Claude Code | Child sessions already use git worktrees; the main session cannot move into one | Planned |
@@ -94,7 +94,17 @@ cost with its source stated (`provider`, `price-table`, `unpriced`) plus a tenan
 uses, substitutes `$ARGUMENTS` and positional arguments, reports what was left unresolved, and refuses
 a screened-out template loudly. It renders text and never executes.
 
-## 6. Next steps
+## 6. What 1.53.0 fixes
 
-In order: G8 working-tree review mode, G9 subagent declaration files, G11 per-turn effort control, G12
-worktree ergonomics for the main session, then G10 signed plugin manifests.
+**G8 — Working-tree review.** `WorkingTreeReviewService` produces file statistics and deterministic
+findings for uncommitted work, the index, or a base-branch comparison, with a shared verdict rollup and
+hard bounds on files, diff size and command output.
+
+**G9 — Subagent files.** `SubagentDefinitionService` reads the ecosystem's agent front matter and
+materialises it into an agent profile plus a society role binding, resolving tools against the live
+catalog and naming everything it could not honour.
+
+## 7. Next steps
+
+In order: G11 per-turn effort control, G12 worktree ergonomics for the main session, per-agent hooks to
+finish G9, then G10 signed plugin manifests and version pinning.

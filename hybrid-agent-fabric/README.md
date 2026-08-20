@@ -8,7 +8,7 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.52.0
+## Current milestone — 1.53.0
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -84,6 +84,7 @@ Implemented and tested:
 - Tool search over the capability catalog for progressive disclosure
 - Named permission modes (plan, manual, acceptEdits, auto, dontAsk, bypass) and sandbox modes per session
 - Session archive/restore with an honest cost surface, and repository command templates
+- Deterministic working-tree review and declarative subagent files resolved onto profiles and roles
 - Aurora autopilot: bounded unattended cadence with a durable run ledger
 - Aurora provenance explainer reconstructing why any artifact exists
 - Embedding-backed semantic memory recall
@@ -1030,6 +1031,20 @@ work. It never overwrites a human verdict, never resolves a plan that is merely 
 marks the decision executed instead), and supports a dry run that shows exactly what would be written.
 Each record keeps its evidence, observed value, surprise and Brier score, so every calibration number
 traces back to the execution behind it.
+
+## Working-tree review and subagent files
+
+`review.worktree` answers "what changed and what should worry me?" mechanically: per-file statistics
+plus deterministic findings — added credentials, `.env` and CI workflow edits, a lockfile moving without
+its manifest, source changes with no test touched, a large deletion against a small addition. No model
+is consulted to produce the evidence, so no model can talk the evidence away. Everything is bounded and
+runs through the session's sandbox, and a clean tree degrades to "nothing to review".
+
+Subagent files (`.aurora/agents`, `.claude/agents`, `.codex/agents`) are read with the front matter the
+ecosystem already uses and resolved onto machinery Aurora had: an agent profile for instructions and the
+allowlist, a society role binding for identity and reputation, a declared permission mode for behaviour.
+Tools resolve against the live catalog, `disallowedTools` is applied and reported, and fields Aurora does
+not honour are named instead of dropped.
 
 ## Session archive and cost
 

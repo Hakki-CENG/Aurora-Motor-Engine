@@ -4,6 +4,8 @@ import type { SessionModeService } from "../policy/session-modes.js";
 import type { ProjectInstructionService } from "../knowledge/project-instructions.js";
 import type { RepositoryCommandService } from "../knowledge/repository-commands.js";
 import type { SessionLifecycleService } from "../runtime/session-lifecycle.js";
+import type { SubagentDefinitionService } from "../knowledge/subagent-definitions.js";
+import { reviewVerdict, type WorkingTreeReviewService } from "../repositories/working-tree-review.js";
 import { auroraDefined } from "../util/aurora-state.js";
 import { defineCapability } from "./schema.js";
 
@@ -172,6 +174,51 @@ export function sessionLifecycleCapabilities(service: SessionLifecycleService) {
       { id: "session.archives", version: "1.0.0", description: "List archived and restored sessions with who changed them and why.", risk: "pure", sideEffect: false, source: "core" },
       z.object({ state: z.enum(["active", "archived"]).optional(), limit: z.number().int().min(1).max(1000).optional() }),
       async (input, ctx) => ({ records: await service.list(ctx.tenantId, auroraDefined(input)) }),
+    ),
+  ];
+}
+
+/** Deterministic working-tree review: evidence first, model reasoning afterwards. */
+export function reviewCapabilities(service: WorkingTreeReviewService) {
+  return [
+    defineCapability(
+      { id: "review.worktree", version: "1.0.0", description: "Review uncommitted changes, the index, or this branch against a base: file stats plus deterministic findings (secrets, sensitive paths, lockfile drift, missing tests, large deletions).", risk: "workspace_read", sideEffect: false, source: "core" },
+      z.object({
+        base: z.string().max(200).optional(),
+        staged: z.boolean().optional(),
+        maxFiles: z.number().int().min(1).max(5000).optional(),
+        maxDiffChars: z.number().int().min(1000).max(2_000_000).optional(),
+      }),
+      async (input, ctx) => {
+        const review = await service.review(auroraDefined({ workspacePath: ctx.workspacePath, ...input, signal: ctx.signal }));
+        return { ...review, ...reviewVerdict(review) };
+      },
+    ),
+  ];
+}
+
+/** Declarative subagent files resolved onto agent profiles and society roles. */
+export function subagentCapabilities(service: SubagentDefinitionService) {
+  return [
+    defineCapability(
+      { id: "subagents.list", version: "1.0.0", description: "List declarative subagent files from .aurora/agents, .claude/agents and .codex/agents.", risk: "workspace_read", sideEffect: false, source: "core" },
+      z.object({}),
+      async (_input, ctx) => await service.list(ctx.workspacePath),
+    ),
+    defineCapability(
+      { id: "subagents.resolve", version: "1.0.0", description: "Resolve one subagent's tool patterns against the live catalog without creating anything.", risk: "workspace_read", sideEffect: false, source: "core" },
+      z.object({ name: z.string().min(1).max(60) }),
+      async (input, ctx) => await service.resolve(ctx.workspacePath, input.name),
+    ),
+    defineCapability(
+      { id: "subagents.materialize", version: "1.0.0", description: "Create or update the agent profile for a subagent definition and bind it to its society role.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({ name: z.string().min(1).max(60), bindRole: z.boolean().optional() }),
+      async (input, ctx) => await service.materialize(auroraDefined({ tenantId: ctx.tenantId, workspacePath: ctx.workspacePath, ...input })),
+    ),
+    defineCapability(
+      { id: "subagents.materialize-all", version: "1.0.0", description: "Materialise every screened subagent definition in this workspace.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({}),
+      async (_input, ctx) => ({ applied: await service.materializeAll({ tenantId: ctx.tenantId, workspacePath: ctx.workspacePath }) }),
     ),
   ];
 }

@@ -153,12 +153,14 @@ import {
 import { discoveryCapabilities } from "./capabilities/discovery.js";
 import {
   lifecycleHookCapabilities, projectInstructionCapabilities, repositoryCommandCapabilities,
-  sessionLifecycleCapabilities, sessionModeCapabilities,
+  reviewCapabilities, sessionLifecycleCapabilities, sessionModeCapabilities, subagentCapabilities,
 } from "./capabilities/workspace-conventions.js";
 import { LifecycleHookService } from "./policy/lifecycle-hooks.js";
 import { SessionModePolicyEngine, SessionModeService } from "./policy/session-modes.js";
 import { ProjectInstructionService } from "./knowledge/project-instructions.js";
 import { RepositoryCommandService } from "./knowledge/repository-commands.js";
+import { SubagentDefinitionService } from "./knowledge/subagent-definitions.js";
+import { WorkingTreeReviewService } from "./repositories/working-tree-review.js";
 import { SessionLifecycleService } from "./runtime/session-lifecycle.js";
 import { memoryGraphCapabilities } from "./capabilities/memory-graph.js";
 import { multiWorldCapabilities, worldModelCapabilities } from "./capabilities/world-model.js";
@@ -338,6 +340,8 @@ export class HybridAgentEngine {
   private readonly hookWorkspaceRoot: string;
   readonly projectInstructions: ProjectInstructionService;
   readonly repositoryCommands: RepositoryCommandService;
+  readonly worktreeReview: WorkingTreeReviewService;
+  readonly subagents: SubagentDefinitionService;
   readonly sessionLifecycle: SessionLifecycleService;
 
   constructor(readonly config: EngineConfig) {
@@ -612,6 +616,7 @@ export class HybridAgentEngine {
       defaultModel: () => modelName ?? this.models.list()[0],
     });
     this.society = new AgentSocietyService(dataRoot, this.supervisor, this.agentProfiles, this.events);
+    this.subagents = new SubagentDefinitionService({ capabilities: this.capabilities, profiles: this.agentProfiles, society: this.society });
     this.cognitive = new CognitiveWorkspaceService(dataRoot);
     this.worldModel = new WorldModelService(dataRoot);
     this.multiWorld = new MultiWorldModelService(dataRoot);
@@ -688,6 +693,7 @@ export class HybridAgentEngine {
     );
     this.capabilities.register(processCapability(sandboxFactory));
     for (const capability of gitCapabilities(sandboxFactory)) this.capabilities.register(capability);
+    this.worktreeReview = new WorkingTreeReviewService(sandboxFactory);
     this.capabilities.register(pythonCapability(this.kernels));
     for (const capability of agentCapabilities(this.supervisor)) this.capabilities.register(capability);
     for (const capability of goalCapabilities(this.supervisor)) this.capabilities.register(capability);
@@ -823,6 +829,8 @@ export class HybridAgentEngine {
     for (const capability of lifecycleHookCapabilities(this.lifecycleHooks)) this.capabilities.register(capability);
     for (const capability of sessionModeCapabilities(this.sessionModes)) this.capabilities.register(capability);
     for (const capability of repositoryCommandCapabilities(this.repositoryCommands)) this.capabilities.register(capability);
+    for (const capability of reviewCapabilities(this.worktreeReview)) this.capabilities.register(capability);
+    for (const capability of subagentCapabilities(this.subagents)) this.capabilities.register(capability);
     for (const capability of sessionLifecycleCapabilities(this.sessionLifecycle)) this.capabilities.register(capability);
     // Registered last so the catalog it searches already contains everything else.
     for (const capability of discoveryCapabilities(() => this.capabilities.list())) this.capabilities.register(capability);

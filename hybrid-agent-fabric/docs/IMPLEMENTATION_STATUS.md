@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-20 — current milestone 1.52
+Updated: 2026-08-20 — current milestone 1.53
 
 ## Original 1.0 baseline (delivered)
 
@@ -328,6 +328,17 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] Repository command templates from Aurora, Claude, Codex and GitHub prompt folders
 - [x] Argument substitution with filled and unresolved placeholders reported
 - [x] Loud refusal for screened-out templates; symlink, size and shadowing refusals
+
+### Peer parity, wave four (1.53)
+
+- [x] Working-tree, staged and base-branch review with per-file statistics
+- [x] Deterministic findings: secrets, sensitive paths, lockfile drift, missing tests, large deletions
+- [x] Verdict rollup (clean / review / blocked) shared by every surface
+- [x] Bounded diffs, validated base reference, sandboxed git calls, clean-tree degradation
+- [x] Declarative subagent files from Aurora, Claude and Codex agent folders
+- [x] Tool resolution against the live catalog with deny applied and reported
+- [x] Unsupported front-matter fields named rather than dropped
+- [x] Idempotent materialisation into agent profiles with society role binding
 
 ## Required for full target parity
 

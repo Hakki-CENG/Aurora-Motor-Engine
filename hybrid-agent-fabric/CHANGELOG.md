@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.53.0 — 2026-08-20
+
+Peer-gap audit, wave four: G8 (working-tree review) and G9 (declarative subagent files) are closed.
+
+- **Working-tree review that does not start with a model.** `review.worktree` inspects uncommitted
+  changes, the index, or the branch against a base, and returns the *evidence*: per-file add/remove
+  counts, change kinds including untracked files, and deterministic findings. A review that begins with
+  an LLM summarising a diff is a review that can be talked out of its own findings; these checks are
+  mechanical, reproducible and cannot be argued away.
+- Findings cover added credentials (AWS keys, private key blocks, bearer tokens, hard-coded secret
+  assignments, Slack tokens), sensitive paths (`.env`, CI workflows, infrastructure, production config),
+  a lockfile changed without its manifest, two or more source files changed with no test touched, a
+  large deletion against a small addition, oversized changes and untracked files. A rollup verdict
+  (`clean` / `review` / `blocked`) keeps the CLI and Canvas agreeing on what "clean" means.
+- Bounded and confined by construction: file count, diff characters and command output are capped,
+  binary files are counted rather than dumped, the base reference is validated so it cannot smuggle
+  shell syntax, and every git call runs through the same sandbox factory the other git capabilities use.
+  A clean tree, missing base branch or non-repository degrades to "nothing to review" instead of failing
+  the turn.
+- **Declarative subagent files (G9).** Aurora reads `.aurora/agents`, `.claude/agents` and
+  `.codex/agents`, parses the front matter the ecosystem actually uses (`name`, `description`, `tools`,
+  `disallowedTools`, `model`, `permissionMode`, `maxTurns`, `role`) and resolves it onto machinery that
+  already existed: an agent profile for the instructions and allowlist, a society role binding for
+  identity and reputation, a declared permission mode for behaviour.
+- Tool patterns resolve against the **live catalog**, so a file can never grant a capability that does
+  not exist; `disallowedTools` is applied after matching and what it removed is reported; fields Aurora
+  does not honour are listed in `unsupportedFields` rather than quietly dropped, so a team importing
+  from another tool can see exactly what did not carry over. Materialisation is idempotent, refuses a
+  definition that fails injection screening, and refuses one that resolves to no capability at all.
+- Added governed `review.worktree`, `subagents.list|resolve|materialize|materialize-all` capabilities
+  and REST for all of them.
+- Added 8 tests (475 engine tests total) covering working-tree statistics, critical secret detection,
+  sensitive-path/lockfile/missing-test findings, base-branch review with clean degradation and reference
+  validation, subagent parsing with unsupported fields named, tool resolution with deny applied,
+  idempotent materialisation with role binding, and refusals for screened-out, empty, symlinked,
+  front-matter-less and shadowed definitions.
+
 ## 1.52.0 — 2026-08-20
 
 Peer-gap audit, wave three: G7 (session archive and the cost surface) and G6 (repository command

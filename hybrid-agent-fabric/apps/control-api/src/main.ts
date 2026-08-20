@@ -9,7 +9,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { searchCapabilities } from "@haf/engine";
+import { reviewVerdict, searchCapabilities } from "@haf/engine";
 import { dashboardHtml } from "./dashboard.js";
 import { IdentityService, roleAllows, type Identity, type Role } from "./auth/identity-service.js";
 import { allowlisted, PlatformJwtVerifier, verifyDiscordSignature, verifyFeishuSignature, verifyLineSignature, verifySharedSecret, verifySlackSignature, verifyWhatsAppSignature } from "./platforms/verification.js";
@@ -1198,6 +1198,13 @@ app.post("/v1/model-prices", async (request) => { const b=auroraTenant.extend({r
 app.delete("/v1/model-prices/:route", async (request) => { const { route } = z.object({ route: z.string() }).parse(request.params); return await engine.sessionLifecycle.removePrice(decodeURIComponent(route)); });
 app.get("/v1/sessions/:sessionId/commands", async (request) => { const { sessionId } = z.object({ sessionId: z.string() }).parse(request.params); const snapshot = await engine.session(sessionId); return await engine.repositoryCommands.list(snapshot.workspacePath); });
 app.post("/v1/sessions/:sessionId/commands/:name/render", async (request) => { const { sessionId, name } = z.object({ sessionId: z.string(), name: z.string().min(1).max(60) }).parse(request.params); const b=z.object({arguments:z.array(z.string().max(10_000)).max(20).optional()}).parse(request.body ?? {}); const snapshot = await engine.session(sessionId); return await engine.repositoryCommands.render(auroraInput({ workspacePath: snapshot.workspacePath, name, arguments: b.arguments })); });
+
+// Working-tree review and declarative subagent files
+app.post("/v1/sessions/:sessionId/review", async (request) => { const { sessionId } = z.object({ sessionId: z.string() }).parse(request.params); const b=z.object({base:z.string().max(200).optional(),staged:z.boolean().optional(),maxFiles:z.number().int().min(1).max(5000).optional(),maxDiffChars:z.number().int().min(1000).max(2_000_000).optional()}).parse(request.body ?? {}); const snapshot = await engine.session(sessionId); const review = await engine.worktreeReview.review(auroraInput({ workspacePath: snapshot.workspacePath, ...b })); return { ...review, ...reviewVerdict(review) }; });
+app.get("/v1/sessions/:sessionId/subagents", async (request) => { const { sessionId } = z.object({ sessionId: z.string() }).parse(request.params); const snapshot = await engine.session(sessionId); return await engine.subagents.list(snapshot.workspacePath); });
+app.get("/v1/sessions/:sessionId/subagents/:name", async (request) => { const { sessionId, name } = z.object({ sessionId: z.string(), name: z.string().min(1).max(60) }).parse(request.params); const snapshot = await engine.session(sessionId); return await engine.subagents.resolve(snapshot.workspacePath, name); });
+app.post("/v1/sessions/:sessionId/subagents/:name/materialize", async (request) => { const { sessionId, name } = z.object({ sessionId: z.string(), name: z.string().min(1).max(60) }).parse(request.params); const b=z.object({bindRole:z.boolean().optional()}).parse(request.body ?? {}); const snapshot = await engine.session(sessionId); return await engine.subagents.materialize(auroraInput({ tenantId: snapshot.tenantId, workspacePath: snapshot.workspacePath, name, bindRole: b.bindRole })); });
+app.post("/v1/sessions/:sessionId/subagents/materialize-all", async (request) => { const { sessionId } = z.object({ sessionId: z.string() }).parse(request.params); const snapshot = await engine.session(sessionId); return { applied: await engine.subagents.materializeAll({ tenantId: snapshot.tenantId, workspacePath: snapshot.workspacePath }) }; });
 app.post("/v1/harvest-policy", async (request) => { const b=auroraTenant.extend({autoRecord:z.boolean().optional(),successAtOrAbove:z.number().min(0).max(1).optional(),failBelow:z.number().min(0).max(1).optional(),settleAfterMs:z.number().int().min(0).max(86_400_000).optional(),maxPerRun:z.number().int().min(1).max(200).optional(),learnFromFailures:z.boolean().optional()}).parse(request.body); return await engine.harvester.configure(auroraInput(b)); });
 
 // Aurora role authority — least-privilege capability allowlists for the society
