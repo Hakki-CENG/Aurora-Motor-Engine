@@ -8,7 +8,7 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.56.0
+## Current milestone — 1.57.0
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -88,6 +88,7 @@ Implemented and tested:
 - Per-session effort levels that move both provider reasoning and harness budgets, and deliberate git worktrees
 - Signed artefact manifests with Ed25519 publisher keys, version pinning and per-agent lifecycle hooks
 - Layered settings with provenance and an immovable managed floor, plus structured questions to the human
+- MCP 2026-07-28 stateless client with server/discover, routing headers, cacheable listings and multi round-trip requests
 - Aurora autopilot: bounded unattended cadence with a durable run ledger
 - Aurora provenance explainer reconstructing why any artifact exists
 - Embedding-backed semantic memory recall
@@ -1034,6 +1035,17 @@ work. It never overwrites a human verdict, never resolves a plan that is merely 
 marks the decision executed instead), and supports a dry run that shows exactly what would be written.
 Each record keeps its evidence, observed value, surprise and Brier score, so every calibration number
 traces back to the execution behind it.
+
+## MCP 2026-07-28
+
+The stateless revision removed the `initialize` handshake and `Mcp-Session-Id` entirely. Aurora speaks it
+natively: `server/discover` for capabilities, `MCP-Protocol-Version` / `Mcp-Method` / `Mcp-Name` routing
+headers that the client refuses to let disagree with the body, cacheable list results, and Multi
+Round-Trip Requests in place of elicitation. `requestState` is treated as attacker-controlled input —
+bounded, never parsed, echoed back verbatim — and a mid-call input request is put to the *human* through
+the same bounded question service the agent uses, so a remote server cannot script its own confirmation.
+Discovery is optional in the revision, so a failing server degrades and registers what it could list
+rather than hanging a turn. The existing SDK-backed manager keeps serving servers on the older revision.
 
 ## Managed settings and asking the human
 

@@ -167,6 +167,7 @@ import { SessionEffortService } from "./policy/session-effort.js";
 import { ManifestTrustService } from "./security/manifest-trust.js";
 import { SettingsResolver } from "./policy/settings-resolver.js";
 import { UserQuestionService } from "./runtime/user-questions.js";
+import { StatelessMcpRegistry } from "./mcp/stateless-mcp-registry.js";
 import { SessionLifecycleService } from "./runtime/session-lifecycle.js";
 import { memoryGraphCapabilities } from "./capabilities/memory-graph.js";
 import { multiWorldCapabilities, worldModelCapabilities } from "./capabilities/world-model.js";
@@ -356,6 +357,7 @@ export class HybridAgentEngine {
   readonly manifestTrust: ManifestTrustService;
   readonly settings: SettingsResolver;
   readonly userQuestions: UserQuestionService;
+  readonly statelessMcp: StatelessMcpRegistry;
   readonly subagents: SubagentDefinitionService;
   readonly sessionLifecycle: SessionLifecycleService;
 
@@ -482,6 +484,31 @@ export class HybridAgentEngine {
     });
     const policy = new SessionModePolicyEngine(layered, this.sessionModes);
     this.capabilities = new CapabilityBroker(policy, this.approvals, effects, this.hooks);
+    // A 2026-07-28 MCP server that needs input mid-call asks the human through the same bounded
+    // question service the agent uses: a remote server never gets to script its own confirmation.
+    this.statelessMcp = new StatelessMcpRegistry(this.capabilities, {
+      askUser: async ({ tenantId, sessionId, requests }) => {
+        const answers: Array<{ id: string; value: string }> = [];
+        for (const request of requests.slice(0, 5)) {
+          const options = request.options?.length
+            ? request.options.map((option) => ({ label: option.label }))
+            : [{ label: "Yes" }, { label: "No" }];
+          const asked = await this.userQuestions.ask({
+            tenantId,
+            sessionId,
+            question: request.prompt,
+            context: "An MCP tool needs input to continue.",
+            options,
+            allowFreeText: request.kind === "text",
+            timeoutMs: 120_000,
+          });
+          if (asked.status !== "answered") throw new Error(`MCP input request "${request.id}" was not answered (${asked.status}).`);
+          const chosen = asked.options.find((option) => option.id === asked.answer?.optionId);
+          answers.push({ id: request.id, value: asked.answer?.text ?? chosen?.label ?? "" });
+        }
+        return answers;
+      },
+    });
     this.wasiPlugins = config.wasiPlugins
       ? new WasiPluginManager(this.capabilities, this.hooks, { rootPath: dataRoot, ...config.wasiPlugins })
       : undefined;

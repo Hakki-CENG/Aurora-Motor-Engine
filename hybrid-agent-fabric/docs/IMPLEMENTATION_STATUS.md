@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-20 — current milestone 1.56
+Updated: 2026-08-20 — current milestone 1.57
 
 ## Original 1.0 baseline (delivered)
 
@@ -372,6 +372,16 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] Structured multiple-choice questions to the human with attributed answers
 - [x] Timeout without an invented answer; `dontAsk` denial; plan-mode allowance
 - [x] Outstanding questions cancelled when a session closes
+
+### Peer parity round two, wave two (1.57)
+
+- [x] MCP 2026-07-28 client: no handshake, no session id, `_meta` self-description
+- [x] `server/discover` with caching and non-blocking failure
+- [x] `MCP-Protocol-Version`, `Mcp-Method`, `Mcp-Name` headers, self-checked against the body
+- [x] Cacheable list results with explicit refresh
+- [x] Multi Round-Trip Requests with verbatim, bounded `requestState` and a stable request id
+- [x] Stateless servers registered as governed capabilities with the server's schema
+- [x] Mid-call input requests routed to a human, bounded rounds, no guessed answers
 
 ## Required for full target parity
 

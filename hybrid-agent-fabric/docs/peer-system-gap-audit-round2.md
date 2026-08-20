@@ -22,7 +22,7 @@ a re-read of the old list.
 
 | # | Gap | Why it matters | Status |
 |---|---|---|---|
-| N1 | **MCP 2026-07-28 stateless client**: `server/discover`, routing headers, cacheable listings, Multi Round-Trip Requests, no session id | The ecosystem's servers are migrating now. A client stuck on the handshake revision loses access to new servers, and MRTR is how mid-call confirmation works without a held-open stream | Planned (next) |
+| N1 | **MCP 2026-07-28 stateless client**: `server/discover`, routing headers, cacheable listings, Multi Round-Trip Requests, no session id | The ecosystem's servers are migrating now. A client stuck on the handshake revision loses access to new servers, and MRTR is how mid-call confirmation works without a held-open stream | **Done in 1.57.0** |
 | N2 | **Managed settings floor with provenance**: a layered settings tree where an enterprise layer cannot be relaxed by any lower layer or flag, and every effective value reports which layer produced it | This is the difference between "approved for use" and "blocked by security" in procurement. Aurora has strong per-tenant governance but no immovable admin floor and no answer to "why is this setting what it is?" | **Done in 1.56.0** |
 | N3 | **Structured user questions**: an agent asking the human a bounded question with options and waiting for the answer | Aurora can request *approval* for an action, but it cannot ask "which of these three?" — so an uncertain agent either guesses or stops | **Done in 1.56.0** |
 
@@ -54,7 +54,14 @@ for an answer with an explicit timeout, and returns the human's choice. A timeou
 rather than a guess; `dontAsk` denies the capability outright, matching the peer semantics, and plan mode
 allows it because asking a question changes nothing.
 
-## 4. Next steps
+## 4. What 1.57.0 fixes
 
-N1 (MCP 2026-07-28 client), then N4 background-task control, N5 model-callable mode transitions, N6
-long-running shells, N7 reviewed automatic approvals.
+**N1 — MCP 2026-07-28.** `StatelessMcpClient` speaks the revision natively (no handshake, no session id,
+`server/discover`, routing headers checked against the body, cacheable listings, MRTR with a bounded
+verbatim `requestState`). `StatelessMcpRegistry` registers such a server's tools as governed capabilities
+and routes mid-call input requests to a human through the bounded question service.
+
+## 5. Next steps
+
+N4 background-task control (`Monitor` / `TaskStop` / `SendMessage`), N5 model-callable mode transitions,
+N6 long-running shells with retrievable output, N7 reviewed automatic approvals.

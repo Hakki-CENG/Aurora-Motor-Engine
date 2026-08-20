@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.57.0 — 2026-08-20
+
+Round-two audit, N1: **the MCP 2026-07-28 stateless revision**, the largest change to the protocol since
+it launched and the one the ecosystem's servers are migrating to now.
+
+- Added `StatelessMcpClient`, a client for the revision rather than an adapter over the old one. There is
+  no `initialize` handshake and no `Mcp-Session-Id`: every request self-describes through `_meta`, and
+  capabilities come from the new optional `server/discover`.
+- **Routing headers are sent and self-checked.** `MCP-Protocol-Version`, `Mcp-Method` and — for named
+  calls — `Mcp-Name` accompany every request, and the client refuses to construct a request whose header
+  would disagree with its body, because that mismatch is exactly what gateway-confusion attacks rely on.
+  A session id is stripped even if a caller configures one; the revision removed sessions outright.
+- **Multi Round-Trip Requests** replace elicitation: a server answering `input_required` returns a
+  `requestState`, and the client re-issues the original call — same request id — with `inputResponses`
+  attached. `requestState` is treated as what it is, attacker-controlled input that round-trips through
+  us: length-bounded, never parsed, never interpreted, echoed back verbatim and nothing more.
+- **Cacheable listings** are cached with a TTL, since the revision made list results connection-invariant,
+  with an explicit refresh. **Startup never blocks**: `server/discover` is optional, so a failure marks
+  the server degraded, registers whatever tools it did manage to list, and lets calls fail on their own
+  terms instead of hanging a turn.
+- Added `StatelessMcpRegistry`, which registers a stateless server's tools as governed capabilities
+  (`mcp.<server>.<tool>`, external-effect risk, the server's own JSON schema passed through to the model).
+  A mid-call input request is routed to the **human** through the same bounded question service the agent
+  uses — a remote server does not get to script its own confirmation — and an unanswered question ends
+  the call rather than guessing. Interactive rounds are capped so a server cannot hold a turn open.
+- Added REST to connect, list, refresh and disconnect stateless servers, and a CLI view.
+- Added 9 tests (510 engine tests total) covering handshake-free discovery with no session id, header
+  mirroring, list caching and forced refresh, a full MRTR round trip with verbatim state echo and a
+  stable request id, the bounded interactive driver, oversized-state and server-error handling,
+  non-blocking discovery failure, endpoint safety refusals, capability registration with a degraded
+  server, and the human-in-the-loop input path.
+
 ## 1.56.0 — 2026-08-20
 
 A **fresh** peer comparison ([`docs/peer-system-gap-audit-round2.md`](docs/peer-system-gap-audit-round2.md))

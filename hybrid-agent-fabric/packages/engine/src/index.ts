@@ -116,6 +116,8 @@ export * from "./policy/session-effort.js";
 export * from "./security/manifest-trust.js";
 export * from "./policy/settings-resolver.js";
 export * from "./runtime/user-questions.js";
+export * from "./mcp/stateless-mcp-client.js";
+export * from "./mcp/stateless-mcp-registry.js";
 export * from "./capabilities/discovery.js";
 export * from "./aurora/provenance-service.js";
 export * from "./aurora/workspace-checkpoint-service.js";
