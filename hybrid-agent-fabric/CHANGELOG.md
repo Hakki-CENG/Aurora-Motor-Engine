@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.48.0 — 2026-08-20
+
+Another deepening release: the decision loop finally closes, delegation schedules like something that
+understands consequences, and a role that keeps failing stops being handed the dangerous work.
+
+- **Plan feedback into decision calibration.** Surprise, Brier score and overconfidence were only ever
+  as good as the outcomes someone remembered to record — which meant mostly none. `AuroraPlanFeedback`
+  derives the outcome of a decision from the plan it produced: the fraction of steps genuinely
+  finished, blended with the mean quality of harvested delegated work when that evidence exists.
+- The derivation is conservative by construction: only terminal plans count (completed, abandoned, or
+  blocked by a failed step), an existing outcome is never overwritten, abandoned and already-reviewed
+  decisions are left alone, and a decision whose plan is merely *executing* is marked executed rather
+  than resolved. `dryRun` shows precisely what would be written before calibration is touched.
+- Every record keeps its evidence references, observed value, surprise and Brier score, so a
+  calibration number can be traced back to the execution that produced it. The ACOS evaluate phase now
+  folds reality in *before* reading calibration, so a finished plan is never still counted as an open bet.
+- **Critical-path-aware delegation.** When the budget only allows a few tasks, the bridge now delegates
+  the longest pole first: critical-path steps, then risk, then estimate size, deterministically. Among
+  equally-waiting plans, the unattended path prefers the one with the longest critical path — fairness
+  still comes first, criticality only breaks ties.
+- **Role probation.** A role whose failure rate exceeds the configured threshold, over enough attempts,
+  is no longer nominated for high-risk steps (`riskLevel >= riskFloor`), and the step is skipped with
+  `all-matching-roles-on-probation` instead of quietly handing dangerous work to the least reliable
+  candidate. Probation is soft and reversible: low-risk work still flows, so a role can earn its record
+  back. Candidate listings now expose completed/failed counts, failure rate and probation status.
+- Added governed `decision.feedback-candidates|reconcile|records|summary` capabilities, REST for all of
+  them, a Canvas "Record decision outcomes" control with the derived outcomes and loop summary, CLI/TUI
+  views and a bounded `decision-feedback-reconcile` action, plus `haf_aurora_plan_feedback` telemetry
+  and a `plan-expectations-off` alert when finished plans keep landing far from what was expected.
+- Added 9 tests (423 engine tests total) covering outcome derivation from step evidence, failure
+  recording, dry runs, execution marking without a verdict, refusal to overwrite a human outcome, the
+  loop summary, ACOS integration, critical-path ordering under a tight budget, and probation keeping a
+  bad record away from high-risk work while leaving routine work untouched.
+
 ## 1.47.0 — 2026-08-20
 
 This release deepens the three newest subsystems rather than adding a fourth: delegation now respects

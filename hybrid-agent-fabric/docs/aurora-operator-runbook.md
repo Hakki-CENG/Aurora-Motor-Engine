@@ -134,6 +134,7 @@ with that evidence.
 | `skipped: society-concurrency-exhausted` | The society is already running its maximum tasks | Raise `maxConcurrentTasks` via `/v1/society/budget` or wait |
 | `skipped: society-token-budget-exhausted` | The daily society token budget cannot cover the step | Raise the budget, lower the step estimate, or wait for the daily reset |
 | Link stuck in `posted` | Nomination or award failed; the reason is on the link's `note` | Usually society budget or concurrency — check `/v1/society/budget` |
+| `skipped: all-matching-roles-on-probation` | Every matching role has a failure rate above the threshold for this risk level | Fix the roles, lower `riskLevel`, or retune `probation` on the delegation policy |
 | Plan blocked after a failure | A delegated task failed, which fails the step | Replan the step, or detach and re-delegate to another role |
 
 **Outcome harvesting.** Settled delegated work is scored from recorded events and recorded
@@ -157,6 +158,21 @@ Each assessment stores the five weighted criteria behind its score, so a dispute
 be recomputed rather than argued about. Widen `settleAfterMs` if work is being scored too eagerly;
 widen the gap between `failBelow` and `successAtOrAbove` to send more cases to human review, narrow it
 to record more automatically. Disabling `autoRecord` routes everything to the queue.
+
+**Decision feedback.** When a plan finishes, the decision that produced it gets its outcome recorded
+automatically, which is what keeps calibration honest.
+
+```bash
+curl -H … "$HAF/v1/decision-feedback/candidates?tenantId=acme"           # what is waiting on reality
+curl -H … -X POST $HAF/v1/decision-feedback/reconcile -d '{"tenantId":"acme","dryRun":true}'
+curl -H … -X POST $HAF/v1/decision-feedback/reconcile -d '{"tenantId":"acme"}'
+curl -H … "$HAF/v1/decision-feedback/summary?tenantId=acme"
+haf-client aurora decision-feedback-summary
+```
+
+Always dry-run first when tuning: the response shows the exact observed value, surprise and Brier score
+that would be written. A human-recorded outcome is never overwritten, and a plan that is only executing
+marks the decision executed rather than resolving it.
 
 **Role authority.** Without a bound profile, a delegated child session inherits the parent's full
 capability set. Bring the society to least authority:
@@ -207,6 +223,7 @@ re-apply the template or justify the exception). A resolved template with a non-
 | `delegation-failing` | Delegated plan work fails more than it succeeds | Read the failed links' outcomes; the role or the step decomposition is wrong |
 | `roles-inherit-authority` | Over half the roles have no least-authority profile | `POST /v1/society/authority/apply-all` |
 | `harvest-review-backlog` | Delegated outcomes are waiting for a human verdict | Work `/v1/harvest-review`; if the band is too wide, retune the thresholds |
+| `plan-expectations-off` | Finished plans keep landing far from what their decisions expected | Read `/v1/decision-feedback`; the planning estimates or the decision confidence are wrong |
 | `acos-degraded` | Last cycle had degraded phases | The cycle report names the phase and the error |
 
 ---

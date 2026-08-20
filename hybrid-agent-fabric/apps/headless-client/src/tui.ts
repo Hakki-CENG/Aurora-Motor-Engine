@@ -86,11 +86,11 @@ export async function runTui(client: HafApiClient): Promise<void> {
         // The cognitive layer is reachable from the same terminal as the conversation: read-only
         // views by default, and only the same bounded actions the CLI exposes.
         if (!argument || argument === "help") {
-          write(`views: ${Object.keys(AURORA_VIEWS).join(", ")}\nactions: cycle, autopilot-run-due, fleet-sweep, delegation-sync, harvest\n`);
+          write(`views: ${Object.keys(AURORA_VIEWS).join(", ")}\nactions: cycle, autopilot-run-due, fleet-sweep, delegation-sync, harvest, decision-feedback-reconcile\n`);
           break;
         }
         const [target, ...flags] = argument.split(/\s+/);
-        const actions: AuroraAction[] = ["cycle", "autopilot-run-due", "fleet-sweep", "delegation-sync", "harvest"];
+        const actions: AuroraAction[] = ["cycle", "autopilot-run-due", "fleet-sweep", "delegation-sync", "harvest", "decision-feedback-reconcile"];
         const limitFlag = flags.indexOf("--limit");
         const limit = limitFlag >= 0 ? Number(flags[limitFlag + 1]) : undefined;
         if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 1000)) throw new Error("--limit must be an integer between 1 and 1000.");

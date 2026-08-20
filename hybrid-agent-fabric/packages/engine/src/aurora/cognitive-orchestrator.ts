@@ -124,6 +124,8 @@ export class CognitiveOrchestrator {
       integrity?: (tenantId: string) => Promise<{ findings: number; critical: number; score: number; details: string[] }>;
       /** Plan-to-society reconciliation, and — only if the tenant enabled it — new delegation. */
       delegation?: (tenantId: string) => Promise<{ synced: number; updatedSteps: number; delegated: number; skipped: number; autoDelegate: boolean; harvested?: number; review?: number }>;
+      /** Record decision outcomes derived from finished plans, so calibration reflects reality. */
+      planFeedback?: (tenantId: string) => Promise<{ recorded: number; executedMarked: number }>;
     } = {},
   ) {
     this.store = new DurableJsonState<OrchestratorStateShape>(
@@ -408,6 +410,14 @@ export class CognitiveOrchestrator {
         };
       }
       case "evaluate": {
+        // Reality is folded in before calibration is read: a decision whose plan finished should not
+        // still be counted as an open bet on the next line.
+        let feedbackRecorded = 0;
+        if (this.hooks.planFeedback) {
+          const feedback = await this.hooks.planFeedback(tenantId);
+          feedbackRecorded = feedback.recorded;
+          if (feedback.recorded > 0) accumulator.recommendations.push(`${feedback.recorded} decision outcome(s) recorded from finished plans.`);
+        }
         const cognitiveHealth = await this.deps.cognitive.health(tenantId);
         const compliance = await this.deps.constitution.compliance(tenantId, 7);
         accumulator.health.cognitive = cognitiveHealth.healthScore;
@@ -435,7 +445,7 @@ export class CognitiveOrchestrator {
           for (const detail of integrity.details.slice(0, 3)) accumulator.recommendations.push(`Integrity: ${detail}`);
         }
         const status = cognitiveHealth.healthScore < 0.5 || integrityCritical > 0 ? "degraded" : "ok";
-        return { status, summary: `Cognitive health ${cognitiveHealth.healthScore}, compliance ${compliance.complianceRate}, ${decisionsDue} decision review(s) due, integrity ${integrityScore}.`, detail: { health: cognitiveHealth.healthScore, blocked: cognitiveHealth.totals.blocked, violations: cognitiveHealth.constitutionalViolations.length, compliance: compliance.complianceRate, decisionsDue, overconfidence, integrityScore, integrityCritical } };
+        return { status, summary: `Cognitive health ${cognitiveHealth.healthScore}, compliance ${compliance.complianceRate}, ${decisionsDue} decision review(s) due, integrity ${integrityScore}.`, detail: { health: cognitiveHealth.healthScore, blocked: cognitiveHealth.totals.blocked, violations: cognitiveHealth.constitutionalViolations.length, compliance: compliance.complianceRate, decisionsDue, overconfidence, integrityScore, integrityCritical, feedbackRecorded } };
       }
       case "learn": {
         // Friction observed by the cognitive layer becomes an evidence-backed capability-gap signal.

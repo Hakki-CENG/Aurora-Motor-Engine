@@ -78,6 +78,7 @@ and none of it can widen that runtime's authority.
 | Execution bridge | `AuroraExecutionBridge` | `plan.delegate`, `plan.sync`, `plan.activate` | `/v1/plans/:id/delegate`, `/v1/delegations/*` | `aurora-delegation.test.ts` |
 | Role authority | `RoleAuthorityService` | `society.authority.*` | `/v1/society/authority/*` | `aurora-role-authority.test.ts` |
 | Outcome harvesting | `AuroraOutcomeHarvester` | `plan.harvest*` | `/v1/delegations/harvest`, `/v1/harvest-review` | `aurora-outcome-harvest.test.ts` |
+| Plan feedback | `AuroraPlanFeedback` | `decision.feedback-*` | `/v1/decision-feedback/*` | `aurora-plan-feedback.test.ts` |
 | Explainability | `ProvenanceService` | `aurora.explain` | `/v1/aurora/explain` | `aurora-reasoning.test.ts`, `aurora-end-to-end.test.ts` |
 | Anomaly detection | `StuckDetectorService` | `session.stuck.analyze` | `/v1/sessions/:id/stuck` | `aurora-acos.test.ts` |
 | Recovery | `WorkspaceCheckpointService` — bounded content-addressed snapshots, reversible restore | `checkpoint.*` | `/v1/checkpoints/*` | `aurora-operations.test.ts` |
@@ -112,6 +113,7 @@ acos/autopilot.json        cadence config and unattended run ledger
 acos/fleet.json            fleet enrollment, circuit-breaker state and the sweep ledger
 planning/delegation.json   plan-step to society-task links, match evidence and delegation policy
 planning/harvest.json      outcome scorecards, review queue and harvesting policy
+planning/feedback.json     decision outcomes derived from finished plans, with evidence
 checkpoints/state.json     workspace checkpoint manifests (content blobs live under checkpoints/blobs)
 cognitive/workspace.json   objects, goals, budgets, modes, intake ledger, allocation buckets
 constitution/state.json    principles, amendments, decision verdicts, identity core
@@ -168,4 +170,6 @@ predate newer fields, and writes atomically through a temporary file plus rename
 - drive a tenant unattended that nobody enrolled, or let one tenant's failures stop the rest of the fleet;
 - mark a plan step done without a society outcome and its evidence, or start delegated work as a side effect of planning;
 - let a delegated child session inherit more authority than its role's reviewed template grants;
-- score its own delegated work as a success without recorded evidence, or resolve an ambiguous outcome by guessing.
+- score its own delegated work as a success without recorded evidence, or resolve an ambiguous outcome by guessing;
+- overwrite a human's recorded decision outcome, or claim a decision's result while its plan is still running;
+- hand high-risk work to a role whose own record says it should not have it.

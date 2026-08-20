@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-20 — current milestone 1.47
+Updated: 2026-08-20 — current milestone 1.48
 
 ## Original 1.0 baseline (delivered)
 
@@ -271,6 +271,17 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] Candidate-only distillation of failed delegation trajectories, disable-able
 - [x] Tenant-defined role authority templates with validation and empty-template rejection
 - [x] Built-in templates immutable and reserved; custom templates audited for drift
+
+### Aurora plan feedback and scheduling intelligence (1.48)
+
+- [x] Decision outcomes derived from terminal plans and delegated-work quality
+- [x] Dry run, no overwriting of existing outcomes, execution marking without a verdict
+- [x] Evidence, observed value, surprise and Brier score stored per record
+- [x] ACOS evaluate folds reality in before reading calibration
+- [x] Critical-path-first delegation under a tight budget
+- [x] Criticality tie-break for unattended cross-plan delegation
+- [x] Reversible role probation keeping poor records away from high-risk steps
+- [x] Plan-feedback telemetry, expectation-drift alert, REST, Canvas, CLI and TUI surfaces
 
 ## Required for full target parity
 

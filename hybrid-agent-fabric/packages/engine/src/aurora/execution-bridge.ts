@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { AgentSocietyService, SocietyRole, SocietyTask } from "../society/agent-society-service.js";
 import type { PlanRecord, PlanningService, PlanStep } from "./planning-service.js";
-import { auroraInteger, auroraOptionalText, auroraRound, auroraTags, auroraText, DurableJsonState } from "../util/aurora-state.js";
+import { auroraInteger, auroraOptionalText, auroraRound, auroraTags, auroraText, auroraUnit, DurableJsonState } from "../util/aurora-state.js";
 
 const MAX_LINKS = 20_000;
 const MAX_PER_DELEGATION = 25;
@@ -42,6 +42,11 @@ export interface DelegationPolicy {
   maxTasksPerRun: number;
   /** Refuse to post work no active role can satisfy instead of leaving an orphan task open. */
   requireRoleMatch: boolean;
+  /**
+   * Soft, reversible protection for consequential work: a role that has earned a bad record is not
+   * nominated for high-risk steps. It keeps its low-risk work, so it can also earn its way back.
+   */
+  probation: { minAttempts: number; maxFailureRate: number; riskFloor: number };
   updatedAt: string;
 }
 
@@ -114,6 +119,7 @@ export class AuroraExecutionBridge {
   async configure(input: {
     tenantId: string; autoDelegate?: boolean; autoActivate?: boolean; rootSessionId?: string | null;
     maxActiveTasksPerPlan?: number; maxTasksPerRun?: number; requireRoleMatch?: boolean;
+    probation?: { minAttempts?: number; maxFailureRate?: number; riskFloor?: number };
   }): Promise<DelegationPolicy> {
     return await this.store.mutate((state) => {
       const policy = this.mutablePolicy(state, input.tenantId);
@@ -126,6 +132,11 @@ export class AuroraExecutionBridge {
       if (input.maxActiveTasksPerPlan !== undefined) policy.maxActiveTasksPerPlan = auroraInteger(input.maxActiveTasksPerPlan, 1, 100, "Active tasks per plan");
       if (input.maxTasksPerRun !== undefined) policy.maxTasksPerRun = auroraInteger(input.maxTasksPerRun, 1, MAX_PER_DELEGATION, "Tasks per run");
       if (input.requireRoleMatch !== undefined) policy.requireRoleMatch = input.requireRoleMatch;
+      if (input.probation) {
+        if (input.probation.minAttempts !== undefined) policy.probation.minAttempts = auroraInteger(input.probation.minAttempts, 1, 1000, "Probation attempts");
+        if (input.probation.maxFailureRate !== undefined) policy.probation.maxFailureRate = auroraUnit(input.probation.maxFailureRate, "Probation failure rate");
+        if (input.probation.riskFloor !== undefined) policy.probation.riskFloor = auroraUnit(input.probation.riskFloor, "Probation risk floor");
+      }
       policy.updatedAt = new Date(this.now()).toISOString();
       return structuredClone(policy);
     });
@@ -135,7 +146,8 @@ export class AuroraExecutionBridge {
    * Rank the active roles that could take a piece of work. Deterministic and explainable: capability
    * coverage first, then earned reputation, then how recently the role has been loaded with work.
    */
-  async candidates(tenantId: string, capabilityTags: string[]): Promise<Array<{ roleId: string; name: string; coverage: number; reputation: number; activeTasks: number; score: number }>> {
+  async candidates(tenantId: string, capabilityTags: string[]): Promise<Array<{ roleId: string; name: string; coverage: number; reputation: number; activeTasks: number; score: number; completedTasks: number; failedTasks: number; failureRate: number; onProbation: boolean }>> {
+    const policy = await this.policy(tenantId);
     const tags = auroraTags(capabilityTags, "Required capability tags");
     const [roles, tasks] = await Promise.all([this.deps.society.roles(tenantId), this.deps.society.tasks(tenantId)]);
     const load = new Map<string, number>();
@@ -150,6 +162,8 @@ export class AuroraExecutionBridge {
         const coverage = tags.length ? tags.filter((tag) => role.capabilityTags.includes(tag)).length / tags.length : 1;
         const activeTasks = load.get(role.id) ?? 0;
         const availability = 1 / (1 + activeTasks);
+        const attempts = role.completedTasks + role.failedTasks;
+        const failureRate = attempts ? auroraRound(role.failedTasks / attempts) : 0;
         return {
           roleId: role.id,
           name: role.name,
@@ -157,6 +171,10 @@ export class AuroraExecutionBridge {
           reputation: role.reputation,
           activeTasks,
           score: auroraRound(coverage * 0.6 + role.reputation * 0.3 + availability * 0.1),
+          completedTasks: role.completedTasks,
+          failedTasks: role.failedTasks,
+          failureRate,
+          onProbation: attempts >= policy.probation.minAttempts && failureRate > policy.probation.maxFailureRate,
         };
       })
       .filter((item) => item.coverage > 0 || tags.length === 0)
@@ -200,7 +218,10 @@ export class AuroraExecutionBridge {
       - societyTasks.filter((item) => ["assigned", "running"].includes(item.status)).length);
     let remainingTokens = Math.max(0, societyBudget.dailyTokenBudget - societyBudget.usedTokens - societyBudget.reservedTokens);
 
-    for (const stepKey of requested ?? progress.ready) {
+    // When the budget is tight the longest pole should move first: critical-path steps, then risk,
+    // then the biggest estimate. Explicitly requested steps keep the caller's order.
+    const queue = requested ?? this.prioritiseReady(plan, progress.ready);
+    for (const stepKey of queue) {
       const step = plan.steps.find((item) => item.key === stepKey);
       if (!step) { skipped.push({ stepKey, reason: "step-not-found" }); continue; }
       if (!progress.ready.includes(step.key)) { skipped.push({ stepKey: step.key, reason: `step-not-ready (${step.status})` }); continue; }
@@ -220,7 +241,14 @@ export class AuroraExecutionBridge {
 
       const tags = await this.tagsFor(input.tenantId, plan, step, input.capabilityTags);
       const ranked = await this.candidates(input.tenantId, tags);
-      const best = ranked.find((item) => item.coverage >= 1) ?? ranked[0];
+      // High-risk work is never nominated to a role on probation, even if it is the best match.
+      const highRisk = step.riskLevel >= policy.probation.riskFloor;
+      const eligible = highRisk ? ranked.filter((item) => !item.onProbation) : ranked;
+      if (highRisk && !eligible.length && ranked.length) {
+        skipped.push({ stepKey: step.key, reason: `all-matching-roles-on-probation (risk ${step.riskLevel})` });
+        continue;
+      }
+      const best = eligible.find((item) => item.coverage >= 1) ?? eligible[0];
       if (policy.requireRoleMatch && (!best || best.coverage < 1)) {
         skipped.push({ stepKey: step.key, reason: `no-role-matches (${tags.join(", ") || "untagged"})` });
         continue;
@@ -363,7 +391,11 @@ export class AuroraExecutionBridge {
         if (!previous || link.createdAt > previous) lastDelegatedAt.set(link.planId, link.createdAt);
       }
       const ordered = [...plans].sort((a, b) =>
-        (lastDelegatedAt.get(a.id) ?? "").localeCompare(lastDelegatedAt.get(b.id) ?? "") || a.id.localeCompare(b.id));
+        (lastDelegatedAt.get(a.id) ?? "").localeCompare(lastDelegatedAt.get(b.id) ?? "")
+        // Fairness first; among equally-waiting plans the one with the longest remaining critical
+        // path goes next, because that is the plan whose finish date the delay actually moves.
+        || b.criticalPath.length - a.criticalPath.length
+        || a.id.localeCompare(b.id));
       let budget = policy.maxTasksPerRun;
       for (const plan of ordered) {
         if (budget <= 0) break;
@@ -379,6 +411,22 @@ export class AuroraExecutionBridge {
       }
     }
     return { synced: sync.synced, updatedSteps: sync.updatedSteps.length, delegated, skipped, autoDelegate: policy.autoDelegate };
+  }
+
+  /** Deterministic scheduling order for ready work: critical path, then risk, then size. */
+  private prioritiseReady(plan: PlanRecord, ready: string[]): string[] {
+    const byKey = new Map(plan.steps.map((item) => [item.key, item]));
+    return [...ready].sort((a, b) => {
+      const left = byKey.get(a);
+      const right = byKey.get(b);
+      const criticality = Number(plan.criticalPath.includes(b)) - Number(plan.criticalPath.includes(a));
+      if (criticality !== 0) return criticality;
+      const risk = (right?.riskLevel ?? 0) - (left?.riskLevel ?? 0);
+      if (risk !== 0) return risk;
+      const size = (right?.estimateMinutes ?? 0) - (left?.estimateMinutes ?? 0);
+      if (size !== 0) return size;
+      return a.localeCompare(b);
+    });
   }
 
   private async createLink(input: {
@@ -559,6 +607,7 @@ export class AuroraExecutionBridge {
         maxActiveTasksPerPlan: 3,
         maxTasksPerRun: 5,
         requireRoleMatch: true,
+        probation: { minAttempts: 4, maxFailureRate: 0.5, riskFloor: 0.7 },
         updatedAt: new Date(this.now()).toISOString(),
       };
       state.policies.push(policy);

@@ -44,6 +44,8 @@ export const AURORA_VIEWS = {
   "role-authority": "/v1/society/authority/audit",
   "harvest-review": "/v1/harvest-review",
   "harvest-assessments": "/v1/harvest-assessments",
+  "decision-feedback": "/v1/decision-feedback",
+  "decision-feedback-summary": "/v1/decision-feedback/summary",
   "delegation-policy": "/v1/delegation-policy",
   fleet: "/v1/aurora/fleet",
   "fleet-members": "/v1/aurora/fleet/members",
@@ -54,7 +56,7 @@ export const AURORA_VIEWS = {
 } as const satisfies Record<string, string>;
 
 export type AuroraView = keyof typeof AURORA_VIEWS;
-export type AuroraAction = "cycle" | "autopilot-run-due" | "fleet-sweep" | "delegation-sync" | "harvest";
+export type AuroraAction = "cycle" | "autopilot-run-due" | "fleet-sweep" | "delegation-sync" | "harvest" | "decision-feedback-reconcile";
 
 export class HafApiClient {
   private readonly origin: string;
@@ -148,7 +150,10 @@ export class HafApiClient {
     if (action === "harvest") {
       return await this.request("/v1/delegations/harvest", { method: "POST", timeoutMs: 10 * 60_000, body: { tenantId: this.tenantId } });
     }
-    throw new Error(`Unknown Aurora action "${action}". Known actions: cycle, autopilot-run-due, fleet-sweep, delegation-sync, harvest.`);
+    if (action === "decision-feedback-reconcile") {
+      return await this.request("/v1/decision-feedback/reconcile", { method: "POST", timeoutMs: 10 * 60_000, body: { tenantId: this.tenantId } });
+    }
+    throw new Error(`Unknown Aurora action "${action}". Known actions: cycle, autopilot-run-due, fleet-sweep, delegation-sync, harvest, decision-feedback-reconcile.`);
   }
 
   async subscribe(sessionId: string, options: EventSubscriptionOptions): Promise<void> {

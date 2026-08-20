@@ -3,6 +3,7 @@ import type { AuroraDataGovernanceService } from "../aurora/data-governance-serv
 import type { AuroraExecutionBridge } from "../aurora/execution-bridge.js";
 import type { AuroraFleetSupervisor } from "../aurora/fleet-supervisor.js";
 import type { AuroraOutcomeHarvester } from "../aurora/outcome-harvester.js";
+import type { AuroraPlanFeedback } from "../aurora/plan-feedback-service.js";
 import type { RoleAuthorityService } from "../aurora/role-authority-service.js";
 import type { AuroraMetricsCollector } from "../aurora/aurora-metrics.js";
 import type { WorkspaceCheckpointService } from "../aurora/workspace-checkpoint-service.js";
@@ -179,10 +180,16 @@ export function delegationCapabilities(service: AuroraExecutionBridge) {
         autoDelegate: z.boolean().optional(), autoActivate: z.boolean().optional(), rootSessionId: z.string().max(200).nullable().optional(),
         maxActiveTasksPerPlan: z.number().int().min(1).max(100).optional(), maxTasksPerRun: z.number().int().min(1).max(25).optional(),
         requireRoleMatch: z.boolean().optional(),
+        probation: z.object({ minAttempts: z.number().int().min(1).max(1000).optional(), maxFailureRate: z.number().min(0).max(1).optional(), riskFloor: z.number().min(0).max(1).optional() }).optional(),
       }),
-      async (input, ctx) => Object.keys(input).length
-        ? await service.configure(auroraDefined({ tenantId: ctx.tenantId, ...input }))
-        : await service.policy(ctx.tenantId),
+      async (input, ctx) => {
+        if (!Object.keys(input).length) return await service.policy(ctx.tenantId);
+        const { probation, ...rest } = input;
+        return await service.configure(auroraDefined({
+          tenantId: ctx.tenantId, ...rest,
+          ...(probation ? { probation: auroraDefined(probation) } : {}),
+        }));
+      },
     ),
   ];
 }
@@ -271,10 +278,40 @@ export function harvestCapabilities(service: AuroraOutcomeHarvester) {
     ),
     defineCapability(
       { id: "plan.harvest-policy", version: "1.0.0", description: "Read or change harvesting: automatic recording, success/failure thresholds and the settle window.", risk: "privileged", sideEffect: true, source: "core" },
-      z.object({ autoRecord: z.boolean().optional(), successAtOrAbove: z.number().min(0).max(1).optional(), failBelow: z.number().min(0).max(1).optional(), settleAfterMs: z.number().int().min(0).max(86_400_000).optional(), maxPerRun: z.number().int().min(1).max(200).optional() }),
+      z.object({ autoRecord: z.boolean().optional(), successAtOrAbove: z.number().min(0).max(1).optional(), failBelow: z.number().min(0).max(1).optional(), settleAfterMs: z.number().int().min(0).max(86_400_000).optional(), maxPerRun: z.number().int().min(1).max(200).optional(), learnFromFailures: z.boolean().optional() }),
       async (input, ctx) => Object.keys(input).length
         ? await service.configure(auroraDefined({ tenantId: ctx.tenantId, ...input }))
         : await service.policy(ctx.tenantId),
+    ),
+  ];
+}
+
+/**
+ * Plan feedback: turn a finished plan into the decision outcome that calibration depends on.
+ * Reading candidates and records is pure; reconciling writes an outcome, so it is privileged and
+ * supports a dry run that shows exactly what would be written.
+ */
+export function planFeedbackCapabilities(service: AuroraPlanFeedback) {
+  return [
+    defineCapability(
+      { id: "decision.feedback-candidates", version: "1.0.0", description: "Decisions whose plans have finished and are waiting for a recorded outcome, with the reason each one is or is not eligible.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({ limit: z.number().int().min(1).max(1000).optional() }),
+      async (input, ctx) => ({ candidates: await service.candidates(ctx.tenantId, input.limit ?? 50) }),
+    ),
+    defineCapability(
+      { id: "decision.feedback-reconcile", version: "1.0.0", description: "Record decision outcomes derived from terminal plans and their evidence. Supports a dry run.", risk: "privileged", sideEffect: true, source: "core" },
+      z.object({ planId: z.string().max(300).optional(), dryRun: z.boolean().optional(), limit: z.number().int().min(1).max(200).optional() }),
+      async (input, ctx) => await service.reconcile(auroraDefined({ tenantId: ctx.tenantId, ...input })),
+    ),
+    defineCapability(
+      { id: "decision.feedback-records", version: "1.0.0", description: "Plan-derived decision outcomes with their surprise, Brier score and evidence.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({ limit: z.number().int().min(1).max(1000).optional() }),
+      async (input, ctx) => ({ records: await service.records(ctx.tenantId, input.limit ?? 50) }),
+    ),
+    defineCapability(
+      { id: "decision.feedback-summary", version: "1.0.0", description: "How well plan-derived expectations matched plan-derived reality.", risk: "pure", sideEffect: false, source: "core" },
+      z.object({}),
+      async (_input, ctx) => await service.summary(ctx.tenantId),
     ),
   ];
 }

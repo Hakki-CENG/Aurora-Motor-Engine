@@ -8,7 +8,7 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.47.0
+## Current milestone — 1.48.0
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -77,6 +77,7 @@ Implemented and tested:
 - Aurora execution bridge: ready plan steps delegated to society roles with recorded match evidence and evidence-bound completion
 - Aurora role authority templates: least-privilege capability allowlists bound to society roles, with drift audit
 - Aurora outcome harvesting: delegated work scored from recorded events, with an explicit review band for ambiguity
+- Aurora plan feedback: decision outcomes derived from finished plans, so calibration reflects execution
 - Aurora autopilot: bounded unattended cadence with a durable run ledger
 - Aurora provenance explainer reconstructing why any artifact exists
 - Embedding-backed semantic memory recall
@@ -1014,6 +1015,16 @@ outright, not partial credit. And anything landing between the failure and succe
 own success rate poisons the calibration, reputation and evolution signals built on top of it. When a
 human resolves a review item, the machine scorecard stays attached to their verdict.
 
+## Aurora plan feedback
+
+Calibration is only honest if outcomes are recorded, and outcomes recorded by hand are outcomes not
+recorded at all. When a plan reaches a terminal state, Aurora derives the outcome of the decision that
+produced it: how much of the plan genuinely finished, blended with the measured quality of delegated
+work. It never overwrites a human verdict, never resolves a plan that is merely still executing (it
+marks the decision executed instead), and supports a dry run that shows exactly what would be written.
+Each record keeps its evidence, observed value, surprise and Brier score, so every calibration number
+traces back to the execution behind it.
+
 ## Aurora role authority
 
 Without a profile, a delegated child session inherits the parent's entire capability set — the
@@ -1037,6 +1048,10 @@ fleet as a whole by a daily sweep ceiling. A tenant whose autopilot throws is co
 the sweep continues, the failure is recorded, and three consecutive failing sweeps open a circuit
 breaker with an exponential pause that only an operator resume clears. The sweep ledger is durable,
 so cross-tenant background activity is reviewable after the fact.
+
+When the budget only allows a few tasks, the longest pole goes first: critical-path steps, then risk,
+then size. And a role that keeps failing stops being nominated for high-risk work — soft, reversible
+probation that still lets it earn its record back on routine steps.
 
 Delegation also respects the society's economics before it posts: the daily token budget and the
 concurrency ceiling are checked up front, so a task that could never be awarded today is never
