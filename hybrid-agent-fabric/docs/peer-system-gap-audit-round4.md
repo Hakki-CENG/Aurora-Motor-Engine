@@ -41,7 +41,7 @@ writes a release note about.
 | # | Gap | Why it matters | Status |
 |---|---|---|---|
 | S4 | **Language-server integration** (diagnostics, symbols, definitions, references) | Hermes keeps an LSP client per workspace: after an edit, the compiler's own opinion is available without running a build. Aurora has no code intelligence at all | **Done in 1.63.0** |
-| S5 | **Prompt-cache breakpoints** | Aurora prices cache reads but never *marks* cache boundaries, so long sessions pay full price for a stable prefix | Planned |
+| S5 | **Prompt-cache breakpoints** | Aurora prices cache reads but never *marks* cache boundaries, so long sessions pay full price for a stable prefix | **Done in 1.64.0** |
 | S6 | **Degeneracy guards**: repeated identical tool calls, empty responses, iteration budgets distinct from the stuck detector | Aurora's stuck detector notices a session going nowhere over time; peers also refuse the specific pathologies as they happen | Planned |
 | S7 | **Telemetry redaction policy** on the OTLP path | Aurora exports operational metrics; Hermes attaches an explicit redaction policy to what leaves the process | Planned |
 
@@ -91,6 +91,18 @@ identifier — are enforced before anything crosses into a tool result. Capabili
 `code.references`; REST under `/v1/sessions/:id/code*`; Canvas Diagnostics row. LSP spawns are gated to
 the local sandbox backend by default and bounded (2 live servers, per-request timeouts, frame caps).
 
+**S5 — Prompt-cache breakpoints.** `PromptCacheService` derives a breakpoint plan for every assembled
+request — system block, conversation prefix and message tail, each labeled stable or volatile by
+SHA-256 digest comparison against the previous plan (same freshness discipline as code diagnostics) —
+and emits Hermes' default four-breakpoint layout (end of the static system prefix via the system block,
+end of system, last tool, last two non-system messages). `prefixHit` is a verdict, not a guess: it is
+true only when both stable regions are byte-identical to what the previous request shipped. Cache scope
+is the physical session id — Aurora compacts in place, so unlike Hermes there is no lineage walk, and
+fork/delegate children keep their own isolated scope. Plans are durable evidence (bounded history, per
+request), `AnthropicProvider` places the `cache_control` markers (skipping textless messages), and
+`session.cache.config` is a privileged approval-gated operation because a marker at the wrong boundary
+changes what a request costs.
+
 ## 4. Next steps
 
-S5 prompt-cache breakpoints, S6 degeneracy guards, S7 telemetry redaction.
+S6 degeneracy guards, S7 telemetry redaction.

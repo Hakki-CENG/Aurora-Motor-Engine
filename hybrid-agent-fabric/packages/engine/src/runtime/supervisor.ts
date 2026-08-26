@@ -5,7 +5,8 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { CapabilityBroker } from "../capabilities/capability-broker.js";
 import type { ContextManager } from "../context/context-manager.js";
-import type { ModelProvider } from "../types.js";
+import type { AgentMessage, ModelProvider, PromptCacheHint } from "../types.js";
+import type { PromptCachePlanRecord } from "../prompt-cache/prompt-cache-service.js";
 import type {
   AgentInboxMessage,
   AgentMessageDeliveryMode,
@@ -124,6 +125,8 @@ export interface SupervisorOptions {
   context: ContextManager;
   /** Optional per-session effort resolution, consulted once per turn. */
   resolveEffort?: (tenantId: string, sessionId: string) => Promise<{ toolIterations: number; reasoningEffort: "low" | "medium" | "high" | "max" }>;
+  /** Optional prompt-cache planner forwarded to every actor. */
+  resolvePromptCache?: (input: { tenantId: string; sessionId: string; systemPrompt: string; messages: AgentMessage[] }) => Promise<{ plan: PromptCachePlanRecord; hint?: PromptCacheHint | undefined } | undefined>;
   modelName?: string;
   modelFallbacks?: string[];
   onSessionClose?: (sessionId: string) => Promise<void>;
@@ -821,6 +824,7 @@ export class Supervisor {
       ...(this.options.modelName ? { modelName: this.options.modelName } : {}),
       ...(this.options.modelFallbacks?.length ? { modelFallbacks: this.options.modelFallbacks } : {}),
       ...(this.options.resolveEffort ? { resolveEffort: this.options.resolveEffort } : {}),
+      ...(this.options.resolvePromptCache ? { resolvePromptCache: this.options.resolvePromptCache } : {}),
       claimSteeringMessages: async (sessionId) => await this.claimSteeringMessages(sessionId),
       markInboxDelivered: async (message, deliveredAt) => await this.markInboxDelivered(message, deliveredAt),
       markInboxUncertain: async (message, reason) => await this.markInboxUncertain(message, reason),

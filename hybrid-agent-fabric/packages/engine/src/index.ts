@@ -130,6 +130,8 @@ export * from "./code-intelligence/servers.js";
 export * from "./code-intelligence/scanner.js";
 export * from "./code-intelligence/service.js";
 export * from "./capabilities/code-intelligence.js";
+export * from "./prompt-cache/prompt-cache-service.js";
+export * from "./capabilities/prompt-cache.js";
 export * from "./policy/auto-approval.js";
 export * from "./policy/session-budget.js";
 export * from "./capabilities/session-budget.js";

@@ -45,6 +45,43 @@ export class AnthropicProvider implements ModelProvider {
       if (previous?.role === role) previous.content.push(...blocks);
       else messages.push({ role, content: blocks });
     }
+    // Explicit prompt-cache breakpoints (Hermes-style plan): one at the end of
+    // the system block, one on the last tool, and one on each of the last N
+    // non-system messages. Markers ride only on text blocks; an assistant
+    // turn that is pure tool calls gets no marker rather than a malformed one.
+    const cache = request.promptCache;
+    const payload: Record<string, unknown> = {
+      model: request.model?.includes(":") ? request.model.slice(request.model.indexOf(":") + 1) : this.options.model,
+      max_tokens: this.options.maxTokens ?? 8192,
+      messages,
+      tools: request.tools.map((tool) => ({
+        name: tool.id.replaceAll(".", "__"),
+        description: `${tool.description} [capability-id: ${tool.id}]`,
+        input_schema: tool.inputSchema,
+      })),
+    };
+    if (cache && cache.ttlMs > 0) {
+      if (cache.systemBreakpoint) {
+        payload.system = [{ type: "text", text: request.systemPrompt, cache_control: { type: "ephemeral", ttl: `${Math.round(cache.ttlMs / 60_000)}m` } }];
+      } else {
+        payload.system = request.systemPrompt;
+      }
+      if (cache.toolBreakpoint && Array.isArray(payload.tools) && (payload.tools as unknown[]).length > 0) {
+        const tools = payload.tools as any[];
+        tools[tools.length - 1] = { ...tools[tools.length - 1], cache_control: { type: "ephemeral", ttl: `${Math.round(cache.ttlMs / 60_000)}m` } };
+      }
+      if (cache.messageTailMarkers > 0) {
+        const tailStart = Math.max(0, messages.length - cache.messageTailMarkers);
+        for (let index = tailStart; index < messages.length; index++) {
+          const message = messages[index] as any;
+          const blocks = message?.content;
+          if (!Array.isArray(blocks)) continue;
+          const textIndex = blocks.map((block: any) => block.type).lastIndexOf("text");
+          if (textIndex < 0) continue;
+          blocks[textIndex] = { ...blocks[textIndex], cache_control: { type: "ephemeral", ttl: `${Math.round(cache.ttlMs / 60_000)}m` } };
+        }
+      }
+    }
     const response = await fetch(`${(this.options.baseUrl ?? "https://api.anthropic.com").replace(/\/$/, "")}/v1/messages`, {
       method: "POST",
       headers: {
@@ -53,17 +90,7 @@ export class AnthropicProvider implements ModelProvider {
         "anthropic-version": this.options.anthropicVersion ?? "2023-06-01",
         ...this.options.headers,
       },
-      body: JSON.stringify({
-        model: request.model?.includes(":") ? request.model.slice(request.model.indexOf(":") + 1) : this.options.model,
-        max_tokens: this.options.maxTokens ?? 8192,
-        system: request.systemPrompt,
-        messages,
-        tools: request.tools.map((tool) => ({
-          name: tool.id.replaceAll(".", "__"),
-          description: `${tool.description} [capability-id: ${tool.id}]`,
-          input_schema: tool.inputSchema,
-        })),
-      }),
+      body: JSON.stringify(payload),
       ...(request.signal ? { signal: request.signal } : {}),
     });
     if (!response.ok) throw await modelHttpError(this.id, response);

@@ -146,6 +146,22 @@ export interface ModelUsage {
   costUsd?: number;
 }
 
+/**
+ * Prompt-cache marker hints for providers that support explicit breakpoints
+ * (Anthropic and compatible APIs). Providers with automatic caching ignore it.
+ * `scopeId` identifies the conversation's cache scope: Aurora compacts in
+ * place, so the physical session id is the scope, and fork/delegate children
+ * own their own id and therefore their own isolated scope.
+ */
+export interface PromptCacheHint {
+  planId: string;
+  scopeId: string;
+  ttlMs: number;
+  systemBreakpoint: boolean;
+  toolBreakpoint: boolean;
+  messageTailMarkers: number;
+}
+
 export interface ModelRequest {
   tenantId?: string;
   sessionId: UUID;
@@ -159,6 +175,8 @@ export interface ModelRequest {
   fallbackModels?: string[];
   /** Requested reasoning effort. Providers that do not support it ignore it; none may be broken by it. */
   reasoningEffort?: "low" | "medium" | "high" | "max";
+  /** Explicit prompt-cache breakpoints computed by the prompt-cache planner. */
+  promptCache?: PromptCacheHint;
   signal?: AbortSignal;
 }
 

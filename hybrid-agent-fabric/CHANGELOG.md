@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.64.0 - 2026-08-26
+
+Round-four audit, gap **S5: prompt-cache breakpoints**. Hermes ships a cache *planner*
+(`prompt_caching.py`, `prompt_cache_boundary.py`, `prompt_cache_scope.py`) that marks stable
+prefixes explicitly; Aurora priced cache reads and wrote no markers, so a long session paid full
+price for a prefix it had already sent.
+
+- **Derived cache plans.** `PromptCacheService` labels the assembled request's regions as stable or
+  volatile — the system block, the conversation prefix (everything before the tail markers) and the
+  message tail — and emits breakpoints Hermes-style: end of the static system prefix, end of the
+  system prompt, the last tool and the last two non-system messages.
+- **`prefixHit` is a digest comparison, not a guess.** Stability is checked against the previous
+  plan's SHA-256 digests; a plan claims a cache hit only when both stable regions are byte-identical
+  to what the previous request shipped (clock-free, same discipline as code diagnostics).
+- **Correct scope, stated in code.** Aurora compacts in place, so the physical session id is the
+  cache scope; `/branch`/delegate children own their own id and therefore an isolated scope, exactly
+  Hermes' `prompt_cache_scope` fork isolation. No lineage walk is needed because Aurora never mints a
+  new physical id for a compaction.
+- **Durable evidence.** Every plan is recorded (`prompt-cache/plans.json`) with a sequence number,
+  marker count, stable/volatile char counts and hit/miss verdict (500 bounded), so "why did this
+  request miss cache?" is answerable from data after the fact.
+- **Provider support.** `AnthropicProvider` places `cache_control` markers on the system block
+  (array form with TTL), the last tool and the last N text-bearing messages; messages without text
+  blocks are skipped rather than malformed. Providers with automatic caching ignore the hint
+  (OpenAI-compatible, Gemini) with no behavioral change.
+- **Governed and operator-controllable.** `session.cache.plan` (read evidence) and
+  `session.cache.config` (privileged: enable/disable, TTL 5m or 1h — an approval like any session
+  configuration). REST: `GET /v1/sessions/:id/cache/plan`, `POST /v1/sessions/:id/cache/config`;
+  Canvas "Cache" row in the session inspector. Engine option `promptCache.{enabled,ttlMs,
+  messageTailMarkers}` for deployment defaults.
+- Added 5 tests: plan derivation with a byte-identical hit, miss on system change and bounded
+  history, disable/coerce behavior, Anthropic marker placement (system/tool/tail, textless messages
+  skipped), and an end-to-end actor test proving every model request records a plan and that the
+  privileged config capability resolves through the approval channel.
+
 ## 1.63.0 - 2026-08-26
 
 Round-four audit, gap **S4: language-server integration** — Aurora's first real code intelligence. Hermes

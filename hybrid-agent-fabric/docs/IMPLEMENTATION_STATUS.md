@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-26 — current milestone 1.63
+Updated: 2026-08-26 — current milestone 1.64
 
 ## Original 1.0 baseline (delivered)
 
@@ -457,6 +457,18 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] Governed capabilities `code.catalog`, `code.diagnostics.run`, `code.diagnostics.evidence`, `code.symbols`, `code.definition`, `code.references`
 - [x] REST surface under `/v1/sessions/:id/code*` and `/v1/sessions/:id/diagnostics`; Canvas Diagnostics row
 - [x] LSP gated to the local sandbox backend by default; `HAF_CODE_INTELLIGENCE_LSP=false` forces toolchain
+
+### Peer parity round four, wave three (1.64) — prompt-cache breakpoints
+
+- [x] Derived cache plans per request: system, conversation prefix and message tail labeled stable/volatile
+- [x] Digest-based stability (previous-plan SHA-256 comparison), honest `prefixHit`/miss verdict, no clocks
+- [x] Hermes-style breakpoints: system end, last tool, last N non-system messages (default 2, max 4)
+- [x] Correct cache scope: Aurora compacts in place, so physical session id is the scope; fork/delegate children stay isolated
+- [x] Durable plan evidence with sequence numbers, bounded history (500), marker and char accounting
+- [x] Anthropic provider places `cache_control` markers (system array form + TTL, last tool, text-bearing tail messages)
+- [x] Automatic-caching providers (OpenAI-compatible, Gemini) unaffected
+- [x] `session.cache.plan` (read) and `session.cache.config` (privileged, approval-gated) capabilities
+- [x] REST `/v1/sessions/:id/cache/plan` and `/v1/sessions/:id/cache/config`; Canvas Cache row; engine `promptCache` defaults
 
 ## Required for full target parity
 

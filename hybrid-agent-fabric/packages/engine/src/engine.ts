@@ -52,6 +52,8 @@ import { verificationCapabilities } from "./capabilities/verification.js";
 import { VerificationService } from "./harness/verification-service.js";
 import { codeIntelligenceCapabilities } from "./capabilities/code-intelligence.js";
 import { CodeIntelligenceService } from "./code-intelligence/service.js";
+import { promptCacheCapabilities } from "./capabilities/prompt-cache.js";
+import { PromptCacheService } from "./prompt-cache/prompt-cache-service.js";
 import { AutoApprovalService } from "./policy/auto-approval.js";
 import { SessionBudgetService } from "./policy/session-budget.js";
 import { sessionBudgetCapabilities } from "./capabilities/session-budget.js";
@@ -232,6 +234,13 @@ export interface EngineConfig {
     maxLspServers?: number;
     toolchainTimeoutMs?: number;
   };
+  /**
+   * Prompt-cache breakpoint planner (S5). Enabled by default: every assembled
+   * request gets a derived cache plan and durable evidence, and providers that
+   * support explicit breakpoints (Anthropic) place the markers. `ttlMs` must
+   * be one of the provider-supported values (5m or 1h).
+   */
+  promptCache?: { enabled?: boolean; ttlMs?: number; messageTailMarkers?: number };
   kernelServerScript: string;
   sandboxBackend: SandboxBackendKind;
   sshSandbox?: SshSandboxOptions;
@@ -392,6 +401,7 @@ export class HybridAgentEngine {
   readonly sessionBudgets: SessionBudgetService;
   readonly verification: VerificationService;
   readonly codeIntelligence: CodeIntelligenceService;
+  readonly promptCache: PromptCacheService;
   readonly statelessMcp: StatelessMcpRegistry;
   readonly subagents: SubagentDefinitionService;
   readonly sessionLifecycle: SessionLifecycleService;
@@ -689,6 +699,14 @@ export class HybridAgentEngine {
       this.capabilities,
       { kind: config.sandboxBackend === "local" || config.sandboxBackend === "docker" ? config.sandboxBackend : "disabled" },
     );
+    // Prompt-cache planner: derives breakpoints for every assembled request and
+    // keeps durable evidence. Providers that support explicit markers consume
+    // the hint; automatic-caching providers ignore it.
+    this.promptCache = new PromptCacheService(dataRoot, {
+      ...(config.promptCache?.enabled === undefined ? {} : { enabled: config.promptCache.enabled }),
+      ...(config.promptCache?.ttlMs ? { ttlMs: config.promptCache.ttlMs } : {}),
+      ...(config.promptCache?.messageTailMarkers ? { messageTailMarkers: config.promptCache.messageTailMarkers } : {}),
+    });
     this.supervisor = new Supervisor({
       dataRoot,
       workspaceRoot,
@@ -705,6 +723,10 @@ export class HybridAgentEngine {
       model: this.models,
       capabilities: this.capabilities,
       context,
+      resolvePromptCache: async (input) => {
+        const planned = await this.promptCache.plan(input);
+        return { plan: planned.plan, ...(planned.hint ? { hint: planned.hint } : {}) };
+      },
       ...(modelName ? { modelName } : {}),
       ...(config.modelFallbacks?.length ? { modelFallbacks: config.modelFallbacks } : {}),
       resolveEffort: async (tenantId: string, sessionId: string) => {
@@ -841,6 +863,7 @@ export class HybridAgentEngine {
       ...(config.codeIntelligence?.toolchainTimeoutMs ? { toolchainTimeoutMs: config.codeIntelligence.toolchainTimeoutMs } : {}),
     });
     for (const capability of codeIntelligenceCapabilities(this.codeIntelligence)) this.capabilities.register(capability);
+    for (const capability of promptCacheCapabilities(this.promptCache)) this.capabilities.register(capability);
     for (const capability of backgroundShellCapabilities(this.backgroundShells)) this.capabilities.register(capability);
     for (const capability of autoApprovalCapabilities(this.autoApprovals)) this.capabilities.register(capability);
     for (const capability of sessionBudgetCapabilities({

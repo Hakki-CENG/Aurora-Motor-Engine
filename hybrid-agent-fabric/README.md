@@ -8,15 +8,22 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.63.0
+## Current milestone — 1.64.0
 
-Round-four audit wave two: **code intelligence**. Aurora now runs a real Language Server Protocol client
-(diagnostics, symbols, definition, references) per workspace — same shape Hermes keeps in
-`agent/lsp/*` — with a sandboxed toolchain fallback (`tsc --noEmit`, `ruff`/Python AST, `go vet`,
-`cargo check`) when no server binary is installed, structured and sanitized diagnostics, and durable
-content-addressed evidence that honestly reports when it has gone stale. Governance: `code.catalog`,
-`code.diagnostics.run`, `code.diagnostics.evidence`, `code.symbols`, `code.definition`,
-`code.references`; REST under `/v1/sessions/:id/code*`; Canvas Diagnostics row.
+Round-four audit wave three: **prompt-cache breakpoints**. Every assembled request now gets a derived
+cache plan — stable system prefix, stable conversation prefix and volatile tail, with Harness-style
+internal markers (system end, last tool, last two messages) — and the plan is durable evidence with an
+honest `prefixHit`/miss verdict computed from content digests, so a session can say exactly what it
+paid for and why. `AnthropicProvider` places the markers; providers with automatic caching ignore the
+hint. Governance: `session.cache.plan` / `session.cache.config`; REST under
+`/v1/sessions/:id/cache*`; Canvas Cache row.
+
+Previous wave: **code intelligence** — a real Language Server Protocol client (diagnostics, symbols,
+definition, references) per workspace, same shape as Hermes `agent/lsp/*`, with a sandboxed toolchain
+fallback (`tsc --noEmit`, `ruff`/Python AST, `go vet`, `cargo check`), structured and sanitized
+diagnostics and durable content-addressed evidence. Governance: `code.catalog`, `code.diagnostics.run`,
+`code.diagnostics.evidence`, `code.symbols`, `code.definition`, `code.references`; REST under
+`/v1/sessions/:id/code*`; Canvas Diagnostics row.
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -33,6 +40,7 @@ Implemented and tested:
 - same-provider credential pools plus persistent audience-bound server-side model configurations
 - OpenAI, Azure OpenAI, AWS Bedrock, Anthropic, OpenRouter, Google AI Studio, Vertex AI, Groq, xAI, DeepSeek, Mistral and Ollama profiles
 - policy/approval-controlled capability broker
+- prompt-cache planner: derived breakpoints per request, digest-verified hit/miss evidence, Anthropic markers, privileged session config
 - language-server code intelligence: stdio LSP client (diagnostics, symbols, definition, references) with sandboxed toolchain fallback and durable content-addressed diagnostic evidence
 - confined text/binary filesystem, bounded multimodal attachment upload, typed local Git operations and process capabilities
 - local, hardened Docker and digest-pinned Singularity/Apptainer sandbox adapters
