@@ -50,6 +50,8 @@ import { backgroundShellCapabilities } from "./capabilities/background-shell.js"
 import { autoApprovalCapabilities } from "./capabilities/auto-approval.js";
 import { verificationCapabilities } from "./capabilities/verification.js";
 import { VerificationService } from "./harness/verification-service.js";
+import { codeIntelligenceCapabilities } from "./capabilities/code-intelligence.js";
+import { CodeIntelligenceService } from "./code-intelligence/service.js";
 import { AutoApprovalService } from "./policy/auto-approval.js";
 import { SessionBudgetService } from "./policy/session-budget.js";
 import { sessionBudgetCapabilities } from "./capabilities/session-budget.js";
@@ -216,6 +218,20 @@ export interface EngineConfig {
   sessionModes?: { defaultPermissionMode?: "plan" | "manual" | "acceptEdits" | "auto" | "dontAsk" | "bypass"; defaultSandboxMode?: "read-only" | "workspace-write" | "danger-full-access"; allowBypass?: boolean };
   /** Discovery bounds for AGENTS.md / CLAUDE.md style repository instruction files. */
   projectInstructions?: { maxFiles?: number; maxFileBytes?: number; maxTotalBytes?: number; maxDepth?: number };
+  /**
+   * Code intelligence: language server diagnostics, symbols, definition and
+   * references. LSP is on by default only for the local sandbox backend, where
+   * the engine and the workspace share a filesystem; toolchain diagnostics run
+   * through whichever sandbox backend is configured. `serverBinaries` pins an
+   * LSP server executable by id (operators, hermetic installs).
+   */
+  codeIntelligence?: {
+    lsp?: boolean;
+    serverBinaries?: Record<string, string>;
+    serverArgs?: Record<string, string[]>;
+    maxLspServers?: number;
+    toolchainTimeoutMs?: number;
+  };
   kernelServerScript: string;
   sandboxBackend: SandboxBackendKind;
   sshSandbox?: SshSandboxOptions;
@@ -375,6 +391,7 @@ export class HybridAgentEngine {
   readonly autoApprovals: AutoApprovalService;
   readonly sessionBudgets: SessionBudgetService;
   readonly verification: VerificationService;
+  readonly codeIntelligence: CodeIntelligenceService;
   readonly statelessMcp: StatelessMcpRegistry;
   readonly subagents: SubagentDefinitionService;
   readonly sessionLifecycle: SessionLifecycleService;
@@ -810,6 +827,20 @@ export class HybridAgentEngine {
     // Verification runs the project's own commands through the same sandbox as everything else.
     this.verification = new VerificationService(dataRoot, sandboxFactory);
     for (const capability of verificationCapabilities(this.verification)) this.capabilities.register(capability);
+    // Code intelligence: LSP when a server binary is installed and the engine
+    // shares the workspace filesystem, toolchain diagnostics through the sandbox
+    // regardless. LSP servers are read-only project processes with a scrubbed
+    // environment, bounded count and graceful shutdown.
+    this.codeIntelligence = new CodeIntelligenceService(dataRoot, sandboxFactory, {
+      ...(config.codeIntelligence?.lsp === undefined
+        ? { lsp: config.sandboxBackend === "local" }
+        : { lsp: config.codeIntelligence.lsp }),
+      ...(config.codeIntelligence?.serverBinaries ? { serverBinaries: config.codeIntelligence.serverBinaries } : {}),
+      ...(config.codeIntelligence?.serverArgs ? { serverArgs: config.codeIntelligence.serverArgs } : {}),
+      ...(config.codeIntelligence?.maxLspServers ? { maxLspServers: config.codeIntelligence.maxLspServers } : {}),
+      ...(config.codeIntelligence?.toolchainTimeoutMs ? { toolchainTimeoutMs: config.codeIntelligence.toolchainTimeoutMs } : {}),
+    });
+    for (const capability of codeIntelligenceCapabilities(this.codeIntelligence)) this.capabilities.register(capability);
     for (const capability of backgroundShellCapabilities(this.backgroundShells)) this.capabilities.register(capability);
     for (const capability of autoApprovalCapabilities(this.autoApprovals)) this.capabilities.register(capability);
     for (const capability of sessionBudgetCapabilities({
@@ -1204,6 +1235,7 @@ export class HybridAgentEngine {
     await this.automationResponders.close();
     await this.outboundChannels.closeAll();
     this.automaticRefinement.stop();
+    await this.codeIntelligence.shutdown();
     this.otlp?.stop();
     this.natsEvents?.stop();
     this.natsCommands?.close();

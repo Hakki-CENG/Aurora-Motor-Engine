@@ -188,6 +188,16 @@ const engine = new HybridAgentEngine({
     rateCapacity: environmentInteger("HAF_AGENT_MESSAGE_RATE_CAPACITY", 3, 1, 1000),
     rateRefillMs: environmentInteger("HAF_AGENT_MESSAGE_RATE_REFILL_MS", 1000, 10, 3_600_000),
   },
+  // Code intelligence: LSP is enabled by default only on the local backend,
+  // where the engine shares the workspace filesystem; set HAF_CODE_INTELLIGENCE_LSP=false
+  // to force the toolchain path everywhere.
+  codeIntelligence: {
+    lsp: process.env.HAF_CODE_INTELLIGENCE_LSP !== "false" && sandboxBackend === "local",
+    ...(process.env.HAF_CODE_INTELLIGENCE_LSP_SERVERS_JSON
+      ? { serverBinaries: z.record(z.string(), z.string()).parse(JSON.parse(process.env.HAF_CODE_INTELLIGENCE_LSP_SERVERS_JSON)) }
+      : {}),
+    ...(process.env.HAF_CODE_INTELLIGENCE_LSP_MAX_SERVERS ? { maxLspServers: environmentInteger("HAF_CODE_INTELLIGENCE_LSP_MAX_SERVERS", 2, 1, 8) } : {}),
+  },
   ...(process.env.HAF_MODEL_OAUTH_REDIRECT_URI ? { modelOAuthRedirectUri: process.env.HAF_MODEL_OAUTH_REDIRECT_URI } : {}),
   context: {
     maxMessageChars: environmentInteger("HAF_CONTEXT_MAX_CHARS", 80_000, 10_000, 2_000_000),
@@ -1245,6 +1255,14 @@ app.post("/v1/sessions/:sessionId/tasks/stop", async (request) => { const { sess
 // Project verification: what this project checks itself with, and the evidence of the last run
 app.get("/v1/sessions/:sessionId/verification", async (request) => { const { sessionId } = z.object({ sessionId: z.string() }).parse(request.params); const q=z.object({limit:z.coerce.number().int().min(1).max(50).optional()}).parse(request.query); const snapshot = await engine.session(sessionId); return { recipe: await engine.verification.detect(snapshot.workspacePath), latest: await engine.verification.latest(snapshot.tenantId, sessionId), history: await engine.verification.list(auroraInput({ tenantId: snapshot.tenantId, sessionId, limit: q.limit })) }; });
 app.post("/v1/sessions/:sessionId/verification/run", async (request) => { const { sessionId } = z.object({ sessionId: z.string() }).parse(request.params); const b=z.object({phases:z.array(z.enum(["bootstrap","build","test","lint"])).min(1).max(4).optional(),timeoutMs:z.number().int().min(1000).max(3_600_000).optional()}).parse(request.body ?? {}); const snapshot = await engine.session(sessionId); return await engine.verification.run(auroraInput({ tenantId: snapshot.tenantId, sessionId, workspacePath: snapshot.workspacePath, phases: b.phases, timeoutMs: b.timeoutMs })); });
+// Code intelligence: language server / toolchain diagnostics, symbols, definition and references
+const plainFile = z.object({ path: z.string().min(1).max(500), line: z.number().int().min(1).max(10_000_000), column: z.number().int().min(1).max(10_000_000) });
+app.get("/v1/sessions/:sessionId/code", async (request) => { const { sessionId } = z.object({ sessionId: z.string() }).parse(request.params); const snapshot = await engine.session(sessionId); return { catalog: await engine.codeIntelligence.catalog(snapshot.workspacePath), latest: await engine.codeIntelligence.latest(snapshot.tenantId, sessionId) }; });
+app.get("/v1/sessions/:sessionId/diagnostics", async (request) => { const { sessionId } = z.object({ sessionId: z.string() }).parse(request.params); const q=z.object({limit:z.coerce.number().int().min(1).max(50).optional()}).parse(request.query); const snapshot = await engine.session(sessionId); return { latest: await engine.codeIntelligence.latest(snapshot.tenantId, sessionId), history: await engine.codeIntelligence.list(auroraInput({ tenantId: snapshot.tenantId, sessionId, limit: q.limit })) }; });
+app.post("/v1/sessions/:sessionId/code/diagnostics/run", async (request) => { const { sessionId } = z.object({ sessionId: z.string() }).parse(request.params); const b=z.object({files:z.array(z.string().min(1).max(500)).max(60).optional(),severities:z.array(z.enum(["error","warning","info","hint"])).min(1).max(4).optional(),forceToolchain:z.boolean().optional(),timeoutMs:z.number().int().min(1000).max(3_600_000).optional()}).parse(request.body ?? {}); const snapshot = await engine.session(sessionId); return await engine.codeIntelligence.runDiagnostics(auroraInput({ tenantId: snapshot.tenantId, sessionId, workspacePath: snapshot.workspacePath, files: b.files, severities: b.severities, forceToolchain: b.forceToolchain })); });
+app.post("/v1/sessions/:sessionId/code/symbols", async (request) => { const { sessionId } = z.object({ sessionId: z.string() }).parse(request.params); const b=z.object({path:z.string().min(1).max(500).optional()}).parse(request.body ?? {}); const snapshot = await engine.session(sessionId); return await engine.codeIntelligence.symbols(auroraInput({ tenantId: snapshot.tenantId, sessionId, workspacePath: snapshot.workspacePath, path: b.path })); });
+app.post("/v1/sessions/:sessionId/code/definition", async (request) => { const { sessionId } = z.object({ sessionId: z.string() }).parse(request.params); const b=plainFile.parse(request.body ?? {}); const snapshot = await engine.session(sessionId); return await engine.codeIntelligence.definition(auroraInput({ tenantId: snapshot.tenantId, sessionId, workspacePath: snapshot.workspacePath, path: b.path, line: b.line, column: b.column })); });
+app.post("/v1/sessions/:sessionId/code/references", async (request) => { const { sessionId } = z.object({ sessionId: z.string() }).parse(request.params); const b=plainFile.extend({includeDeclaration:z.boolean().optional()}).parse(request.body ?? {}); const snapshot = await engine.session(sessionId); return await engine.codeIntelligence.references(auroraInput({ tenantId: snapshot.tenantId, sessionId, workspacePath: snapshot.workspacePath, path: b.path, line: b.line, column: b.column, includeDeclaration: b.includeDeclaration })); });
 
 // Tenant-wide agent directory, and messaging outside family reach
 app.get("/v1/agent-directory", async (request) => { const q=auroraTenant.extend({query:z.string().max(200).optional(),includeClosed:z.coerce.boolean().optional(),limit:z.coerce.number().int().min(1).max(500).optional()}).parse(request.query); return { agents: await engine.supervisor.directory(q.tenantId, auroraInput({ query: q.query, includeClosed: q.includeClosed, limit: q.limit })) }; });

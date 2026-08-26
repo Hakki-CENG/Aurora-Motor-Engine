@@ -8,7 +8,15 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.62.0
+## Current milestone — 1.63.0
+
+Round-four audit wave two: **code intelligence**. Aurora now runs a real Language Server Protocol client
+(diagnostics, symbols, definition, references) per workspace — same shape Hermes keeps in
+`agent/lsp/*` — with a sandboxed toolchain fallback (`tsc --noEmit`, `ruff`/Python AST, `go vet`,
+`cargo check`) when no server binary is installed, structured and sanitized diagnostics, and durable
+content-addressed evidence that honestly reports when it has gone stale. Governance: `code.catalog`,
+`code.diagnostics.run`, `code.diagnostics.evidence`, `code.symbols`, `code.definition`,
+`code.references`; REST under `/v1/sessions/:id/code*`; Canvas Diagnostics row.
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
@@ -25,6 +33,7 @@ Implemented and tested:
 - same-provider credential pools plus persistent audience-bound server-side model configurations
 - OpenAI, Azure OpenAI, AWS Bedrock, Anthropic, OpenRouter, Google AI Studio, Vertex AI, Groq, xAI, DeepSeek, Mistral and Ollama profiles
 - policy/approval-controlled capability broker
+- language-server code intelligence: stdio LSP client (diagnostics, symbols, definition, references) with sandboxed toolchain fallback and durable content-addressed diagnostic evidence
 - confined text/binary filesystem, bounded multimodal attachment upload, typed local Git operations and process capabilities
 - local, hardened Docker and digest-pinned Singularity/Apptainer sandbox adapters
 - persistent Python kernel with JSON-safe snapshots

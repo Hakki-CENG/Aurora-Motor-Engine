@@ -40,7 +40,7 @@ writes a release note about.
 
 | # | Gap | Why it matters | Status |
 |---|---|---|---|
-| S4 | **Language-server integration** (diagnostics, symbols, definitions, references) | Hermes keeps an LSP client per workspace: after an edit, the compiler's own opinion is available without running a build. Aurora has no code intelligence at all | Planned |
+| S4 | **Language-server integration** (diagnostics, symbols, definitions, references) | Hermes keeps an LSP client per workspace: after an edit, the compiler's own opinion is available without running a build. Aurora has no code intelligence at all | **Done in 1.63.0** |
 | S5 | **Prompt-cache breakpoints** | Aurora prices cache reads but never *marks* cache boundaries, so long sessions pay full price for a stable prefix | Planned |
 | S6 | **Degeneracy guards**: repeated identical tool calls, empty responses, iteration budgets distinct from the stuck detector | Aurora's stuck detector notices a session going nowhere over time; peers also refuse the specific pathologies as they happen | Planned |
 | S7 | **Telemetry redaction policy** on the OTLP path | Aurora exports operational metrics; Hermes attaches an explicit redaction policy to what leaves the process | Planned |
@@ -76,6 +76,21 @@ phase, and `verified` requires that a build or test phase actually ran — a pro
 `inconclusive`, never verified. `verify.recipe`, `verify.run` and `verify.evidence` expose it to the
 agent; the Canvas inspector shows whether the session can currently prove anything.
 
+**S4 — Language-server integration.** Aurora now runs a real LSP client — `code-intelligence/` with
+`protocol.ts` (framing + sanitization), `client.ts` (one client per `(server, workspace)` pair,
+whole-document sync, version-based freshness, `ContentModified` retry, graceful shutdown), `servers.ts`
+(language profiles + binary discovery) and `service.ts` (orchestration). It serves **diagnostics**
+(tsc/pyright/gopls/rust-analyzer when the binary is installed, sandboxed `tsc --noEmit`, `ruff` or
+read-only Python AST, `go vet`, `cargo check` otherwise), **symbols**, **definition** and
+**references**; the fallbacks are a dependency-free structural scanner and exact token search. Every
+run is durable evidence: per-file SHA-256 digests make `fresh`/`stale` a content question rather than a
+clock question, and the same guarantees Hermes' `reporter.py` enforces — server-produced fields are
+sanitized and length-capped because a hostile repo can inject instruction-shaped text through an
+identifier — are enforced before anything crosses into a tool result. Capabilities: `code.catalog`,
+`code.diagnostics.run`, `code.diagnostics.evidence`, `code.symbols`, `code.definition`,
+`code.references`; REST under `/v1/sessions/:id/code*`; Canvas Diagnostics row. LSP spawns are gated to
+the local sandbox backend by default and bounded (2 live servers, per-request timeouts, frame caps).
+
 ## 4. Next steps
 
-S4 language-server diagnostics, S5 prompt-cache breakpoints, S6 degeneracy guards, S7 telemetry redaction.
+S5 prompt-cache breakpoints, S6 degeneracy guards, S7 telemetry redaction.

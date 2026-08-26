@@ -1,5 +1,52 @@
 # Changelog
 
+## 1.63.0 - 2026-08-26
+
+Round-four audit, gap **S4: language-server integration** — Aurora's first real code intelligence. Hermes
+keeps a per-workspace LSP client (`agent/lsp/*`); an agent that edits code without being able to read its
+own type errors is working blind. Aurora now does the same, with the invariants it insists on elsewhere.
+
+- **A real LSP client over stdio.** `code-intelligence/client.ts` speaks the Language Server Protocol:
+  `Content-Length` framing with corrupt-frame tolerance, `initialize`/`initialized` handshake,
+  whole-document text sync with **version-based freshness** (never clock-based, so a slow server's
+  leftovers cannot pass as a verdict on current content), `ContentModified` retries (Hermes/OpenCode
+  behaviour), per-request timeouts, bounded frame sizes and a graceful shutdown → SIGTERM → SIGKILL
+  sequence. Servers are spawned with the same scrubbed environment allow-list as the command sandbox.
+- **Server discovery and language profiles.** TypeScript/JavaScript (typescript-language-server),
+  Python (pyright), Go (gopls), Rust (rust-analyzer), each with workspace markers and extension counts;
+  binaries resolve from the workspace's own `node_modules/.bin` first, then PATH. `code.catalog` reports
+  what is installed and *why* something is unavailable.
+- **Toolchain fallback through the sandbox.** When no server binary exists (`tsc --noEmit`, `ruff` or a
+  read-only Python AST syntax check, `go vet`, `cargo check --message-format=json`), diagnostics still
+  run with the same confinement, resource limits and timeouts as any other command Aurora runs.
+- **Structured, sanitized, bounded diagnostics.** Every diagnostic is normalized to
+  `{path, line, column, severity, message, source, code}` with 1-based positions. Server-produced fields
+  pass through Hermes-style sanitization (newline collapse, control-char neutralising, 300/80/80 char
+  caps), because a hostile repository can shape an identifier so the compiler echoes prompt-shaped text
+  back into the model.
+- **Durable, content-addressed evidence.** Runs are stored in `code-intelligence/diagnostics.json` with
+  monotonic sequence numbers and a per-file SHA-256 of the exact text the server saw. `latest()` answers
+  "is this still true?" by hashing the files again — a run goes stale the moment content changes, by
+  construction, and old runs are pruned (200 max, 60 files, 500 diagnostics).
+- **Symbols, definition and references.** `code.symbols` (one file or whole workspace), `code.definition`
+  and `code.references` use the language server when it is installed and fall back to a dependency-free
+  structural scanner (tokenizer + declaration patterns for TS/JS, Python with indentation-based
+  containers, Go, Rust) otherwise. Bounded: 400 files, 5000 symbols, 200 references.
+- Guarded by governed capabilities: `code.catalog`, `code.diagnostics.run` (risk `process`),
+  `code.diagnostics.evidence`, `code.symbols`, `code.definition`, `code.references`.
+- Control API: `GET /v1/sessions/:id/code`, `GET /v1/sessions/:id/diagnostics`,
+  `POST /v1/sessions/:id/code/diagnostics/run`, `POST /v1/sessions/:id/code/symbols`,
+  `POST /v1/sessions/:id/code/definition`, `POST /v1/sessions/:id/code/references`;
+  `HAF_CODE_INTELLIGENCE_LSP=false` forces the toolchain path.
+- Canvas session inspector shows a Diagnostics row (count, backend/server, current vs stale).
+- LSP is enabled by default only on the local sandbox backend, where the engine and the workspace share
+  a filesystem; `codeIntelligence.serverBinaries` lets operators pin executables per server id.
+- Added 11 tests (577 engine tests total): framing with hostile bodies, field sanitization, TS and Python
+  symbol scanning, word-boundary occurrences, sandboxed Python syntax diagnostics with durable evidence
+  and honest staleness, project-local tsc output parsing, LSP diagnostics with version checking and
+  severity filtering, LSP symbols/definition/references, toolchain fallback + catalog reporting, and
+  workspace-escape refusal.
+
 ## 1.62.0 - 2026-08-20
 
 Round-four audit (`docs/peer-system-gap-audit-round4.md`), done by **reading the peers' source** rather

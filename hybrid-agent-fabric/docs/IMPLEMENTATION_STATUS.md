@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-20 — current milestone 1.62
+Updated: 2026-08-26 — current milestone 1.63
 
 ## Original 1.0 baseline (delivered)
 
@@ -443,6 +443,20 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] Verification runs through the sandbox with durable evidence and bounded output tails
 - [x] First-failure stopping, and `verified` requiring that a build or test phase actually ran
 - [x] `verify.recipe` / `verify.run` / `verify.evidence` plus REST and a Canvas verification row
+
+### Peer parity round four, wave two (1.63) — language-server integration
+
+- [x] LSP client over stdio: `Content-Length` framing with corrupt-frame tolerance, initialize handshake, whole-document sync
+- [x] Version-based diagnostic freshness (never clock-based) and `ContentModified` retry like Hermes/OpenCode
+- [x] Server discovery: TypeScript/JS (typescript-language-server), Python (pyright), Go (gopls), Rust (rust-analyzer)
+- [x] Binary resolution from workspace `node_modules/.bin` first, then PATH; catalog explains what is missing
+- [x] Sandboxed toolchain fallback: `tsc --noEmit`, `ruff`/read-only Python AST, `go vet`, `cargo check` JSON
+- [x] Structured diagnostics `{path,line,column,severity,message,source,code}` with Hermes-style field sanitization
+- [x] Durable content-addressed evidence: per-file SHA-256 digests, honest `fresh`/`stale`, bounded history
+- [x] Symbols, definition and references via LSP with a dependency-free structural scanner fallback
+- [x] Governed capabilities `code.catalog`, `code.diagnostics.run`, `code.diagnostics.evidence`, `code.symbols`, `code.definition`, `code.references`
+- [x] REST surface under `/v1/sessions/:id/code*` and `/v1/sessions/:id/diagnostics`; Canvas Diagnostics row
+- [x] LSP gated to the local sandbox backend by default; `HAF_CODE_INTELLIGENCE_LSP=false` forces toolchain
 
 ## Required for full target parity
 
