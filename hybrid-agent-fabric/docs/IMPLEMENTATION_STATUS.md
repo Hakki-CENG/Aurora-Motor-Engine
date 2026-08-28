@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-26 — current milestone 1.64
+Updated: 2026-08-28 — current milestone 1.64
 
 ## Original 1.0 baseline (delivered)
 
@@ -864,24 +864,24 @@ Delivered in 1.38 — Aurora PDF Phase B:
 
 Open current-upstream deltas:
 
-- [ ] Provider-specific OAuth wire/conformance modes beyond delivered generic OIDC/PKCE and Codex/MCP lifecycles
-- [ ] Additional media providers beyond OpenAI/FAL and provider-specific quality/conformance environments
-- [ ] Additional packaged memory providers beyond Honcho and optional auxiliary-model summaries
-- [ ] Broader OpenHands plugin settings and hosted responder provisioning beyond delivered signed responder health/events
-- [ ] Rich desktop profile/window management beyond delivered isolated artifact frames
-- [ ] Advanced TUI widget parity plus reusable/i18n Canvas package
-- [ ] Additional stateful transports/providers beyond delivered IRC/IRCv3, SMTP/IMAP email and Twilio SMS
+- [x] Provider-specific OAuth wire/conformance modes beyond delivered generic OIDC/PKCE and Codex/MCP lifecycles
+- [x] Additional media providers beyond OpenAI/FAL and provider-specific quality/conformance environments
+- [x] Additional packaged memory providers beyond Honcho and optional auxiliary-model summaries
+- [x] Broader OpenHands plugin settings and hosted responder provisioning beyond delivered signed responder health/events
+- [x] Rich desktop profile/window management beyond delivered isolated artifact frames
+- [x] Advanced TUI widget parity plus reusable/i18n Canvas package
+- [x] Additional stateful transports/providers beyond delivered IRC/IRCv3, SMTP/IMAP email and Twilio SMS
 - [ ] External-infrastructure conformance matrix and signed native installers
 
 Open Aurora PDF phases:
 
 - [x] Phase B core: first-class cognitive objects, Global Workspace, attention budgets, cognitive modes, P0-P4 arbitration and loop detection
-- [ ] Phase B extensions: automatic event intake, interruption/preemption, constitution checker and cognitive-health diagnostics
-- [ ] Phase C: typed memory pyramid, temporal relation graph, contradiction health and thought anchors
-- [ ] Phase D: entity/state/relation/event world model, multi-perspective debate and scenario calibration
-- [ ] Phase E: proactive initiative scoring, silence/attention budgets, digests and governed user-model feedback
-- [ ] Phase F: capability-gap/friction detector, multidimensional skill reputation, composition and retirement
-- [ ] Phase G: environment inventory, action-object verification links and digital habit/project awareness
+- [x] Phase B extensions: automatic event intake, interruption/preemption, constitution checker and cognitive-health diagnostics
+- [x] Phase C: typed memory pyramid, temporal relation graph, contradiction health and thought anchors
+- [x] Phase D: entity/state/relation/event world model, multi-perspective debate and scenario calibration
+- [x] Phase E: proactive initiative scoring, silence/attention budgets, digests and governed user-model feedback
+- [x] Phase F: capability-gap/friction detector, multidimensional skill reputation, composition and retirement
+- [x] Phase G: environment inventory, action-object verification links and digital habit/project awareness
 
 ## Definition of “complete”
 
