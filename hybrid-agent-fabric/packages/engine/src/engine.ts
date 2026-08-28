@@ -42,6 +42,7 @@ import { AgentProfileRegistry } from "./profiles/agent-profile-registry.js";
 import { KernelManager } from "./kernel/kernel-manager.js";
 import { Supervisor, type AgentFanoutLimits } from "./runtime/supervisor.js";
 import { FileAgentInboxStore, PostgresAgentInboxStore, type AgentInboxStore } from "./runtime/agent-inbox.js";
+import { StuckDetectorService } from "./runtime/stuck-detector.js";
 import { filesystemCapabilities } from "./capabilities/filesystem.js";
 import { memoryCapabilities } from "./capabilities/memory.js";
 import { skillCapabilities } from "./capabilities/skills.js";
@@ -155,16 +156,18 @@ import {
 import {
   autopilotCapabilities, decisionCapabilities, distillerCapabilities, planningCapabilities, provenanceCapabilities,
 } from "./capabilities/aurora-reasoning.js";
+import {
+  constitutionCapabilities, harnessCapabilities, microagentCapabilities, riskCapabilities, stuckCapabilities,
+  orchestratorCapabilities, insightCapabilities,
+} from "./capabilities/aurora-core.js";
 import { ContinualHarnessService } from "./harness/continual-harness-service.js";
 import { MicroagentRegistry } from "./knowledge/microagent-registry.js";
 import { RiskAnalyzerService } from "./policy/risk-analyzer.js";
-import { StuckDetectorService } from "./runtime/stuck-detector.js";
-import {
-  constitutionCapabilities, harnessCapabilities, insightCapabilities, microagentCapabilities,
-  orchestratorCapabilities, riskCapabilities, stuckCapabilities,
-} from "./capabilities/aurora-core.js";
+import { ThoughtCoreService } from "./thought/thought-core-service.js";
+import { BackgroundThinkingService } from "./thought/background-thinking-service.js";
 import { discoveryCapabilities } from "./capabilities/discovery.js";
 import { backgroundTaskCapabilities, planModeCapabilities } from "./capabilities/background-tasks.js";
+import { thoughtCapabilities } from "./capabilities/thought-capabilities.js";
 import {
   effortCapabilities, lifecycleHookCapabilities, projectInstructionCapabilities, repositoryCommandCapabilities,
   reviewCapabilities, sessionLifecycleCapabilities, sessionModeCapabilities, settingsCapabilities,
@@ -394,6 +397,8 @@ export class HybridAgentEngine {
   readonly worktrees: WorktreeService;
   readonly sessionEffort: SessionEffortService;
   readonly manifestTrust: ManifestTrustService;
+  readonly thoughtCore: ThoughtCoreService;
+  readonly backgroundThinking: BackgroundThinkingService;
   readonly settings: SettingsResolver;
   readonly userQuestions: UserQuestionService;
   readonly backgroundShells: BackgroundShellService;
@@ -768,6 +773,8 @@ export class HybridAgentEngine {
     this.cognitive = new CognitiveWorkspaceService(dataRoot);
     this.worldModel = new WorldModelService(dataRoot);
     this.multiWorld = new MultiWorldModelService(dataRoot);
+    this.thoughtCore = new ThoughtCoreService(dataRoot);
+    this.backgroundThinking = new BackgroundThinkingService(dataRoot, this.thoughtCore);
     this.userModel = new UserModelService(dataRoot);
     this.evolution = new SkillEvolutionService(dataRoot);
     this.environment = new EnvironmentAwarenessService(dataRoot);
@@ -905,6 +912,7 @@ export class HybridAgentEngine {
     for (const capability of userModelCapabilities(this.userModel)) this.capabilities.register(capability);
     for (const capability of evolutionCapabilities(this.evolution)) this.capabilities.register(capability);
     for (const capability of environmentCapabilities(this.environment)) this.capabilities.register(capability);
+    for (const capability of thoughtCapabilities({ thoughtCore: this.thoughtCore, backgroundThinking: this.backgroundThinking })) this.capabilities.register(capability);
     this.delegation = new AuroraExecutionBridge(dataRoot, { planning: this.planning, society: this.society, evolution: this.evolution });
     this.roleAuthority = new RoleAuthorityService({ capabilities: this.capabilities, profiles: this.agentProfiles, society: this.society }, Date.now, dataRoot);
     // ACOS is constructed last: it composes every governed Aurora service into one control loop.
@@ -1223,6 +1231,7 @@ export class HybridAgentEngine {
     }
     if (this.natsEvents) await this.natsEvents.start();
     this.automaticRefinement.start();
+    await this.thoughtCore.initialize();
     if (this.hostedScheduler) await this.hostedScheduler.reconcile(await this.scheduler.list());
   }
 
@@ -1230,6 +1239,7 @@ export class HybridAgentEngine {
     this.scheduler.start();
     this.otlp?.start();
     this.outboundChannels.startAll();
+    this.backgroundThinking.start();
   }
 
   /**
@@ -1254,6 +1264,8 @@ export class HybridAgentEngine {
   async shutdown(): Promise<void> {
     this.autopilot.stop();
     this.auroraFleet.stop();
+    this.backgroundThinking.stop();
+    await this.thoughtCore.close();
     await this.scheduler.close();
     await this.automationResponders.close();
     await this.outboundChannels.closeAll();
