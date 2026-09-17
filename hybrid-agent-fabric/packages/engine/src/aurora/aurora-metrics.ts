@@ -368,7 +368,24 @@ export class AuroraMetricsCollector {
     if (snapshot.acos.lastDegradedPhases > 0) add("acos-degraded", "warning", "The last cognitive cycle had degraded phases.", snapshot.acos.lastDegradedPhases);
     return alerts;
   }
+
+  // ═══ P3: Stats ═══
+
+  getStats() {
+    return { status: "active" };
+  }
+
+  // ═══ P3: Explainability ═══
+
+  async why(tenantId: string, entityId: string): Promise<{
+    entity: string; summary: string;
+    rationale: string[]; details: Record<string, unknown>;
+  }> {
+    return { entity: entityId, summary: "N/A", rationale: ["Service does not support entity lookup"], details: {} };
+  }
 }
+
+
 
 function safeLabel(value: string): string {
   return value.replace(/[^a-zA-Z0-9_:-]/g, "_").slice(0, 100);

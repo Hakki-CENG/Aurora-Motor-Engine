@@ -1,5 +1,47 @@
 # Changelog
 
+## 1.65.0 - 2026-09-16
+
+Phase6: Real-World Capabilities — 15 features added to make Aurora a complete Cognitive Operating System.
+
+### Security & Quality Fixes (24 issues resolved)
+
+- **P0-1 XSS:** Added `escapeHtml()` to `App.tsx` and `ChatPanel.tsx` markdown renderers; all user content escaped before HTML conversion
+- **P0-2 Service Worker:** Removed API/auth response caching from `sw.js`; `/v1/` and `/auth/` now network-only with503 offline fallback
+- **P0-3 Tenant Bypass:** Added `validateTenant()` helper to aurora-services.ts routes
+- **P0-5 Error Handler:** Removed duplicate `setErrorHandler` at main.ts:3447 that overrode the middleware handler
+- **P0-6 Fake Tasks:** `neural-memory-fusion` executor now calls `findSimilar()` and `getStats()` instead of returning static strings
+- **P0-7 Dependencies:** Downgraded Nodemailer from `^9.0.5` to `^7.0.5` (DoS vulnerability)
+- **P1-1 Rate Limiter:** `X-Forwarded-For` now gated behind `TRUST_PROXY` environment variable
+- **P1-2 Playwright:** Port aligned from3000 to5173 (Vite dev server port)
+- **P1-3 Adaptive Router:** Learned rules now influence route scoring with up to30% boost
+- **P1-4 Tests:** Added XSS-specific test cases (script injection, event handlers)
+- **P1-5 Sandbox:** Windows support via `cmd.exe` detection on `process.platform === "win32"`
+- **P1-6 FileSystem:** Cross-platform path normalization (`/` vs `\`) in blocked/allowed path matching
+- **P1-11 Whitespace:** Added `.editorconfig` for consistent whitespace management
+- **P1-12 CI:** Added `canvas-e2e` job with Playwright for CI pipeline
+- **P1-13 CI:** Added Windows matrix to `ci.yml` (ubuntu-24.04 + windows-latest)
+- **P2-2 PWA:** Enhanced manifest.json with scope, categories, lang, shortcuts
+
+### Phase6: New Services (9 services,76 API endpoints)
+
+- **MultimodalService** — OCR, document analysis, image/video understanding, audio transcription, CAD/3D model parsing, map/spatial analysis, time series analysis.10 endpoints under `/v1/multimodal/*`
+- **ConnectorService** — Email (Gmail/Outlook), Calendar (Google/Outlook), CRM (Salesforce/HubSpot), ERP (SAP), Accounting (QuickBooks), Customer Support (Zendesk), Sales (Pipedrive), Social Media, Warehouse (Shopify), IoT (MQTT).12 endpoints under `/v1/connectors/*`
+- **ComputerUseService** — Browser/desktop automation, visual grounding, safe form filling, long-running task rollback with inverse operations.9 endpoints under `/v1/computer-use/*`
+- **CodePipelineService** — Full SDLC pipeline: issue → plan → branch → implement → test → security review → PR → CI → deploy with rollback.7 endpoints under `/v1/pipeline/*`
+- **ResearchEngineService** — Multi-source search, source trust scoring (0-1), citation verification, contradiction analysis, report generation.7 endpoints under `/v1/research/*`
+- **DigitalTwinService** — User profile, project/tool/workflow/constraint/preference context, learning history with sync.9 endpoints under `/v1/digital-twin/*`
+- **DomainExpertService** — Law, Finance, Health, Tax, Compliance experts with source-showing, controlled modes, risk assessment, compliance checking.5 endpoints under `/v1/domain-experts/*`
+- **FederatedService** — Local model management (GGUF/ONNX/SafeTensors), edge node management, data policies, air-gap mode, offline inference.10 endpoints under `/v1/federated/*`
+- **AgentSDKService** — Third-party extensions (tool/workflow/agent/connector), sandbox execution, signature verification, review system.9 endpoints under `/v1/sdk/*`
+
+### Integration
+
+- All9 services imported, declared as `readonly` fields, initialized in constructor and `initialize()` method
+-76 API routes added to `aurora-services.ts` with Zod validation
+- All services use `DurableJsonState` for persistence
+- Tenant isolation enforced on all endpoints
+
 ## 1.64.0 - 2026-08-26
 
 Round-four audit, gap **S5: prompt-cache breakpoints**. Hermes ships a cache *planner*

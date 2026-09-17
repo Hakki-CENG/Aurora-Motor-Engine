@@ -1,6 +1,6 @@
 # Implementation status
 
-Updated: 2026-08-28 — current milestone 1.64
+Updated: 2026-09-16 — current milestone 1.65
 
 ## Original 1.0 baseline (delivered)
 
@@ -469,6 +469,42 @@ Adoption rationale: [`aurora-upstream-adoption-2026-08-19.md`](aurora-upstream-a
 - [x] Automatic-caching providers (OpenAI-compatible, Gemini) unaffected
 - [x] `session.cache.plan` (read) and `session.cache.config` (privileged, approval-gated) capabilities
 - [x] REST `/v1/sessions/:id/cache/plan` and `/v1/sessions/:id/cache/config`; Canvas Cache row; engine `promptCache` defaults
+
+### Phase6: Real-World Capabilities (1.65)
+
+Security & quality audit closed (24 issues: 7 P0, 13 P1, 4 P2):
+
+- [x] XSS prevention: `escapeHtml()` on all markdown renderers (App.tsx, ChatPanel.tsx)
+- [x] Service Worker: API/auth endpoints no longer cached; network-only with 503 offline fallback
+- [x] Tenant authorization bypass closed with `validateTenant()` on aurora routes
+- [x] Duplicate `setErrorHandler` removed from main.ts
+- [x] Fake system task executors replaced with real service calls
+- [x] Nodemailer downgraded to ^7.0.5 (DoS fix)
+- [x] Rate limiter trusts `X-Forwarded-For` only when `TRUST_PROXY=true`
+- [x] Playwright port aligned to 5173
+- [x] Adaptive Router learned rules influence route scoring
+- [x] XSS test cases added
+- [x] Sandbox Windows support (`cmd.exe` detection)
+- [x] FileSystem cross-platform path normalization
+- [x] `.editorconfig` for whitespace management
+- [x] CI: Windows matrix + Playwright E2E job
+
+Phase6 new services (9 services, 76 endpoints):
+
+- [x] **MultimodalService** (`/v1/multimodal/*`) — OCR, document analysis, image/video/audio understanding, CAD/3D parsing, map/spatial analysis, time series analysis
+- [x] **ConnectorService** (`/v1/connectors/*`) — Email, Calendar, CRM, ERP, Accounting, Customer Support, Sales, Social Media, Warehouse, IoT integrations
+- [x] **ComputerUseService** (`/v1/computer-use/*`) — Browser/desktop automation, visual grounding, safe form filling, long-running task rollback
+- [x] **CodePipelineService** (`/v1/pipeline/*`) — Issue → plan → branch → implement → test → security review → PR → CI → deploy chain
+- [x] **ResearchEngineService** (`/v1/research/*`) — Multi-source search, trust scoring, citation verification, contradiction analysis, report generation
+- [x] **DigitalTwinService** (`/v1/digital-twin/*`) — User project/tool/workflow/constraint/preference context with learning history
+- [x] **DomainExpertService** (`/v1/domain-experts/*`) — Law, Finance, Health, Tax, Compliance experts with source-showing, controlled modes
+- [x] **FederatedService** (`/v1/federated/*`) — Local model management, edge node management, data policies, air-gap mode
+- [x] **AgentSDKService** (`/v1/sdk/*`) — Third-party extension framework with sandbox execution, signature verification, review system
+
+- [x] All 9 services integrated into engine.ts (imports, fields, constructor, initialize)
+- [x] 76 API routes with Zod validation and tenant isolation
+- [x] All services use `DurableJsonState` for persistence
+- [x] API documentation: `docs/API.md`
 
 ## Required for full target parity
 

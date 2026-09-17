@@ -351,7 +351,25 @@ export class RoleAuthorityService {
       generatedAt: new Date(this.now()).toISOString(),
     };
   }
+
+  // ═══ P3: Stats ═══
+
+  getStats() {
+    return { status: "active" };
+  }
+
+  // ═══ P3: Explainability ═══
+
+  async why(tenantId: string, entityId: string): Promise<{
+    entity: string; summary: string;
+    rationale: string[]; details: Record<string, unknown>;
+  }> {
+    return { entity: entityId, summary: "N/A", rationale: ["Service does not support entity lookup"], details: {} };
+  }
 }
+
+
+
 
 function matchesPattern(id: string, pattern: string): boolean {
   const trimmed = pattern.trim();

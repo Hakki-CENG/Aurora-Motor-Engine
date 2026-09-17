@@ -398,6 +398,45 @@ export class DecisionService {
     }
   }
 
+  // ═══ P2: Explainability ═══
+
+  
+  // ═══ P3: Stats ═══
+
+  async getStats(tenantId: string) {
+    const s = await this.store.read();
+    const items = (s as any).decisions?.filter((x: any) => x.tenantId === tenantId) ?? [];
+    return { total: items.length };
+  }
+
+async why(tenantId: string, decisionId: string): Promise<{
+    decision: string; winner: string | null; confidence: number;
+    rationale: string[]; criteriaBreakdown: Array<{ criterion: string; weight: number; winnerScore: number; bestAlternative: number }>;
+    rejectedOptions: string[]; uncertainties: string[];
+  }> {
+    const s = await this.store.read();
+    const d = s.decisions.find((x) => x.tenantId === tenantId && x.id === decisionId);
+    if (!d) throw new Error("Aurora decision not found");
+    this.rescore(d);
+    const ranked = [...d.options].sort((a, b) => (b.weightedScore ?? 0) - (a.weightedScore ?? 0));
+    const winner = ranked[0] ?? null;
+    const second = ranked[1] ?? null;
+    const gap = winner && second ? (winner.weightedScore ?? 0) - (second.weightedScore ?? 0) : 1;
+    const confidence = Math.min(1, Math.max(0, 0.5 + gap));
+    const rationale: string[] = [];
+    if (winner) rationale.push(`Selected "${winner.name}" with score ${(winner.weightedScore ?? 0).toFixed(3)}`);
+    if (gap < 0.05) rationale.push("WARNING: Near-tie between top options — decision may be fragile");
+    if (d.evidenceRefs.length > 0) rationale.push(`${d.evidenceRefs.length} evidence reference(s) applied`);
+    const criteriaBreakdown = d.criteria.map(c => {
+      const wScore = winner ? (winner.scores[c.name] ?? 0) : 0;
+      const bAlt = second ? (second.scores[c.name] ?? 0) : 0;
+      return { criterion: c.name, weight: c.weight, winnerScore: wScore, bestAlternative: bAlt };
+    });
+    const rejectedOptions = ranked.slice(1).map(o => o.name);
+    const uncertainties = d.criteria.filter(c => !winner?.scores[c.name]).map(c => c.name);
+    return { decision: d.title, winner: winner?.name ?? null, confidence, rationale, criteriaBreakdown, rejectedOptions, uncertainties };
+  }
+
   private mutable(state: DecisionStateShape, tenantId: string, id: string): DecisionRecord {
     const decision = state.decisions.find((item) => item.tenantId === tenantId && item.id === id);
     if (!decision) throw new Error("Aurora decision not found in tenant.");

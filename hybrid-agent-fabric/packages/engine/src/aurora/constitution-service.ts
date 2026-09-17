@@ -466,6 +466,31 @@ export class ConstitutionService {
     if (!principle) throw new Error("Constitutional principle not found in tenant.");
     return principle;
   }
+
+  // ═══ P2: Explainability ═══
+
+  
+  // ═══ P3: Stats ═══
+
+  async getStats(tenantId: string) {
+    const s = await this.store.read();
+    const items = (s as any).decisions?.filter((x: any) => x.tenantId === tenantId) ?? [];
+    return { total: items.length };
+  }
+
+async why(tenantId: string, violationId: string): Promise<{
+    rule: string; violation: string; severity: string;
+    rationale: string[]; remediation: string; precedent: string[];
+  }> {
+    const s = await this.store.read();
+    const v = s.decisions.find((x: any) => x.tenantId === tenantId && x.id === violationId);
+    if (!v) throw new Error("Aurora verdict not found");
+    const maxSeverity = v.violations.reduce((m: string, vi: any) => vi.severity === "critical" ? "critical" : vi.severity === "high" && m !== "critical" ? "high" : m, "low");
+    const rationale: string[] = [`Verdict: ${v.verdict}`, `Summary: ${v.summary}`, `Violations: ${v.violations.length}`];
+    for (const vi of v.violations) rationale.push(`  ${vi.code}: ${vi.detail}`);
+    const precedent: string[] = [];
+    return { rule: v.verdict, violation: v.summary, severity: maxSeverity, rationale, remediation: v.violations.map((vi: any) => vi.remedy).join("; ") || "Review action", precedent };
+  }
 }
 
 /** Convenience helper so callers can express a unit-scored attribute without importing the validator. */

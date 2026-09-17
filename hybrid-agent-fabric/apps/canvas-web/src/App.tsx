@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { t, setLocale, getLocale, type Locale } from "./i18n";
 import {
-  Bot, Boxes, Brain, CheckCircle2, ChevronRight, Code2, Download, FileCode2, Files, GitBranch,
-  Globe2, ImageIcon, KeyRound, ListTodo, Loader2, MessageSquare, Paperclip, Play, Plus, RefreshCw, Save, Video,
+  Bot, Boxes, Brain, Calendar, CheckCircle2, ChevronRight, Code2, Download, FileCode2, Files, GitBranch,
+  Globe2, ImageIcon, KeyRound, Layers, ListTodo, Loader2, MessageSquare, Paperclip, Play, Plus, Puzzle,
+  RefreshCw, Save, Scale, Search, Server, Shield, TrendingUp, User, Video,
   Send, ShieldCheck, SquareTerminal, Workflow, XCircle,
 } from "lucide-react";
 
@@ -14,7 +16,36 @@ type Session = {
   tree?: { activeLeafId?: string; entries: Array<{ id: string; parentId?: string; message: Message; labels: string[]; contextReset?: boolean }> };
   totalUsage: { inputTokens: number; outputTokens: number };
 };
-type Tab = "chat" | "terminal" | "files" | "changes" | "browser" | "media" | "artifacts" | "tree" | "tasks" | "society" | "cognitive" | "aurora" | "models" | "profiles" | "mcp" | "secrets" | "channels" | "learning" | "automations";
+type Tab = "chat" | "terminal" | "files" | "changes" | "browser" | "media" | "artifacts" | "tree" | "tasks" | "society" | "cognitive" | "aurora" | "models" | "profiles" | "mcp" | "secrets" | "channels" | "learning" | "automations" | "knowledge" | "codeintel" | "bgworkers" | "schedules" | "trust" | "risk" | "usermodel" | "world" | "evolution" | "plugins" | "backends" | "causality" | "constitution";
+
+/** Simple loading skeleton */
+function Skeleton({ width = "100%", height = 14, style = {} }: { width?: string | number; height?: string | number; style?: React.CSSProperties }) {
+  return <span style={{display:"inline-block",width,height,background:"linear-gradient(90deg,#1a2436 25%,#26354d 50%,#1a2436 75%)",backgroundSize:"200% 100%",animation:"skeleton-pulse 1.5s ease-in-out infinite",borderRadius:4,...style}}/>;
+}
+
+/** React Error Boundary — catches rendering errors and shows a fallback UI */
+class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean; error: Error | null}> {
+  constructor(props: {children: React.ReactNode}) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error("[ErrorBoundary]", error, info.componentStack);
+  }
+  render() {
+    if (this.state.hasError) {
+      return <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100vh",padding:32,textAlign:"center",color:"#ff738b",background:"#080d17"}}>
+        <h1 style={{fontSize:24,marginBottom:8}}>Something went wrong</h1>
+        <p style={{color:"#8695ad",maxWidth:500,marginBottom:16}}>{this.state.error?.message ?? "An unexpected error occurred."}</p>
+        <button onClick={() => { this.setState({hasError:false,error:null}); window.location.reload(); }} style={{background:"#1b2a42",color:"#fff",border:"1px solid #26354d",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontWeight:700}}>Reload Canvas</button>
+      </div>;
+    }
+    return this.props.children;
+  }
+}
 
 let csrfToken: string | null = null;
 async function api<T = any>(path: string, options: RequestInit = {}): Promise<T> {
@@ -41,6 +72,48 @@ function textOf(message: Message): string {
     if (part.type === "tool_result") return `← ${part.name}\n${JSON.stringify(part.result, null, 2)}`;
     return "";
   }).join("\n");
+}
+
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+/** Simple markdown → HTML for assistant messages */
+function renderMarkdown(text: string): string {
+  // First escape ALL HTML to prevent XSS
+  let h = escapeHtml(text);
+  // Then restore code blocks (they were escaped, need to re-escape content only)
+  h = h.replace(/```(\w+)?\n([\s\S]*?)```/g, (_: string, lang: string, code: string) => {
+    return `<div class="code-block"><div class="code-header">${lang ? `<span class="code-lang">${lang}</span>` : ""}<button class="copy-btn" onclick="navigator.clipboard.writeText(this.closest('.code-block').querySelector('code').textContent)">Copy</button></div><pre><code>${code}</code></pre></div>`;
+  });
+  h = h.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+  h = h.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  h = h.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, "<em>$1</em>");
+  h = h.replace(/^### (.+)$/gm, "<h4>$1</h4>");
+  h = h.replace(/^## (.+)$/gm, "<h3>$1</h3>");
+  h = h.replace(/^# (.+)$/gm, "<h2>$1</h2>");
+  h = h.replace(/^> (.+)$/gm, "<blockquote>$1</blockquote>");
+  h = h.replace(/^[*-] (.+)$/gm, "<li>$1</li>");
+  // Links: URLs are already escaped, safe to use
+  h = h.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  h = h.replace(/^---$/gm, "<hr>");
+  h = h.replace(/\n/g, "<br>");
+  return h;
+}
+
+/** Parse ANSI escape codes to HTML spans */
+function renderAnsi(text: string): string {
+  const colors: Record<string, string> = { "30":"#000","31":"#e74c3c","32":"#2ecc71","33":"#f1c40f","34":"#3498db","35":"#9b59b6","36":"#1abc9c","37":"#ecf0f1","90":"#7f8c8d","91":"#ff6b6b","92":"#51cf66","93":"#ffd43b","94":"#74c0fc","95":"#da77f2","96":"#63e6be","97":"#f8f9fa" };
+  let result = "", style = "";
+  for (const part of text.split(/\x1b\[([0-9;]*)m/)) {
+    if (style) result += `<span style="${style}">${part.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</span>`;
+    else result += part.replace(/&/g,"&amp;").replace(/</g,"&lt;");
+    style = ""; const codes = (part.match(/\x1b\[([0-9;]*)m/)?.[1] ?? "0").split(";");
+    const s: string[] = [];
+    for (const c of codes) { if (c === "0") continue; if (c === "1") s.push("font-weight:bold"); if (colors[c]) s.push(`color:${colors[c]}`); }
+    if (s.length) style = s.join(";");
+  }
+  return result || text.replace(/&/g,"&amp;").replace(/</g,"&lt;");
 }
 
 export function App() {
@@ -94,6 +167,19 @@ export function App() {
   const [inbox, setInbox] = useState<any[]>([]);
   const [metrics, setMetrics] = useState<any>(null);
   const streamAbort = useRef<AbortController | null>(null);
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("haf-theme") as "dark" | "light") ?? "dark";
+    }
+    return "dark";
+  });
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => {
+      const next = prev === "dark" ? "light" : "dark";
+      localStorage.setItem("haf-theme", next);
+      return next;
+    });
+  }, []);
 
   const showError = (value: unknown) => {
     setError(value instanceof Error ? value.message : String(value));
@@ -107,6 +193,35 @@ export function App() {
   const loadSessions = useCallback(async () => {
     const body = await api<{ sessions: Session[] }>("/v1/sessions?tenantId=local"); setSessions(body.sessions);
   }, []);
+  const [sessionSearch, setSessionSearch] = useState("");
+  const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
+  const [locale, setLocaleState] = useState<Locale>(getLocale);
+  const filteredSessions = useMemo(() => {
+    if (!sessionSearch.trim()) return sessions;
+    const q = sessionSearch.toLowerCase();
+    return sessions.filter(s =>
+      s.name.toLowerCase().includes(q) || s.sessionId.toLowerCase().includes(q) ||
+      s.status.toLowerCase().includes(q) || (s.modelName ?? "").toLowerCase().includes(q)
+    );
+  }, [sessions, sessionSearch]);
+  const toggleSessionSelect = useCallback((id: string) => {
+    setSelectedSessions(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  }, []);
+  const bulkClose = useCallback(async () => {
+    if (selectedSessions.size === 0) return;
+    try {
+      await Promise.all(Array.from(selectedSessions).map(id =>
+        api(`/v1/sessions/${id}/close`, { method: "POST", body: JSON.stringify({ reason: "Bulk close from Canvas.", actor: "canvas-operator" }) })
+      ));
+      setSelectedSessions(new Set());
+      await loadSessions();
+    } catch (cause) { showError(cause); }
+  }, [selectedSessions, loadSessions, showError]);
+  const toggleLocale = useCallback(() => {
+    const next = locale === "en" ? "tr" : "en";
+    setLocale(next);
+    setLocaleState(next);
+  }, [locale]);
   const loadAgentProfiles = useCallback(async () => {
     const body = await api<{ profiles: any[] }>("/v1/agent-profiles?tenantId=local"); setAgentProfiles(body.profiles.filter(profile=>profile.enabled));
   }, []);
@@ -136,6 +251,7 @@ export function App() {
   }, [activeId]);
 
   useEffect(() => { void loadIdentity().then((me) => { if (me?.authenticated || me?.developmentMode) void Promise.all([loadSessions(), loadAgentProfiles(), loadHostedProviders(), loadGithubApps(), loadSideData()]); }); }, []);
+
   useEffect(() => {
     if (!hostedProviderId) { setHostedRepositories([]); setHostedRepositoryId(""); return; }
     void api<any>(`/v1/repository-providers/${hostedProviderId}/repositories?tenantId=local&limit=200`).then(body=>{setHostedRepositories(body.repositories??[]);setHostedRepositoryId(current=>(body.repositories??[]).some((item:any)=>item.repositoryId===current)?current:(body.repositories?.[0]?.repositoryId??""))}).catch(showError);
@@ -298,30 +414,60 @@ export function App() {
 
   const tabs: Array<[Tab, any, string]> = [
     ["chat", MessageSquare, "Conversation"], ["terminal", SquareTerminal, "Terminal"], ["files", Files, "Files"],
-    ["changes", GitBranch, "Changes"], ["browser", Globe2, "Browser"], ["media", Video, "Media"], ["artifacts", Boxes, "Artifacts"], ["tree", Workflow, "Tree"], ["tasks", ListTodo, "Tasks"], ["society", Boxes, "Society"], ["cognitive", Workflow, "Cognitive"], ["aurora", Brain, "Aurora"], ["models", Code2, "Models"], ["profiles", Bot, "Profiles"], ["mcp", Workflow, "MCP"], ["secrets", KeyRound, "Secrets"], ["channels", Send, "Channels"], ["learning", RefreshCw, "Learning"], ["automations", Boxes, "Automations"],
+    ["changes", GitBranch, "Changes"], ["browser", Globe2, "Browser"], ["media", Video, "Media"], ["artifacts", Boxes, "Artifacts"], ["tree", Workflow, "Tree"], ["tasks", ListTodo, "Tasks"], ["society", Boxes, "Society"], ["cognitive", Workflow, "Cognitive"], ["aurora", Brain, "Aurora"],
+    ["knowledge", Search, "Knowledge"], ["codeintel", Code2, "Code Intel"], ["bgworkers", Layers, "Workers"], ["schedules", Calendar, "Schedules"],
+    ["trust", Shield, "Trust"], ["risk", ShieldCheck, "Risk"], ["usermodel", User, "User Model"], ["world", Globe2, "World"], ["evolution", TrendingUp, "Evolution"],
+    ["constitution", Scale, "Constitution"], ["plugins", Puzzle, "Plugins"], ["backends", Server, "Backends"], ["causality", GitBranch, "Causality"],
+    ["models", Code2, "Models"], ["profiles", Bot, "Profiles"], ["mcp", Workflow, "MCP"], ["secrets", KeyRound, "Secrets"], ["channels", Send, "Channels"], ["learning", RefreshCw, "Learning"], ["automations", Boxes, "Automations"],
   ];
 
-  return <div className="canvas">
-    <header className="topbar">
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        const input = document.querySelector<HTMLInputElement>(".session-search input");
+        input?.focus();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "n") { e.preventDefault(); void createSession(); }
+      if ((e.ctrlKey || e.metaKey) && e.key >= "1" && e.key <= "9") {
+        e.preventDefault();
+        const idx = parseInt(e.key) - 1;
+        if (tabs[idx]) setTab(tabs[idx]![0]);
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "L") { e.preventDefault(); toggleLocale(); }
+      if (e.key === "Escape") { setError(null); setSessionSearch(""); setSelectedSessions(new Set()); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [tabs, toggleLocale]);
+
+  return <ErrorBoundary><div className="canvas" data-theme={theme} role="application" aria-label="Aurora Canvas - Durable Agent Control Center">
+    <header className="topbar" role="banner">
       <div className="wordmark"><span>HAF</span> Canvas</div>
       <div className={`health ${metrics?.alerts?.length ? "warn" : ""}`}>{metrics ? `${metrics.workers.running} workers · ${metrics.alerts.length} alerts` : "connecting"}</div>
+      <button onClick={toggleTheme} title="Toggle theme" style={{background:"transparent",border:"1px solid var(--line)",borderRadius:7,padding:"5px 9px",color:"var(--muted)",cursor:"pointer",fontSize:12}}>{theme === "dark" ? t("theme.light") : t("theme.dark")}</button>
+      <button onClick={toggleLocale} title="Toggle language" style={{background:"transparent",border:"1px solid var(--line)",borderRadius:7,padding:"5px 9px",color:"var(--muted)",cursor:"pointer",fontSize:12}}>{locale === "en" ? "🇹🇷 TR" : "🇬🇧 EN"}</button>
       <div className="top-spacer" />
       {identity?.developmentMode ? <span className="dev-badge">development admin</span> : identity?.identity ? <span className="identity"><ShieldCheck size={14}/>{identity.identity.email ?? identity.identity.subject}</span> : <><input className="token" type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder="API token"/><button onClick={login}><KeyRound size={15}/> Login</button></>}
     </header>
-    <aside className="sidebar">
+    <aside className="sidebar" role="navigation" aria-label="Agent sessions">
       <select className="profile-select" value={selectedAgentProfile} onChange={e=>setSelectedAgentProfile(e.target.value)}><option value="">No agent profile</option>{agentProfiles.map(profile=><option key={profile.id} value={profile.id}>{profile.name} · v{profile.version}</option>)}</select>
       <button className="new-agent" onClick={createSession}><Plus size={16}/> New agent</button>
       <details className="repo-import"><summary>Import repository</summary><input value={repositoryUrl} onChange={e=>setRepositoryUrl(e.target.value)} placeholder="https://github.com/org/repo.git"/><input value={repositoryBranch} onChange={e=>setRepositoryBranch(e.target.value)} placeholder="branch (optional)"/><input value={repositorySecretId} onChange={e=>setRepositorySecretId(e.target.value)} placeholder="credential secret ID (optional)"/><button disabled={!repositoryUrl.trim()} onClick={importRepository}><GitBranch size={14}/>Clone + create agent</button><small>Credentials are redeemed server-side and never placed in the URL.</small><hr/><b>Hosted accounts</b><select value={hostedProviderId} onChange={e=>setHostedProviderId(e.target.value)}><option value="">Select account</option>{hostedProviders.map(item=><option key={item.id} value={item.id}>{item.name} · {item.kind}</option>)}</select><select value={hostedRepositoryId} onChange={e=>setHostedRepositoryId(e.target.value)}><option value="">Select repository</option>{hostedRepositories.map(item=><option key={item.repositoryId} value={item.repositoryId}>{item.fullName}</option>)}</select><button disabled={!hostedProviderId||!hostedRepositoryId} onClick={importHostedRepository}><GitBranch size={14}/>Import hosted repo</button><select value={hostedKind} onChange={e=>setHostedKind(e.target.value)}><option value="github">GitHub</option><option value="gitlab">GitLab</option></select><input value={hostedName} onChange={e=>setHostedName(e.target.value)} placeholder="account display name"/><input value={hostedSecretId} onChange={e=>setHostedSecretId(e.target.value)} placeholder="credential secret ID"/><button disabled={!hostedName.trim()||!hostedSecretId.trim()} onClick={addHostedProvider}>Add token account</button><hr/><b>GitHub App installations</b><select value={githubAppId} onChange={e=>setGithubAppId(e.target.value)}><option value="">Select GitHub App</option>{githubApps.map(item=><option key={item.id} value={item.id}>{item.name} · {item.enabled?"enabled":"disabled"}</option>)}</select><button disabled={!githubAppId} onClick={startGithubInstallation}>Install selected App</button><select value={githubInstallationId} onChange={e=>setGithubInstallationId(e.target.value)}><option value="">Select verified installation</option>{githubInstallations.map(item=><option key={item.id} value={item.id}>{item.accountLogin??item.installationProjection.slice(0,12)} · {item.status}</option>)}</select><button disabled={!githubInstallations.some(item=>item.id===githubInstallationId&&item.status==="active")} onClick={bindGithubInstallation}>Bind installation as account</button><small>Setup callback: /auth/github-app/callback · webhook: /v1/platforms/github-app/webhook</small><input value={githubAppName} onChange={e=>setGithubAppName(e.target.value)} placeholder="GitHub App display name"/><input value={githubNumericId} onChange={e=>setGithubNumericId(e.target.value)} placeholder="numeric App ID"/><input value={githubClientId} onChange={e=>setGithubClientId(e.target.value)} placeholder="client ID (recommended JWT issuer)"/><input value={githubSlug} onChange={e=>setGithubSlug(e.target.value)} placeholder="public App slug"/><input value={githubPrivateKeySecretId} onChange={e=>setGithubPrivateKeySecretId(e.target.value)} placeholder="RSA private-key secret ID"/><input value={githubWebhookSecretId} onChange={e=>setGithubWebhookSecretId(e.target.value)} placeholder="webhook-secret ID (optional)"/><button disabled={!githubAppName.trim()||!githubNumericId.trim()||!githubSlug.trim()||!githubPrivateKeySecretId.trim()} onClick={registerGithubApp}>Register GitHub App</button></details>
-      <div className="side-title">Agents</div>
-      <div className="session-list">{sessions.map((item) => <button key={item.sessionId} className={`session-row ${activeId === item.sessionId ? "active" : ""}`} onClick={() => setActiveId(item.sessionId)}>
+      <div className="side-title">{t("sidebar.agents")}</div>
+      <div className="session-search"><input type="text" value={sessionSearch} onChange={e => setSessionSearch(e.target.value)} placeholder="🔍 Search sessions…" aria-label="Search sessions"/></div>
+      {selectedSessions.size > 0 && <div className="bulk-actions"><span>{selectedSessions.size} selected</span><button className="danger" onClick={bulkClose}>Close selected</button><button onClick={() => setSelectedSessions(new Set())}>Clear</button></div>}
+      <div className="session-list" role="listbox" aria-label="Agent sessions">{filteredSessions.map((item) => <button key={item.sessionId} role="option" aria-selected={activeId === item.sessionId} className={`session-row ${activeId === item.sessionId ? "active" : ""}`} onClick={() => setActiveId(item.sessionId)}>
+        <input type="checkbox" checked={selectedSessions.has(item.sessionId)} onChange={e => { e.stopPropagation(); toggleSessionSelect(item.sessionId); }} onClick={e => e.stopPropagation()} aria-label={`Select ${item.name}`}/>
         <span className={`status-dot ${item.status}`}/><span><b>{item.name}</b><small>{item.status} · {item.sessionId.slice(0,8)}</small></span><ChevronRight size={14}/>
       </button>)}</div>
       <div className="sidebar-bottom"><button onClick={() => void Promise.all([loadSessions(), loadAgentProfiles(), loadHostedProviders(), loadGithubApps(), loadSideData()])}><RefreshCw size={14}/> Refresh</button></div>
     </aside>
-    <nav className="tabs">{tabs.map(([id, Icon, label]) => <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)} disabled={!session}><Icon size={16}/>{label}</button>)}</nav>
-    <main className="workspace">
+    <nav className="tabs" role="tablist" aria-label="Workspace tabs">{tabs.map(([id, Icon, label]) => <button key={id} role="tab" aria-selected={tab === id} aria-controls={`panel-${id}`} className={tab === id ? "active" : ""} onClick={() => setTab(id)} disabled={!session}><Icon size={16}/>{label}</button>)}</nav>
+    <main className="workspace" role="main" aria-label="Workspace content">
       {!session ? <div className="welcome"><Bot size={52}/><h1>Durable agent control center</h1><p>Create or select an agent to open conversation, terminal, files, changes, browser and automation panels.</p></div> : <>
-        <div className="session-head"><div><h2>{session.name}</h2><p>{session.status} · generation {session.generation} · {session.totalUsage.inputTokens + session.totalUsage.outputTokens} tokens{sessionCost ? ` · $${sessionCost.costUsd.toFixed(4)} (${sessionCost.costSource})` : ""}{sessionCost?.state === "archived" ? " · archived" : ""}</p></div><code>{session.workspacePath}</code><div className="mode-actions"><select value={sessionMode?.permissionMode ?? "manual"} onChange={e=>void changeSessionMode({ permissionMode: e.target.value })} title="Permission mode">{["plan","manual","acceptEdits","auto","dontAsk","bypass"].map(mode=><option key={mode} value={mode}>{mode}</option>)}</select><select value={sessionEffort?.level ?? "medium"} onChange={e=>void changeEffort(e.target.value)} title="Effort level">{["low","medium","high","xhigh","max"].map(level=><option key={level} value={level}>{level}</option>)}</select><select value={sessionMode?.sandboxMode ?? "workspace-write"} onChange={e=>void changeSessionMode({ sandboxMode: e.target.value })} title="Sandbox mode">{["read-only","workspace-write","danger-full-access"].map(mode=><option key={mode} value={mode}>{mode}</option>)}</select></div><div className="export-actions"><button className="export-link" onClick={archiveSession}>{sessionCost?.state === "archived" ? "Restore" : "Archive"}</button><a className="export-link" href={`/v1/sessions/${session.sessionId}/export?format=markdown`} download><Download size={14}/>Markdown</a><a className="export-link" href={`/v1/sessions/${session.sessionId}/export?format=trajectory`} download><Code2 size={14}/>Trajectory</a></div></div>
+        <div className="session-head"><div><h2>{session.name}</h2><p>{session.status} · generation {session.generation} · {session.totalUsage.inputTokens + session.totalUsage.outputTokens} tokens{sessionCost ? ` · $${sessionCost.costUsd.toFixed(4)} (${sessionCost.costSource})` : ""}{sessionCost?.state === "archived" ? " · archived" : ""}</p>{sessionEffort && <p className="cost-bar"><span style={{display:"inline-block",width:60,height:6,background:"var(--line)",borderRadius:3,overflow:"hidden",verticalAlign:"middle"}}><span style={{display:"block",height:"100%",width:`${Math.min(100, (sessionEffort.tokensUsed ?? 0) / Math.max(1, sessionEffort.tokensBudget ?? 1) * 100)}%`,background:"var(--accent)",borderRadius:3}}/></span> <small>{sessionEffort.tokensUsed ?? 0}/{sessionEffort.tokensBudget ?? "∞"} tokens · level {sessionEffort.level ?? "medium"}</small></p>}</div><code>{session.workspacePath}</code><div className="mode-actions"><select value={sessionMode?.permissionMode ?? "manual"} onChange={e=>void changeSessionMode({ permissionMode: e.target.value })} title="Permission mode">{["plan","manual","acceptEdits","auto","dontAsk","bypass"].map(mode=><option key={mode} value={mode}>{mode}</option>)}</select><select value={sessionEffort?.level ?? "medium"} onChange={e=>void changeEffort(e.target.value)} title="Effort level">{["low","medium","high","xhigh","max"].map(level=><option key={level} value={level}>{level}</option>)}</select><select value={sessionMode?.sandboxMode ?? "workspace-write"} onChange={e=>void changeSessionMode({ sandboxMode: e.target.value })} title="Sandbox mode">{["read-only","workspace-write","danger-full-access"].map(mode=><option key={mode} value={mode}>{mode}</option>)}</select></div><div className="export-actions"><button className="export-link" onClick={archiveSession}>{sessionCost?.state === "archived" ? "Restore" : "Archive"}</button><a className="export-link" href={`/v1/sessions/${session.sessionId}/export?format=markdown`} download><Download size={14}/>Markdown</a><a className="export-link" href={`/v1/sessions/${session.sessionId}/export?format=trajectory`} download><Code2 size={14}/>Trajectory</a></div></div>
         {tab === "chat" && <ChatPanel session={session} prompt={prompt} setPrompt={setPrompt} images={promptImages} setImages={setPromptImages} send={sendPrompt} busy={busy} showError={showError}/>} 
         {tab === "terminal" && <TerminalPanel sessionId={session.sessionId} showError={showError}/>} 
         {tab === "files" && <FilesPanel sessionId={session.sessionId} showError={showError}/>} 
@@ -340,30 +486,52 @@ export function App() {
         {tab === "secrets" && <SecretsPanel showError={showError}/>} 
         {tab === "channels" && <ChannelsPanel sessionId={session.sessionId} showError={showError}/>} 
         {tab === "learning" && <LearningPanel sessionId={session.sessionId} showError={showError}/>} 
-        {tab === "automations" && <AutomationsPanel sessionId={session.sessionId} showError={showError}/>} 
+        {tab === "automations" && <AutomationsPanel sessionId={session.sessionId} showError={showError}/>}
+        {tab === "knowledge" && <KnowledgePanel sessionId={session.sessionId} showError={showError}/>}
+        {tab === "codeintel" && <CodeIntelPanel sessionId={session.sessionId} showError={showError}/>}
+        {tab === "bgworkers" && <BgWorkersPanel sessionId={session.sessionId} showError={showError}/>}
+        {tab === "schedules" && <SchedulesPanel showError={showError}/>}
+        {tab === "trust" && <TrustPanel showError={showError}/>}
+        {tab === "risk" && <RiskPanel showError={showError}/>}
+        {tab === "usermodel" && <UserModelPanel showError={showError}/>}
+        {tab === "world" && <WorldPanel showError={showError}/>}
+        {tab === "evolution" && <EvolutionPanel showError={showError}/>}
+        {tab === "constitution" && <ConstitutionPanel showError={showError}/>}
+        {tab === "plugins" && <PluginsPanel showError={showError}/>}
+        {tab === "backends" && <BackendsPanel showError={showError}/>}
+        {tab === "causality" && <CausalityPanel showError={showError}/>}
       </>}
     </main>
-    <aside className="inspector">
+    <aside className="inspector" role="complementary" aria-label="Session inspector">
       <section><h3>Questions</h3>{questions.length ? questions.map((item) => <div className="approval" key={item.id}><b>{item.question}</b><small>{item.context ?? "waiting for an answer"}</small><div>{item.options.map((option:any)=><button key={option.id} onClick={() => void answerQuestion(item.id, option.id)}>{option.label}</button>)}</div></div>) : <p className="muted">No open questions.</p>}</section>
       <section><h3>Background shells</h3>{shells.length ? shells.map((item) => <div className="approval" key={item.id}><b>{item.label}</b><small>{item.status} · {item.producedChars} chars{item.droppedChars ? ` · ${item.droppedChars} dropped` : ""}</small><pre>{item.command}</pre>{item.status === "running" && <div><button onClick={() => void stopShell(item.id)} className="danger"><XCircle size={13}/>Kill</button></div>}{item.stopReason && <small>{item.stopReason}</small>}</div>) : <p className="muted">No background shells.</p>}</section>
       <section><h3>Approvals</h3>{approvals.length ? approvals.map((item) => <div className="approval" key={item.id}><b>{item.capabilityId}</b><small>{item.risk}</small><pre>{JSON.stringify(item.argumentsPreview,null,2)}</pre><div><button onClick={() => resolveApproval(item.id,"approve_once")}><CheckCircle2 size={13}/>Once</button><button onClick={() => resolveApproval(item.id,"deny")} className="danger"><XCircle size={13}/>Deny</button></div></div>) : <p className="muted">No pending approvals.</p>}</section>
       <section><h3>Agent family</h3>{roster.length ? <>{roster.map((item) => <button className="child" key={item.sessionId} onClick={() => setActiveId(item.sessionId)}><Bot size={14}/><span><b>{item.name}</b><small>{item.relationship} · {item.status}</small></span></button>)}<div className="family-composer"><select value={familyTarget} onChange={e=>setFamilyTarget(e.target.value)}>{roster.map(item=><option key={item.sessionId} value={item.sessionId}>{item.relationship}: {item.name}</option>)}</select><select value={familyMode} onChange={e=>setFamilyMode(e.target.value)}><option value="auto">Auto</option><option value="steer">Steer</option><option value="follow_up">Follow up</option></select><textarea value={familyMessage} onChange={e=>setFamilyMessage(e.target.value)} placeholder="Message a reachable agent…"/><button onClick={sendFamilyMessage} disabled={!familyMessage.trim()||!familyTarget}><Send size={13}/>Send</button></div></> : <p className="muted">No directly reachable agents.</p>}{inbox.length>0&&<p className="inbox-warning"><MessageSquare size={13}/>{inbox.length} queued or uncertain messages</p>}</section>
       <section><h3>Runtime</h3><dl><dt>Profile</dt><dd>{session?.agentProfile?`${session.agentProfile.name} v${session.agentProfile.version}`:"none"}</dd><dt>Model</dt><dd>{session?.modelName ?? "default"}</dd><dt>Fallbacks</dt><dd>{session?.modelFallbacks?.length ?? 0}</dd><dt>Open tasks</dt><dd>{session?.tasks?.filter(task=>!["done","cancelled"].includes(task.status)).length ?? 0}</dd><dt>Sequence</dt><dd>{session?.lastSequence ?? 0}</dd><dt>Fleet events</dt><dd>{metrics?.eventsTotal ?? 0}</dd><dt>Budget</dt><dd>{budget && budget.state !== "unlimited" ? `${budget.state}${budget.remainingUsd !== undefined ? ` · $${budget.remainingUsd.toFixed(2)} left` : ""}${budget.blocked ? " · blocked" : ""}` : "unlimited"}</dd><dt>Verified</dt><dd>{verification ? (verification.latest?.verified ? `yes · ${verification.recipe?.name ?? ""}` : verification.latest?.run ? `no · ${verification.latest.run.verdict}` : `not run · ${verification.recipe?.name ?? "unknown"}`) : "—"}</dd><dt>Diagnostics</dt><dd>{codeIntel ? (codeIntel.latest?.run ? `${codeIntel.latest.run.counts.total} issue(s) · ${codeIntel.latest.run.backend}${codeIntel.latest.run.serverId ? ` · ${codeIntel.latest.run.serverId}` : ""} · ${codeIntel.latest.fresh ? "current" : "stale"}` : `not run · ${codeIntel.catalog?.detection?.markers?.length ? codeIntel.catalog.detection.markers.join(", ") : "no code project"}`) : "—"}</dd><dt>Fan-out</dt><dd>{fanout ? `${fanout.liveChildren}/${fanout.limits.maxConcurrentChildren} live · depth ${fanout.depth}/${fanout.limits.maxDepth}` : "—"}</dd><dt>Cache</dt><dd>{cachePlan ? (cachePlan.latest?.plan ? `${cachePlan.latest.plan.markerCount} markers · ${cachePlan.latest.plan.stableChars} stable chars · ${cachePlan.latest.plan.prefixHit ? "hit" : "miss"} · ttl ${Math.round(cachePlan.latest.plan.ttlMs / 60_000)}m` : cachePlan.latest?.message ?? "no plan") : "—"}</dd></dl></section>
     </aside>
-    {error && <div className="toast"><XCircle size={16}/>{error}</div>}
-  </div>;
+    {error && <div className="toast" role="alert" aria-live="assertive"><XCircle size={16}/>{error}</div>}
+  </div></ErrorBoundary>;
 }
 
 function ChatPanel({ session, prompt, setPrompt, images, setImages, send, busy, showError }: {session:Session;prompt:string;setPrompt:Dispatch<SetStateAction<string>>;images:Array<{path:string;mimeType:string;sha256:string;fileName:string}>;setImages:Dispatch<SetStateAction<Array<{path:string;mimeType:string;sha256:string;fileName:string}>>>;send:()=>void;busy:boolean;showError:(e:any)=>void}) {
   const end = useRef<HTMLDivElement>(null), fileInput=useRef<HTMLInputElement>(null); const [uploading,setUploading]=useState(false); useEffect(() => end.current?.scrollIntoView({ behavior:"smooth" }), [session.messages.length]);
   const attach=async(file?:File)=>{if(!file)return;if(file.size>2_800_000){showError(new Error("Attachment exceeds 2.8 MB."));return}setUploading(true);try{const dataUrl=await new Promise<string>((resolvePromise,reject)=>{const reader=new FileReader();reader.onload=()=>resolvePromise(String(reader.result));reader.onerror=()=>reject(reader.error);reader.readAsDataURL(file)});const base64=dataUrl.slice(dataUrl.indexOf(",")+1);const result=await api<any>(`/v1/sessions/${session.sessionId}/attachments`,{method:"POST",body:JSON.stringify({fileName:file.name,mimeType:file.type||"application/octet-stream",base64})});if(["image/png","image/jpeg","image/webp","image/gif"].includes(result.mimeType)){if(images.length>=8)throw new Error("A prompt supports at most 8 images.");setImages(previous=>[...previous,{path:result.path,mimeType:result.mimeType,sha256:result.sha256,fileName:result.fileName}])}else setPrompt(previous=>`${previous}${previous.trim()?"\n\n":""}Attached workspace file: ${result.path}\nUse filesystem tools to inspect it.`)}catch(e){showError(e)}finally{setUploading(false);if(fileInput.current)fileInput.current.value=""}};
-  return <div className="panel chat-panel"><div className="messages">{session.messages.map((message) => <article key={message.id} className={`message ${message.role}`}><header><b>{message.role}</b><time>{new Date(message.timestamp).toLocaleTimeString()}</time></header><pre>{textOf(message)}</pre></article>)}<div ref={end}/></div><div className="composer"><input ref={fileInput} className="hidden-file" type="file" onChange={e=>void attach(e.target.files?.[0])}/>{images.length>0&&<div className="attachment-chips">{images.map((image,index)=><span key={image.path}><b>{image.fileName}</b><small>{image.mimeType}</small><button onClick={()=>setImages(current=>current.filter((_,item)=>item!==index))}><XCircle size={12}/></button></span>)}</div>}<button className="attach-button" disabled={uploading} onClick={()=>fileInput.current?.click()}>{uploading?<Loader2 className="spin" size={17}/>:<Paperclip size={17}/>}</button><textarea value={prompt} onChange={(e)=>setPrompt(e.target.value)} onKeyDown={(e)=>{if((e.ctrlKey||e.metaKey)&&e.key==="Enter")send()}} placeholder="Message the agent…"/><button disabled={busy||!prompt.trim()} onClick={send}>{busy?<Loader2 className="spin" size={17}/>:<Send size={17}/>}Send</button></div></div>;
+  return <div className="panel chat-panel"><div className="messages" role="log" aria-live="polite" aria-label="Chat messages">{session.messages.map((message) => {
+    const raw = textOf(message);
+    const isMarkdown = message.role === "assistant" && (raw.includes("```") || raw.includes("## ") || raw.includes("**") || raw.includes("- "));
+    const isAnsi = raw.includes("\x1b[");
+    return <article key={message.id} className={`message ${message.role}`}><header><b>{message.role}</b><time>{new Date(message.timestamp).toLocaleTimeString()}</time></header>
+      {isMarkdown ? <div className="message-rendered" dangerouslySetInnerHTML={{ __html: renderMarkdown(raw) }}/>
+       : isAnsi ? <pre className="ansi-content" dangerouslySetInnerHTML={{ __html: renderAnsi(raw) }}/>
+       : <pre>{raw}</pre>}
+    </article>;
+  })}</div><div className="composer"><input ref={fileInput} className="hidden-file" type="file" onChange={e=>void attach(e.target.files?.[0])}/>{images.length>0&&<div className="attachment-chips">{images.map((image,index)=><span key={image.path}><b>{image.fileName}</b><small>{image.mimeType}</small><button onClick={()=>setImages(current=>current.filter((_,item)=>item!==index))}><XCircle size={12}/></button></span>)}</div>}<button className="attach-button" disabled={uploading} onClick={()=>fileInput.current?.click()}>{uploading?<Loader2 className="spin" size={17}/>:<Paperclip size={17}/>}</button><textarea value={prompt} onChange={(e)=>setPrompt(e.target.value)} onKeyDown={(e)=>{if((e.ctrlKey||e.metaKey)&&e.key==="Enter")send()}} placeholder="Message the agent…"/><button disabled={busy||!prompt.trim()} onClick={send}>{busy?<Loader2 className="spin" size={17}/>:<Send size={17}/>}Send</button></div></div>;
 }
 
 function TerminalPanel({sessionId,showError}:{sessionId:string;showError:(e:any)=>void}) {
   const [command,setCommand]=useState("pwd && ls -la"); const [history,setHistory]=useState<Array<{command:string;output:string;exitCode:any}>>([]); const [busy,setBusy]=useState(false);
   const run=async()=>{setBusy(true);try{const r=await api<any>(`/v1/sessions/${sessionId}/terminal`,{method:"POST",body:JSON.stringify({command})});setHistory((h)=>[...h,{command,output:r.stdout,exitCode:r.exitCode}])}catch(e){showError(e)}finally{setBusy(false)}};
-  return <div className="panel terminal-panel"><div className="terminal-output">{history.map((h,i)=><div key={i}><div className="terminal-command">$ {h.command}</div><pre>{h.output}</pre><span className={h.exitCode===0?"exit-ok":"exit-bad"}>exit {String(h.exitCode)}</span></div>)}</div><div className="terminal-input"><span>$</span><input value={command} onChange={e=>setCommand(e.target.value)} onKeyDown={e=>e.key==="Enter"&&run()}/><button onClick={run} disabled={busy}><Play size={15}/></button></div></div>;
+  return <div className="panel terminal-panel" role="region" aria-label="Terminal"><div className="terminal-output" role="log" aria-live="polite" aria-label="Terminal output">{history.map((h,i)=><div key={i}><div className="terminal-command" aria-label={`Command: ${h.command}`}>$ {h.command}</div><pre>{h.output}</pre><span className={h.exitCode===0?"exit-ok":"exit-bad"} aria-label={`Exit code ${h.exitCode}`}>exit {String(h.exitCode)}</span></div>)}</div><div className="terminal-input"><span aria-hidden="true">$</span><input value={command} onChange={e=>setCommand(e.target.value)} onKeyDown={e=>e.key==="Enter"&&run()} aria-label="Terminal command input"/><button onClick={run} disabled={busy} aria-label="Run command"><Play size={15}/></button></div></div>;
 }
 
 function FilesPanel({sessionId,showError}:{sessionId:string;showError:(e:any)=>void}) {
@@ -371,7 +539,7 @@ function FilesPanel({sessionId,showError}:{sessionId:string;showError:(e:any)=>v
   const load=async()=>{try{const r=await api<any>(`/v1/sessions/${sessionId}/files?path=.&maxEntries=2000`);setFiles(r.entries.filter((x:any)=>x.type==="file"))}catch(e){showError(e)}};
   useEffect(()=>{void load()},[sessionId]); const open=async(path:string)=>{try{const r=await api<any>(`/v1/sessions/${sessionId}/file?path=${encodeURIComponent(path)}`);setSelected(path);setContent(r.content)}catch(e){showError(e)}};
   const save=async()=>{if(!selected)return;try{await api(`/v1/sessions/${sessionId}/file`,{method:"PUT",body:JSON.stringify({path:selected,content})})}catch(e){showError(e)}};
-  return <div className="panel files-panel"><div className="file-tree"><div className="panel-toolbar"><b>Workspace</b><button onClick={load}><RefreshCw size={14}/></button></div>{files.map(f=><button key={f.path} className={selected===f.path?"active":""} onClick={()=>open(f.path)}><FileCode2 size={14}/>{f.path}<small>{f.size}</small></button>)}</div><div className="editor"><div className="panel-toolbar"><code>{selected??"Select a file"}</code><button disabled={!selected} onClick={save}><Save size={14}/>Save</button></div><textarea spellCheck={false} value={content} onChange={e=>setContent(e.target.value)}/></div></div>;
+  return <div className="panel files-panel" role="region" aria-label="File explorer"><div className="file-tree" role="tree" aria-label="File tree"><div className="panel-toolbar"><b>Workspace</b><button onClick={load} aria-label="Refresh files"><RefreshCw size={14}/></button></div>{files.map(f=><button key={f.path} role="treeitem" aria-selected={selected===f.path} className={selected===f.path?"active":""} onClick={()=>open(f.path)}><FileCode2 size={14}/>{f.path}<small>{f.size}</small></button>)}</div><div className="editor" role="region" aria-label="File editor"><div className="panel-toolbar"><code>{selected??"Select a file"}</code><button disabled={!selected} onClick={save} aria-label="Save file"><Save size={14}/>Save</button></div><textarea spellCheck={false} value={content} onChange={e=>setContent(e.target.value)} aria-label={`Editing ${selected ?? "no file"}`}/></div></div>;
 }
 
 function ChangesPanel({sessionId,showError}:{sessionId:string;showError:(e:any)=>void}) {
@@ -911,4 +1079,118 @@ function AutomationsPanel({sessionId,showError}:{sessionId:string;showError:(e:a
   const addResponder=async()=>{try{await api("/v1/automation-responders",{method:"POST",body:JSON.stringify({tenantId:"local",name:responderName,automationId:responderAutomationId,credentialSecretId:responderSecretId})});setResponderSecretId("");await load()}catch(e){showError(e)}};
   const toggleResponder=async(responder:any)=>{try{await api(`/v1/automation-responders/${responder.id}`,{method:"PATCH",body:JSON.stringify({tenantId:"local",enabled:!responder.enabled})});await load()}catch(e){showError(e)}};
   return <div className="panel automations-panel"><div className="automation-form"><input value={name} onChange={e=>setName(e.target.value)}/><textarea value={prompt} onChange={e=>setPrompt(e.target.value)}/><button onClick={create}><Plus size={14}/>Create manual automation</button></div>{items.map(item=><div className="automation" key={item.id}><Workflow size={18}/><div><b>{item.name}</b><small>{item.trigger.kind} · {item.enabled?"enabled":"disabled"}{item.managedBy?` · Git ${item.managedBy.key}`:""}</small></div><button onClick={()=>api(`/v1/automations/${item.id}/dispatch`,{method:"POST"}).catch(showError)}><Play size={14}/>Run</button></div>)}<div className="automation-form"><h3>Hosted Git manifest sync</h3><input value={sourceName} onChange={e=>setSourceName(e.target.value)} placeholder="source name"/><input value={providerId} onChange={e=>setProviderId(e.target.value)} placeholder="hosted provider ID"/><input value={repositoryId} onChange={e=>setRepositoryId(e.target.value)} placeholder="repository ID"/><input value={manifestPath} onChange={e=>setManifestPath(e.target.value)} placeholder="manifest JSON path"/><input value={ref} onChange={e=>setRef(e.target.value)} placeholder="branch/ref"/><input value={hookSecretEnv} onChange={e=>setHookSecretEnv(e.target.value)} placeholder="webhook secret env (optional)"/><button disabled={!sourceName||!providerId||!repositoryId||!manifestPath||!ref} onClick={addSource}><GitBranch size={14}/>Add Git source</button><small>Plan fetches and validates only. Apply requires the exact planned SHA-256; branch movement forces a new plan.</small></div>{sources.map(source=>{const planned=plans[source.id];return <div className="automation" key={source.id}><GitBranch size={18}/><div><b>{source.name}</b><small>{source.status} · {source.ref}:{source.manifestPath} · {source.enabled?"enabled":"disabled"}</small>{planned&&<code>{planned.entries.length} entries · {planned.disableKeys.length} disable · {planned.manifestSha256.slice(0,12)}</code>}</div><button disabled={!source.enabled} onClick={()=>plan(source)}>Plan</button><button disabled={!planned} onClick={()=>apply(source)}>Apply exact hash</button><button onClick={()=>toggleSource(source)}>{source.enabled?"Disable":"Enable"}</button></div>})}<div className="automation-form"><h3>External responder deployment</h3><input value={responderName} onChange={e=>setResponderName(e.target.value)} placeholder="responder name"/><select value={responderAutomationId} onChange={e=>setResponderAutomationId(e.target.value)}><option value="">Select webhook automation</option>{items.filter((item:any)=>item.trigger.kind==="webhook").map((item:any)=><option key={item.id} value={item.id}>{item.name}</option>)}</select><input value={responderSecretId} onChange={e=>setResponderSecretId(e.target.value)} placeholder="Credential Broker secret ID"/><button disabled={!responderName||!responderAutomationId||!responderSecretId} onClick={addResponder}>Register responder</button><small>Responder signs raw JSON with timestamp + nonce. The secret is never returned by status APIs.</small></div>{responders.map((responder:any)=><div className="automation" key={responder.id}><Workflow size={18}/><div><b>{responder.name}</b><small>{responder.health} · {responder.eventType} · {responder.enabled?"enabled":"disabled"}{responder.version?` · v${responder.version}`:""}</small><code>{responder.eventCounts.delivered} delivered · {responder.eventCounts.uncertain} uncertain · {responder.lastHeartbeatAt?new Date(responder.lastHeartbeatAt).toLocaleString():"no heartbeat"}</code></div><button onClick={()=>toggleResponder(responder)}>{responder.enabled?"Disable":"Enable"}</button></div>)}</div>
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TIER 2 + TIER 3 PANELS
+// ═══════════════════════════════════════════════════════════════
+
+/** S7: Knowledge Search — semantic search across workspace */
+function KnowledgePanel({sessionId,showError}:{sessionId:string;showError:(e:any)=>void}) {
+  const [query,setQuery]=useState(""),[results,setResults]=useState<any[]>([]),[busy,setBusy]=useState(false);
+  const search=async()=>{if(!query.trim())return;setBusy(true);try{const r=await api<any>("/v1/knowledge/search",{method:"POST",body:JSON.stringify({tenantId:"local",query:query.trim(),sessionId,limit:20})});setResults(r.hits??r.results??[])}catch(e){showError(e)}finally{setBusy(false)}};
+  return <div className="panel tasks-panel"><div className="task-toolbar"><b>Knowledge Search</b><input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==="Enter"&&void search()} placeholder="Search workspace knowledge…"/><button disabled={busy||!query.trim()} onClick={search}>{busy?<Loader2 className="spin" size={14}/>:<Search size={14}/>}Search</button></div><div className="task-grid">{results.map((hit:any,i:number)=><article className="task-card" key={hit.id??i}><h3>{hit.title??hit.source??`Result ${i+1}`}</h3><p>{(hit.content??hit.text??"").slice(0,300)}</p><small>score {hit.score?.toFixed(3)??"—"} · {hit.kind??hit.type??"match"}{hit.path?` · ${hit.path}`:""}</small></article>)}{!results.length&&query&&!busy&&<div className="welcome"><Search size={38}/><p>No results found.</p></div>}{!query&&!results.length&&<div className="welcome"><Search size={38}/><p>Search across workspace files, memories, and knowledge base.</p></div>}</div></div>;
+}
+
+/** S8: Code Intelligence — lint results, diagnostics */
+function CodeIntelPanel({sessionId,showError}:{sessionId:string;showError:(e:any)=>void}) {
+  const [data,setData]=useState<any>(null),[busy,setBusy]=useState(false);
+  const load=async()=>{setBusy(true);try{const [code,score]=await Promise.all([api<any>(`/v1/sessions/${sessionId}/code`),api<any>(`/v1/sessions/${sessionId}/verification?limit=1`).catch(()=>null)]);setData({code,score})}catch(e){showError(e)}finally{setBusy(false)}};
+  useEffect(()=>{void load()},[sessionId]);
+  return <div className="panel tasks-panel"><div className="task-toolbar"><b>Code Intelligence</b><small>{data?.code?.catalog?.detection?.markers?.length?data.code.catalog.detection.markers.join(", "):"no project detected"}</small><button onClick={load} disabled={busy}>{busy?<Loader2 className="spin" size={14}/>:<RefreshCw size={14}/>}Refresh</button></div><div className="task-grid">{data?.code?.latest?.run&&<article className={`task-card ${data.code.latest.run.counts.total>0?"failed":"done"}`}><h3>Diagnostics</h3><p>{data.code.latest.run.counts.total} issue(s) · {data.code.latest.run.backend}</p><small>{data.code.latest.fresh?"current":"stale"} · server {data.code.latest.run.serverId??"—"}</small>{data.code.latest.run.issues?.slice(0,10).map((issue:any,j:number)=><p key={j}><small>{issue.severity} · {issue.file}:{issue.line} — {issue.message}</small></p>)}</article>}{data?.score?.latest?.run&&<article className={`task-card ${data.score.latest.verified?"done":"failed"}`}><h3>Verification</h3><p>{data.score.latest.verified?"PASSED":"FAILED"} · {data.score.recipe?.name??"unknown"}</p><small>verdict {data.score.latest.run?.verdict??"not run"}</small></article>}{!data&&<div className="welcome"><Code2 size={38}/><p>Code intelligence analysis for this session.</p></div>}</div></div>;
+}
+
+/** S9: Background Tasks / Detached Workers */
+function BgWorkersPanel({sessionId,showError}:{sessionId:string;showError:(e:any)=>void}) {
+  const [workers,setWorkers]=useState<any[]>([]),[busy,setBusy]=useState(false);
+  const load=async()=>{setBusy(true);try{const r=await api<any>("/v1/detached-workers?tenantId=local");setWorkers(r.workers??[])}catch(e){showError(e)}finally{setBusy(false)}};
+  useEffect(()=>{void load()},[sessionId]);
+  const sendCommand=async(id:string,kind:string)=>{try{await api(`/v1/detached-workers/${id}/commands`,{method:"POST",body:JSON.stringify({tenantId:"local",kind})});await load()}catch(e){showError(e)}};
+  return <div className="panel tasks-panel"><div className="task-toolbar"><b>Detached Workers</b><small>{workers.length} worker(s)</small><button onClick={load} disabled={busy}>{busy?<Loader2 className="spin" size={14}/>:<RefreshCw size={14}/>}Refresh</button></div><div className="task-grid">{workers.map(w=><article className={`task-card ${w.status}`} key={w.id}><h3>{w.label??w.kind} <small>{w.id.slice(0,8)}</small></h3><p>{w.status} · {w.sessionId?.slice(0,8)??"—"}</p><small>{w.createdAt} · {w.heartbeatAt?`heartbeat ${w.heartbeatAt}`:"no heartbeat"}</small><div className="task-actions">{w.status==="running"&&<button className="danger" onClick={()=>sendCommand(w.id,"stop")}>Stop</button>}{w.status==="idle"&&<button onClick={()=>sendCommand(w.id,"resume")}>Resume</button>}</div></article>)}{!workers.length&&<div className="welcome"><Layers size={38}/><p>No detached workers.</p></div>}</div></div>;
+}
+
+/** S10: Schedule Manager */
+function SchedulesPanel({showError}:{showError:(e:any)=>void}) {
+  const [schedules,setSchedules]=useState<any[]>([]),[name,setName]=useState(""),[cron,setCron]=useState(""),[prompt,setPrompt]=useState(""),[busy,setBusy]=useState(false);
+  const load=async()=>{try{const r=await api<any>("/v1/schedules?tenantId=local");setSchedules(r.schedules??r.jobs??[])}catch(e){showError(e)}};
+  useEffect(()=>{void load()},[]);
+  const create=async()=>{if(!name.trim()||!cron.trim())return;setBusy(true);try{await api("/v1/schedules",{method:"POST",body:JSON.stringify({tenantId:"local",name:name.trim(),cron:prompt.trim()||name.trim(),schedule:{cron:cron.trim()},payload:{kind:"agent-prompt",prompt:prompt.trim()||name.trim()}})});setName("");setCron("");setPrompt("");await load()}catch(e){showError(e)}finally{setBusy(false)}};
+  const toggleStatus=async(job:any)=>{try{await api(`/v1/schedules/${job.id}/status`,{method:"POST",body:JSON.stringify({tenantId:"local",enabled:!job.enabled})});await load()}catch(e){showError(e)}};
+  return <div className="panel tasks-panel"><div className="task-toolbar"><b>Schedules</b><small>{schedules.length} job(s)</small><button onClick={load}><RefreshCw size={14}/>Refresh</button></div><div className="task-toolbar"><input value={name} onChange={e=>setName(e.target.value)} placeholder="job name"/><input value={cron} onChange={e=>setCron(e.target.value)} placeholder="cron: */5 * * * *"/><input value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="prompt or command"/><button disabled={busy||!name.trim()||!cron.trim()} onClick={create}>{busy?<Loader2 className="spin" size={14}/>:<Plus size={14}/>}Create</button></div><div className="task-grid">{schedules.map(job=><article className={`task-card ${job.enabled?"":"done"}`} key={job.id}><h3>{job.name}</h3><p>{job.schedule?.cron??"—"}</p><small>{job.enabled?"enabled":"disabled"} · {job.lastRunAt?`last ${job.lastRunAt}`:"never run"}{job.nextRunAt?` · next ${job.nextRunAt}`:""}</small><div className="task-actions"><button onClick={()=>toggleStatus(job)}>{job.enabled?"Disable":"Enable"}</button></div></article>)}{!schedules.length&&<div className="welcome"><Calendar size={38}/><p>No scheduled jobs.</p></div>}</div></div>;
+}
+
+/** S11: Trust Policy */
+function TrustPanel({showError}:{showError:(e:any)=>void}) {
+  const [policy,setPolicy]=useState<any>(null),[pins,setPins]=useState<any[]>([]),[publishers,setPublishers]=useState<any[]>([]),[decisions,setDecisions]=useState<any[]>([]);
+  const load=async()=>{try{const [p,pin,pub,d]=await Promise.all([api<any>("/v1/trust/policy?tenantId=local"),api<any>("/v1/trust/pins?tenantId=local"),api<any>("/v1/trust/publishers?tenantId=local"),api<any>("/v1/trust/decisions?tenantId=local&limit=20")]);setPolicy(p);setPins(pin.pins??[]);setPublishers(pub.publishers??[]);setDecisions(d.decisions??[])}catch(e){showError(e)}};
+  useEffect(()=>{void load()},[]);
+  return <div className="panel tasks-panel"><div className="task-toolbar"><b>Trust Policy</b><small>mode {policy?.mode??"—"} · {pins.length} pin(s) · {publishers.length} publisher(s)</small><button onClick={load}><RefreshCw size={14}/>Refresh</button></div><div className="task-grid">{policy&&<article className="task-card"><h3>Policy</h3><p>mode: {policy.mode} · autoPin: {policy.autoPin?"yes":"no"} · requirePublisher: {policy.requirePublisher?"yes":"no"}</p></article>}{pins.map(pin=><article className="task-card" key={`${pin.kind}-${pin.artifactId}`}><h3>{pin.kind} · {pin.artifactId?.slice(0,16)}</h3><small>pinned {pin.pinnedAt}</small></article>)}{publishers.map(pub=><article className="task-card" key={pub.id}><h3>{pub.name}</h3><small>{pub.kind} · trusted {pub.trustedAt??"—"}</small></article>)}{decisions.map(d=><article className={`task-card ${d.outcome==="deny"?"failed":"done"}`} key={d.id}><h3>{d.outcome} · {d.capabilityId}</h3><p>{d.reason}</p><small>{d.at}</small></article>)}{!policy&&<div className="welcome"><Shield size={38}/><p>Trust policy and pinned artifacts.</p></div>}</div></div>;
+}
+
+/** S12: Risk Assessment */
+function RiskPanel({showError}:{showError:(e:any)=>void}) {
+  const [posture,setPosture]=useState<any>(null),[policy,setPolicy]=useState<any>(null),[assessments,setAssessments]=useState<any[]>([]);
+  const load=async()=>{try{const [po,pi,a]=await Promise.all([api<any>("/v1/risk/posture?tenantId=local"),api<any>("/v1/risk/policy?tenantId=local"),api<any>("/v1/risk/assessments?tenantId=local&limit=20")]);setPosture(po);setPolicy(pi);setAssessments(a.assessments??[])}catch(e){showError(e)}};
+  useEffect(()=>{void load()},[]);
+  const setMode=async(mode:string)=>{try{await api("/v1/risk/policy",{method:"POST",body:JSON.stringify({tenantId:"local",mode})});await load()}catch(e){showError(e)}};
+  return <div className="panel tasks-panel"><div className="task-toolbar"><b>Risk Assessment</b><small>mode {policy?.mode??"—"} · {posture?.total??0} assessment(s) · rate {posture?.confirmationRate??"—"}</small><select value={policy?.mode??"high"} onChange={e=>void setMode(e.target.value)}><option value="never">never</option><option value="critical">critical</option><option value="high">high</option><option value="medium">medium</option><option value="all">all</option></select><button onClick={load}><RefreshCw size={14}/>Refresh</button></div><div className="task-grid">{posture&&Object.entries(posture.byLevel??{}).map(([level,count])=><article className={`task-card ${level==="critical"?"failed":""}`} key={level}><h3>{level}</h3><p>{String(count)} assessment(s)</p></article>)}{(posture?.topRules??[]).map((rule:any)=><article className="task-card" key={rule.code}><h3>{rule.code}</h3><p>Triggered {rule.count} time(s)</p></article>)}{assessments.map(a=><article className={`task-card ${a.outcome==="deny"?"failed":""}`} key={a.id}><h3>{a.outcome} · {a.capabilityId}</h3><p>{a.reason}</p><small>{a.riskLevel} · {a.at}</small></article>)}{!posture&&<div className="welcome"><ShieldCheck size={38}/><p>Risk posture and assessments.</p></div>}</div></div>;
+}
+
+/** S13: User Model Dashboard */
+function UserModelPanel({showError}:{showError:(e:any)=>void}) {
+  const [userId,setUserId]=useState("primary"),[summary,setSummary]=useState<any>(null),[state,setState]=useState<any>(null),[goals,setGoals]=useState<any[]>([]);
+  const load=async()=>{try{const [s,st,g]=await Promise.all([api<any>(`/v1/user-model/${encodeURIComponent(userId)}?tenantId=local`),api<any>(`/v1/user-model/${encodeURIComponent(userId)}/state?tenantId=local`),api<any>(`/v1/user-model/${encodeURIComponent(userId)}/goals?tenantId=local`)]);setSummary(s);setState(st);setGoals(g.goals??[])}catch(e){showError(e)}};
+  useEffect(()=>{void load()},[userId]);
+  const forget=async()=>{try{await api(`/v1/user-model/${encodeURIComponent(userId)}?tenantId=local`,{method:"DELETE"});await load()}catch(e){showError(e)}};
+  return <div className="panel tasks-panel"><div className="task-toolbar"><b>User Model</b><input value={userId} onChange={e=>setUserId(e.target.value)} placeholder="user id"/><small>state {state?.state??"unknown"} · confidence {state?.confidence?.toFixed(2)??"—"} · frustration {summary?.frustrationRisk??"—"}</small><button onClick={load}><RefreshCw size={14}/>Refresh</button><button className="danger" onClick={forget}>Forget</button></div><div className="task-grid">{summary&&Object.entries(summary.claims??{}).map(([cat,vals])=><article className="task-card" key={cat}><h3>{cat}</h3>{(vals as any[]).map((c,i)=><p key={i}>{c.key}: {c.value} <small>({c.status}, {c.confidence})</small></p>)}</article>)}{goals.map(g=><article className="task-card" key={g.id}><h3>{g.horizon} · {g.title}</h3><p>{g.description??"—"}</p><small>progress {g.progress} · importance {g.importance} · {g.status}</small></article>)}{!summary&&<div className="welcome"><User size={38}/><p>User model, preferences, and goals.</p></div>}</div></div>;
+}
+
+/** S14: World Model Explorer */
+function WorldPanel({showError}:{showError:(e:any)=>void}) {
+  const [entities,setEntities]=useState<any[]>([]),[events,setEvents]=useState<any[]>([]),[calibration,setCalibration]=useState<any>(null);
+  const load=async()=>{try{const [e,ev,c]=await Promise.all([api<any>("/v1/world/entities?tenantId=local&limit=30"),api<any>("/v1/world/events?tenantId=local&limit=20"),api<any>("/v1/world/calibration?tenantId=local")]);setEntities(e.entities??[]);setEvents(ev.events??[]);setCalibration(c)}catch(e){showError(e)}};
+  useEffect(()=>{void load()},[]);
+  return <div className="panel tasks-panel"><div className="task-toolbar"><b>World Model</b><small>{entities.length} entity · {events.length} event · accuracy {calibration?.accuracy?.toFixed(3)??"—"} · Brier {calibration?.brierMean?.toFixed(3)??"—"}</small><button onClick={load}><RefreshCw size={14}/>Refresh</button></div><div className="task-grid">{entities.map(e=><article className="task-card" key={e.id}><h3>{e.kind} · {e.name??e.id?.slice(0,12)}</h3><p>{e.description??"—"}</p><small>confidence {e.confidence?.toFixed(2)??"—"} · {e.scope??""} · {e.updatedAt??""}</small></article>)}{events.map(ev=><article className="task-card" key={ev.id}><h3>{ev.kind} · {ev.entityId?.slice(0,12)??"—"}</h3><p>{ev.summary??JSON.stringify(ev.payload??"").slice(0,200)}</p><small>{ev.at}</small></article>)}{!entities.length&&<div className="welcome"><Globe2 size={38}/><p>World model entities and events.</p></div>}</div></div>;
+}
+
+/** S15: Evolution Tracker */
+function EvolutionPanel({showError}:{showError:(e:any)=>void}) {
+  const [index,setIndex]=useState<any>(null),[gaps,setGaps]=useState<any[]>([]),[candidates,setCandidates]=useState<any[]>([]);
+  const load=async()=>{try{const [i,g,c]=await Promise.all([api<any>("/v1/evolution/index?tenantId=local"),api<any>("/v1/evolution/gaps?tenantId=local"),api<any>("/v1/evolution/candidates?tenantId=local")]);setIndex(i);setGaps(g.gaps??[]);setCandidates(c.candidates??[])}catch(e){showError(e)}};
+  useEffect(()=>{void load()},[]);
+  const sweep=async()=>{try{await api("/v1/evolution/retirement-sweep",{method:"POST",body:JSON.stringify({tenantId:"local"})});await load()}catch(e){showError(e)}};
+  return <div className="panel tasks-panel"><div className="task-toolbar"><b>Evolution</b><small>index {index?.index?.toFixed(3)??"—"} (Δ {index?.delta??0}) · prod {index?.productionSkills??0} · beta {index?.betaSkills??0} · gap closure {index?.gapClosureRate??0}</small><button onClick={sweep}>Retirement sweep</button><button onClick={load}><RefreshCw size={14}/>Refresh</button></div><div className="task-grid">{gaps.map(gap=><article className="task-card" key={gap.id}><h3>{gap.kind} · ×{gap.occurrences}</h3><p>{gap.description}</p><small>{gap.status} · severity {gap.severity}</small></article>)}{candidates.map(c=><article className="task-card" key={c.id}><h3>{c.stage} · {c.name} v{c.version}</h3><p>{c.purpose}</p><small>composite {c.scores?.composite??"—"} · accuracy {c.scores?.accuracy??"—"} · uses {c.usage?.invocations??0}</small></article>)}{!gaps.length&&!candidates.length&&<div className="welcome"><TrendingUp size={38}/><p>Evolution index and skill candidates.</p></div>}</div></div>;
+}
+
+/** S16: Constitution Editor */
+function ConstitutionPanel({showError}:{showError:(e:any)=>void}) {
+  const [principles,setPrinciples]=useState<any[]>([]),[identity,setIdentity]=useState<any>(null),[compliance,setCompliance]=useState<any>(null);
+  const load=async()=>{try{const [p,i,c]=await Promise.all([api<any>("/v1/constitution/principles?tenantId=local&status=active"),api<any>("/v1/constitution/identity?tenantId=local"),api<any>("/v1/constitution/compliance?tenantId=local")]);setPrinciples(p.principles??[]);setIdentity(i);setCompliance(c)}catch(e){showError(e)}};
+  useEffect(()=>{void load()},[]);
+  return <div className="panel tasks-panel"><div className="task-toolbar"><b>Constitution</b><small>mission v{identity?.version??"—"} · {principles.length} principle(s) · compliance {compliance?.complianceRate??"—"}</small><button onClick={load}><RefreshCw size={14}/>Refresh</button></div><div className="task-grid">{identity&&<article className="task-card"><h3>Identity Core v{identity.version}</h3><p>{identity.mission}</p><small>{identity.continuity?.length??0} continuity entry(ies)</small></article>}{principles.map(p=><article className={`task-card ${p.severity==="hard"?"failed":""}`} key={p.id}><h3>{p.code} · {p.title}</h3><p>{p.statement}</p><small>{p.severity} · {p.category} · v{p.version}{p.builtin?" · builtin":""}</small></article>)}{compliance&&<article className="task-card"><h3>Compliance Report</h3><p>{compliance.complianceRate} · {compliance.denied??0} denied · {compliance.review??0} review</p></article>}{!identity&&<div className="welcome"><Scale size={38}/><p>Constitutional principles and identity.</p></div>}</div></div>;
+}
+
+/** S17: Plugin Manager (WASI) */
+function PluginsPanel({showError}:{showError:(e:any)=>void}) {
+  const [plugins,setPlugins]=useState<any[]>([]),[busy,setBusy]=useState(false);
+  const load=async()=>{try{const r=await api<any>("/v1/plugins/wasi?tenantId=local");setPlugins(r.plugins??[])}catch(e){showError(e)}};
+  useEffect(()=>{void load()},[]);
+  return <div className="panel tasks-panel"><div className="task-toolbar"><b>WASI Plugins</b><small>{plugins.length} plugin(s)</small><button onClick={load} disabled={busy}><RefreshCw size={14}/>Refresh</button></div><div className="task-grid">{plugins.map(p=><article className="task-card" key={p.id}><h3>{p.name}</h3><code>{p.id}</code><small>{p.enabled?"enabled":"disabled"} · {p.manifest?.version??"—"} · {p.capabilityIds?.length??0} capabilities</small><p>{p.manifest?.description??"—"}</p></article>)}{!plugins.length&&<div className="welcome"><Puzzle size={38}/><p>No WASI plugins installed.</p></div>}</div></div>;
+}
+
+/** S18: Backend Health Dashboard */
+function BackendsPanel({showError}:{showError:(e:any)=>void}) {
+  const [backends,setBackends]=useState<any[]>([]),[busy,setBusy]=useState(false);
+  const load=async()=>{setBusy(true);try{const r=await api<any>("/v1/backends?tenantId=local");setBackends(r.backends??[])}catch(e){showError(e)}finally{setBusy(false)}};
+  useEffect(()=>{void load()},[]);
+  const checkHealth=async(id:string)=>{try{await api(`/v1/backends/${id}/health?tenantId=local`);await load()}catch(e){showError(e)}};
+  return <div className="panel tasks-panel"><div className="task-toolbar"><b>Backend Health</b><small>{backends.length} backend(s)</small><button onClick={load} disabled={busy}>{busy?<Loader2 className="spin" size={14}/>:<RefreshCw size={14}/>}Refresh</button></div><div className="task-grid">{backends.map(b=><article className={`task-card ${b.health==="healthy"?"done":b.health==="degraded"?"failed":""}`} key={b.id}><h3>{b.name}</h3><code>{b.kind}</code><small>health {b.health??"—"} · {b.enabled?"enabled":"disabled"}</small><div className="task-actions"><button onClick={()=>checkHealth(b.id)}>Check</button></div></article>)}{!backends.length&&<div className="welcome"><Server size={38}/><p>No backends configured.</p></div>}</div></div>;
+}
+
+/** S19: Causality Graph */
+function CausalityPanel({showError}:{showError:(e:any)=>void}) {
+  const [links,setLinks]=useState<any[]>([]),[entityId,setEntityId]=useState(""),[busy,setBusy]=useState(false);
+  const load=async()=>{setBusy(true);try{const r=await api<any>(`/v1/world/causality?tenantId=local${entityId?`&entityId=${encodeURIComponent(entityId)}`:""}`);setLinks(r.links??r.causalities??[])}catch(e){showError(e)}finally{setBusy(false)}};
+  useEffect(()=>{void load()},[]);
+  return <div className="panel tasks-panel"><div className="task-toolbar"><b>Causality Graph</b><input value={entityId} onChange={e=>setEntityId(e.target.value)} placeholder="filter by entity ID (optional)"/><button onClick={load} disabled={busy}>{busy?<Loader2 className="spin" size={14}/>:<RefreshCw size={14}/>}Refresh</button></div><div className="task-grid">{links.map((link:any,i:number)=><article className="task-card" key={link.id??i}><h3>{link.cause?.slice(0,16)??"—"} → {link.effect?.slice(0,16)??"—"}</h3><p>{link.description??link.mechanism??"—"}</p><small>confidence {link.confidence?.toFixed(2)??"—"} · {link.kind??"relation"}</small></article>)}{!links.length&&!busy&&<div className="welcome"><GitBranch size={38}/><p>Causal relationships in the world model.</p></div>}</div></div>;
 }

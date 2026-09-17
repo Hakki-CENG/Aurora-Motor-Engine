@@ -339,4 +339,26 @@ export class AuroraPlanFeedback {
     }
     return { refs: [...new Set(refs)].slice(0, 200), ...(quality === undefined ? {} : { quality }), assessments };
   }
+
+  async getStats(tenantId: string) {
+    const s = await this.store.read();
+    const items = (s as any).feedback?.filter((x: any) => x.tenantId === tenantId) ?? [];
+    return { total: items.length };
+  }
+
+  // ═══ P2: Explainability ═══
+
+  async why(tenantId: string, entityId: string): Promise<{
+    entity: string; summary: string;
+    rationale: string[]; details: Record<string, unknown>;
+  }> {
+    const s = await this.store.read();
+    const keys = Object.keys(s);
+    const arrayKey = keys.find(k => Array.isArray((s as any)[k]));
+    const items: any[] = arrayKey ? ((s as any)[arrayKey] as any[]).filter((x: any) => x.tenantId === tenantId) : [];
+    const entity = items.find((x: any) => x.id === entityId);
+    if (!entity) throw new Error("Entity not found");
+    const rationale: string[] = [`Found entity: ${entity.name ?? entity.title ?? entity.id ?? entityId}`];
+    return { entity: entity.name ?? entity.title ?? entityId, summary: entity.description ?? entity.statement ?? "", rationale, details: entity };
+  }
 }

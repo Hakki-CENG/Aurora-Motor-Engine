@@ -11,8 +11,10 @@ import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { reviewVerdict, searchCapabilities } from "@haf/engine";
 import { dashboardHtml } from "./dashboard.js";
+import { registerCognitiveRoutes, registerMetaControllerRoutes, registerAuroraServiceRoutes } from "./routes/index.js";
 import { IdentityService, roleAllows, type Identity, type Role } from "./auth/identity-service.js";
 import { allowlisted, PlatformJwtVerifier, verifyDiscordSignature, verifyFeishuSignature, verifyLineSignature, verifySharedSecret, verifySlackSignature, verifyWhatsAppSignature } from "./platforms/verification.js";
+import { registerRateLimiting, registerSecurityHeaders, registerErrorHandler, registerAuditLogger } from "./middleware/index.js";
 import {
   HybridAgentEngine,
   commandEnvelopeSchema,
@@ -617,6 +619,39 @@ app.addHook("onSend", async (request, reply, payload) => {
   return payload;
 });
 
+// Helper function for session capability execution (must be before route registration)
+async function executeSessionCapability(
+  sessionId: string,
+  capabilityId: string,
+  input: unknown,
+  source: "web" | "api" = "web",
+  idempotencyKey?: string,
+) {
+  const session = await engine.session(sessionId);
+  return await engine.capabilities.execute(capabilityId, input, {
+    tenantId: session.tenantId,
+    sessionId: session.sessionId,
+    familyId: session.familyId,
+    turnId: `bff:${randomUUID()}`,
+    toolCallId: randomUUID(),
+    source,
+    workspacePath: session.workspacePath,
+    idempotencyKey: idempotencyKey && /^[A-Za-z0-9_.:-]{8,200}$/.test(idempotencyKey)
+      ? `bff:${sessionId}:${capabilityId}:${idempotencyKey}`
+      : `bff:${sessionId}:${capabilityId}:${randomUUID()}`,
+  });
+}
+
+// Register middleware (security, rate limiting, error handling, audit logging)
+await registerErrorHandler(app);
+await registerSecurityHeaders(app);
+await registerRateLimiting(app);
+await registerAuditLogger(app);
+
+// Note: Route endpoints remain inline in this file for API compatibility.
+// The modular route files in ./routes/ serve as reference implementations
+// and can be migrated incrementally with proper auroraInput() helper support.
+
 const apiToken = process.env.HAF_API_TOKEN?.trim();
 const oidcConfigured = Boolean(process.env.HAF_OIDC_ISSUER && process.env.HAF_OIDC_CLIENT_ID && process.env.HAF_OIDC_REDIRECT_URI);
 const authDisabled = process.env.HAF_AUTH_DISABLED === "true" || (!apiToken && !oidcConfigured);
@@ -837,7 +872,7 @@ app.get("/", async (_request, reply) => {
 app.get("/health", async () => ({
   status: "ok",
   engine: "hybrid-agent-fabric",
-  version: "1.38.0",
+  version: "1.64.0",
   provider: engine.models.list(),
   sandbox: engine.config.sandboxBackend,
   persistence: engine.database ? "postgres" : "file",
@@ -1201,6 +1236,8 @@ app.get("/v1/sessions/:sessionId/mode/history", async (request) => { const { ses
 app.get("/v1/sessions/:sessionId/cost", async (request) => { const { sessionId } = z.object({ sessionId: z.string() }).parse(request.params); return await engine.sessionLifecycle.cost(sessionId); });
 app.post("/v1/sessions/:sessionId/archive", async (request) => { const { sessionId } = z.object({ sessionId: z.string() }).parse(request.params); const b=z.object({reason:z.string().min(1).max(1000),actor:z.string().max(200).optional()}).parse(request.body); const snapshot = await engine.session(sessionId); return await engine.sessionLifecycle.archive(auroraInput({ tenantId: snapshot.tenantId, sessionId, reason: b.reason, actor: b.actor })); });
 app.post("/v1/sessions/:sessionId/restore", async (request) => { const { sessionId } = z.object({ sessionId: z.string() }).parse(request.params); const b=z.object({reason:z.string().min(1).max(1000),actor:z.string().max(200).optional()}).parse(request.body); const snapshot = await engine.session(sessionId); return await engine.sessionLifecycle.restore(auroraInput({ tenantId: snapshot.tenantId, sessionId, reason: b.reason, actor: b.actor })); });
+// Close session (idempotent — already-closed sessions return their snapshot)
+app.post("/v1/sessions/:sessionId/close", async (request) => { const { sessionId } = z.object({ sessionId: z.string() }).parse(request.params); return await engine.closeSession(sessionId); });
 app.get("/v1/session-archives", async (request) => { const q=auroraTenant.extend({state:z.enum(["active","archived"]).optional(),limit:z.coerce.number().int().min(1).max(1000).optional()}).parse(request.query); return { records: await engine.sessionLifecycle.list(q.tenantId, auroraInput({ state: q.state, limit: q.limit })) }; });
 app.get("/v1/usage", async (request) => { const q=auroraTenant.extend({limit:z.coerce.number().int().min(1).max(100).optional()}).parse(request.query); return await engine.sessionLifecycle.usage(q.tenantId, auroraInput({ limit: q.limit })); });
 app.get("/v1/model-prices", async (request) => { const q=auroraTenant.parse(request.query); return { prices: await engine.sessionLifecycle.prices(q.tenantId) }; });
@@ -1990,28 +2027,6 @@ app.post("/v1/sessions/:sessionId/commands", async (request) => {
   const parsed = commandEnvelopeSchema.parse(raw);
   return await engine.command(parsed as CommandEnvelope);
 });
-
-async function executeSessionCapability(
-  sessionId: string,
-  capabilityId: string,
-  input: unknown,
-  source: "web" | "api" = "web",
-  idempotencyKey?: string,
-) {
-  const session = await engine.session(sessionId);
-  return await engine.capabilities.execute(capabilityId, input, {
-    tenantId: session.tenantId,
-    sessionId: session.sessionId,
-    familyId: session.familyId,
-    turnId: `bff:${randomUUID()}`,
-    toolCallId: randomUUID(),
-    source,
-    workspacePath: session.workspacePath,
-    idempotencyKey: idempotencyKey && /^[A-Za-z0-9_.:-]{8,200}$/.test(idempotencyKey)
-      ? `bff:${sessionId}:${capabilityId}:${idempotencyKey}`
-      : `bff:${sessionId}:${capabilityId}:${randomUUID()}`,
-  });
-}
 
 app.get("/v1/sessions/:sessionId/files", async (request) => {
   const { sessionId } = z.object({ sessionId: z.string() }).parse(request.params);
@@ -3429,15 +3444,63 @@ app.post("/v1/skills/candidates/:directory/promote", async (request) => {
   return manifest;
 });
 
-app.setErrorHandler(async (error, _request, reply) => {
-  const normalized = error instanceof Error ? error : new Error(String(error));
-  const status = normalized instanceof z.ZodError ? 400 : /does not exist|not found/i.test(normalized.message) ? 404 : 500;
-  return await reply.code(status).send({
-    error: normalized.name,
-    message: normalized.message,
-    ...(normalized instanceof z.ZodError ? { issues: normalized.issues } : {}),
-  });
-});
+// ═══ Phase1-5: Cognitive Architecture API Endpoints ═══
+
+// Self-Model
+app.get("/v1/self-model", async (request) => { const q = auroraTenant.parse(request.query); return await engine.selfModel.getFullState(q.tenantId); });
+app.post("/v1/self-model/goals", async (request) => { const b = z.object({ tenantId: z.string().default("local"), title: z.string(), description: z.string(), priority: z.number().optional(), parentId: z.string().optional() }).parse(request.body); return await engine.selfModel.addGoal(b.tenantId, b.title, b.description, b.priority, b.parentId); });
+app.post("/v1/self-model/beliefs", async (request) => { const b = z.object({ tenantId: z.string().default("local"), claim: z.string(), confidence: z.number(), source: z.string(), tags: z.array(z.string()).optional() }).parse(request.body); return await engine.selfModel.addBelief(b.tenantId, b.claim, b.confidence, b.source as any, b.tags); });
+app.post("/v1/self-model/capabilities", async (request) => { const b = z.object({ tenantId: z.string().default("local"), domain: z.string(), level: z.string(), notes: z.string().optional() }).parse(request.body); return await engine.selfModel.assessCapability(b.tenantId, b.domain, b.level as any, b.notes); });
+app.post("/v1/self-model/hypotheses", async (request) => { const b = z.object({ tenantId: z.string().default("local"), statement: z.string(), confidence: z.number() }).parse(request.body); return await engine.selfModel.proposeHypothesis(b.tenantId, b.statement, b.confidence); });
+app.post("/v1/self-model/reflect", async (request) => { const b = auroraTenant.parse(request.body ?? {}); return await engine.selfModel.reflect(); });
+app.post("/v1/self-model/strategy", async (request) => { const b = z.object({ type: z.string(), description: z.string(), confidence: z.number() }).parse(request.body); await engine.selfModel.switchStrategy(b.type as any, b.description, b.confidence); return { ok: true }; });
+
+// Uncertainty Engine
+app.get("/v1/uncertainty/claims", async (request) => { const q = z.object({ tenantId: z.string().default("local"), domain: z.string().optional(), status: z.string().optional() }).parse(request.query); return { claims: await engine.uncertaintyEngine.getClaims(q.tenantId, q.domain, q.status) }; });
+app.post("/v1/uncertainty/assert", async (request) => { const b = z.object({ tenantId: z.string().default("local"), claim: z.string(), domain: z.string(), confidence: z.number(), evidence: z.array(z.any()).optional(), assumptions: z.array(z.string()).optional(), uncertaintySources: z.array(z.string()).optional(), requiredVerification: z.array(z.string()).optional() }).parse(request.body); const opts: { evidence?: any[]; assumptions?: string[]; uncertaintySources?: any[]; requiredVerification?: string[] } = {}; if (b.evidence) opts.evidence = b.evidence; if (b.assumptions) opts.assumptions = b.assumptions; if (b.uncertaintySources) opts.uncertaintySources = b.uncertaintySources; if (b.requiredVerification) opts.requiredVerification = b.requiredVerification; return await engine.uncertaintyEngine.assert(b.tenantId, b.claim, b.domain, b.confidence, opts); });
+app.get("/v1/uncertainty/confident", async (request) => { const q = z.object({ tenantId: z.string().default("local"), threshold: z.coerce.number().default(0.7) }).parse(request.query); return { claims: await engine.uncertaintyEngine.getConfident(q.tenantId, q.threshold) }; });
+app.get("/v1/uncertainty/uncertain", async (request) => { const q = z.object({ tenantId: z.string().default("local"), threshold: z.coerce.number().default(0.4) }).parse(request.query); return { claims: await engine.uncertaintyEngine.getUncertain(q.tenantId, q.threshold) }; });
+app.get("/v1/uncertainty/calibration", async () => { return await engine.uncertaintyEngine.getCalibrationStats(); });
+
+// Failure Taxonomy
+app.get("/v1/failures", async (request) => { const q = z.object({ tenantId: z.string().default("local"), category: z.string().optional(), unresolvedOnly: z.coerce.boolean().optional() }).parse(request.query); return { failures: await engine.failureTaxonomy.getFailures(q.tenantId, q.category as any, q.unresolvedOnly) }; });
+app.post("/v1/failures/classify", async (request) => { const b = z.object({ tenantId: z.string().default("local"), description: z.string(), category: z.string(), severity: z.string(), rootCause: z.string(), sessionId: z.string().optional(), taskId: z.string().optional(), contributingFactors: z.array(z.string()).optional(), capabilityGap: z.string().optional(), suggestedFix: z.string().optional() }).parse(request.body); const opts: { sessionId?: string; taskId?: string; contributingFactors?: string[]; capabilityGap?: string; suggestedFix?: string } = {}; if (b.sessionId) opts.sessionId = b.sessionId; if (b.taskId) opts.taskId = b.taskId; if (b.contributingFactors) opts.contributingFactors = b.contributingFactors; if (b.capabilityGap) opts.capabilityGap = b.capabilityGap; if (b.suggestedFix) opts.suggestedFix = b.suggestedFix; return await engine.failureTaxonomy.classify(b.tenantId, b.description, b.category as any, b.severity as any, b.rootCause, opts); });
+app.get("/v1/failures/stats", async (request) => { const q = auroraTenant.parse(request.query); return await engine.failureTaxonomy.getStats(q.tenantId); });
+app.get("/v1/failures/patterns", async (request) => { const q = auroraTenant.parse(request.query); return { patterns: await engine.failureTaxonomy.getPatterns(q.tenantId) }; });
+app.get("/v1/failures/recommendations", async (request) => { const q = auroraTenant.parse(request.query); return { recommendations: await engine.failureTaxonomy.getRecommendations(q.tenantId) }; });
+
+// Cognitive Telemetry
+app.get("/v1/telemetry/traces", async (request) => { const q = z.object({ tenantId: z.string().default("local"), sessionId: z.string().optional(), outcome: z.string().optional(), limit: z.coerce.number().default(50) }).parse(request.query); return { traces: await engine.cognitiveTelemetry.getTraces(q.tenantId, q.sessionId, q.outcome, q.limit) }; });
+app.get("/v1/telemetry/stats", async (request) => { const q = auroraTenant.parse(request.query); return await engine.cognitiveTelemetry.getStats(q.tenantId); });
+app.get("/v1/telemetry/insights", async (request) => { const q = auroraTenant.parse(request.query); return { traces: await engine.cognitiveTelemetry.getInsightfulTraces(q.tenantId) }; });
+
+// Neural Memory Fusion
+app.get("/v1/neural-fusion/stats", async (request) => { const q = auroraTenant.parse(request.query); return await engine.neuralMemoryFusion.getStats(q.tenantId); });
+app.get("/v1/neural-fusion/patterns", async (request) => { const q = auroraTenant.parse(request.query); return { patterns: await engine.neuralMemoryFusion.getPatterns(q.tenantId) }; });
+app.post("/v1/neural-fusion/similar", async (request) => { const b = z.object({ tenantId: z.string().default("local"), query: z.string(), limit: z.number().optional(), layer: z.string().optional() }).parse(request.body); return { results: await engine.neuralMemoryFusion.findSimilar(b.tenantId, b.query, b.limit, b.layer) }; });
+app.post("/v1/neural-fusion/consolidate", async (request) => { const b = auroraTenant.parse(request.body ?? {}); return await engine.neuralMemoryFusion.consolidate(b.tenantId); });
+
+// Experience Compiler
+app.get("/v1/experience-compiler/skills", async (request) => { const q = auroraTenant.parse(request.query); return { skills: await engine.experienceCompiler.getSkills(q.tenantId) }; });
+app.get("/v1/experience-compiler/experiences", async (request) => { const q = z.object({ tenantId: z.string().default("local"), tags: z.string().optional() }).parse(request.query); return { experiences: await engine.experienceCompiler.getExperiences(q.tenantId, q.tags?.split(",")) }; });
+app.post("/v1/experience-compiler/compile", async (request) => { const b = auroraTenant.parse(request.body ?? {}); return { compiled: await engine.experienceCompiler.compileSkills(b.tenantId) }; });
+
+// Sleep Cycle
+app.get("/v1/sleep-cycle/cycles", async (request) => { const q = z.object({ tenantId: z.string().default("local"), limit: z.coerce.number().default(20) }).parse(request.query); return { cycles: await engine.sleepCycle.getCycles(q.tenantId, q.limit) }; });
+app.post("/v1/sleep-cycle/schedule", async (request) => { const b = z.object({ tenantId: z.string().default("local"), lightCycleMinutes: z.number().optional(), deepCycleMinutes: z.number().optional(), remCycleMinutes: z.number().optional(), enabled: z.boolean().optional() }).parse(request.body); const patch: Record<string, unknown> = {}; if (b.lightCycleMinutes !== undefined) patch.lightCycleMinutes = b.lightCycleMinutes; if (b.deepCycleMinutes !== undefined) patch.deepCycleMinutes = b.deepCycleMinutes; if (b.remCycleMinutes !== undefined) patch.remCycleMinutes = b.remCycleMinutes; if (b.enabled !== undefined) patch.enabled = b.enabled; return await engine.sleepCycle.setSchedule(b.tenantId, patch as any); });
+
+// Counterfactual Simulator
+app.get("/v1/simulations", async (request) => { const q = z.object({ tenantId: z.string().default("local"), limit: z.coerce.number().default(20) }).parse(request.query); return { simulations: await engine.counterfactualSimulator.getSimulations(q.tenantId, q.limit) }; });
+app.post("/v1/simulations", async (request) => { const b = z.object({ tenantId: z.string().default("local"), question: z.string(), context: z.string() }).parse(request.body); return await engine.counterfactualSimulator.createSimulation(b.tenantId, b.question, b.context); });
+app.post("/v1/simulations/:simId/scenarios", async (request) => { const { simId } = z.object({ simId: z.string() }).parse(request.params); const b = z.object({ name: z.string(), description: z.string(), assumptions: z.array(z.string()), parameters: z.record(z.union([z.number(), z.string()])), estimatedEffort: z.number(), estimatedRisk: z.number(), estimatedCost: z.number(), estimatedQuality: z.number(), pros: z.array(z.string()), cons: z.array(z.string()), confidence: z.number() }).parse(request.body); return await engine.counterfactualSimulator.addScenario(simId, b); });
+app.post("/v1/simulations/:simId/recommend", async (request) => { const { simId } = z.object({ simId: z.string() }).parse(request.params); return await engine.counterfactualSimulator.recommend(simId); });
+app.get("/v1/simulations/calibration", async (request) => { const q = auroraTenant.parse(request.query); return await engine.counterfactualSimulator.getCalibrationAccuracy(q.tenantId); });
+
+
+// ═══ Route Modules: Meta Controller + Aurora Services + Cognitive Runtime ═══
+registerMetaControllerRoutes(app, engine, z, auroraTenant);
+registerAuroraServiceRoutes(app, engine, z, auroraTenant);
+registerCognitiveRoutes(app, engine, z, auroraTenant);
 
 const host = process.env.HAF_HOST ?? "0.0.0.0";
 const port = Number(process.env.HAF_PORT ?? 8787);

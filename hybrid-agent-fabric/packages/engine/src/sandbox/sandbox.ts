@@ -172,7 +172,11 @@ export class LocalSandbox implements Sandbox {
 
   async exec(request: SandboxExecRequest): Promise<SandboxExecResult> {
     const cwd = await assertInside(this.workspacePath, request.cwd ?? ".");
-    return await runProcess("/bin/bash", ["-lc", `${resourceLimitPrefix(this.limits)}${request.command}`], {
+    // Use cmd.exe on Windows, /bin/bash on Unix
+    const isWindows = process.platform === "win32";
+    const shell = isWindows ? "cmd.exe" : "/bin/bash";
+    const shellArgs = isWindows ? ["/c", request.command] : ["-lc", `${resourceLimitPrefix(this.limits)}${request.command}`];
+    return await runProcess(shell, shellArgs, {
       cwd,
       env: scrubEnvironment(request.env),
       timeoutMs: request.timeoutMs ?? 120_000,

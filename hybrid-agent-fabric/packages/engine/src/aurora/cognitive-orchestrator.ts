@@ -145,8 +145,33 @@ export class CognitiveOrchestrator {
   async tick(tenantId: string, options: CycleOptions = {}): Promise<CognitiveCycleReport> {
     const mode = options.mode ?? "full";
     const skip = new Set(options.skipPhases ?? []);
-    const phases = MODE_PHASES[mode].filter((phase) => !skip.has(phase));
     const startedAt = this.now();
+
+    // ═══ PREFLIGHT: Should this cycle run? ═══
+    const preflight = await this.preflight(tenantId, mode);
+    if (!preflight.shouldRun) {
+      return {
+        id: `cycle-preflight-blocked-${randomUUID()}`,
+        tenantId,
+        mode,
+        sequence: 0,
+        phases: [],
+        attention: { focused: 0, deferred: 0, preempted: 0, budgetSaturation: 0 },
+        health: { cognitive: 1, memory: 1, constitutionCompliance: 1 },
+        signals: { intake: 0, initiativesQueued: 0, advisories: 0, gaps: 0, stuckSessions: 0, decisionsDue: 0, stalledPlans: 0 },
+        recommendations: [preflight.reason],
+        constitutionVerdict: "deny",
+        degraded: [],
+        startedAt: new Date(startedAt).toISOString(),
+        finishedAt: new Date(this.now()).toISOString(),
+        durationMs: 0,
+      };
+    }
+
+    // Apply preflight constraints
+    const phases = MODE_PHASES[mode]
+      .filter((phase) => !skip.has(phase))
+      .filter((phase) => !preflight.blockedPhases.has(phase));
     const results: CyclePhaseResult[] = [];
     const degraded: string[] = [];
     const recommendations: string[] = [];
@@ -198,7 +223,7 @@ export class CognitiveOrchestrator {
       health,
       signals,
       recommendations: [...new Set(recommendations)].slice(0, 50),
-      constitutionVerdict: verdict.verdict,
+      constitutionVerdict: verdict.verdict as "allow" | "review" | "deny",
       degraded,
       startedAt: new Date(startedAt).toISOString(),
       finishedAt: new Date(finishedAt).toISOString(),
@@ -299,6 +324,49 @@ export class CognitiveOrchestrator {
       lastCycle: lastCycle ? { sequence: lastCycle.sequence, mode: lastCycle.mode, degraded: lastCycle.degraded, finishedAt: lastCycle.finishedAt } : null,
       generatedAt: new Date(this.now()).toISOString(),
     };
+  }
+
+  // ═══ PREFLIGHT: Check if cycle should run and what's allowed ═══
+  private async preflight(
+    tenantId: string,
+    mode: CycleMode,
+  ): Promise<{ shouldRun: boolean; reason: string; blockedPhases: Set<CyclePhase>; maxDurationMs: number }> {
+    const blockedPhases = new Set<CyclePhase>();
+
+    // 1. Constitutional preflight
+    const verdict = await this.deps.constitution.check({
+      tenantId,
+      actor: "acos-preflight",
+      summary: `ACOS ${mode} cycle preflight`,
+      attributes: {
+        autonomous: true,
+        hasEvidence: false,
+        estimatedTokens: 0,
+        budgetRemainingTokens: 0,
+        claimType: "observation",
+        confidence: 0.9,
+        dissentPreserved: true,
+      },
+    });
+
+    if (verdict.verdict === "deny") {
+      return { shouldRun: false, reason: `Constitutional denied: ${verdict.violations.map(v => v.detail).join(", ") || "blocked"}`, blockedPhases, maxDurationMs: 0 };
+    }
+
+    // 2. Resource budget
+    const maxDurationMs = mode === "emergency" ? 30000 : mode === "dream" ? 60000 : 120000;
+
+    // 3. Per-phase governance: high-risk phases need extra clearance
+    if (mode === "dream") {
+      blockedPhases.add("execute");
+      blockedPhases.add("allocate");
+      blockedPhases.add("evolve");
+    }
+    if (mode !== "full") {
+      blockedPhases.add("evolve");
+    }
+
+    return { shouldRun: true, reason: "preflight passed", blockedPhases, maxDurationMs };
   }
 
   private async runPhase(
@@ -520,7 +588,31 @@ export class CognitiveOrchestrator {
     if (state.journal.length > MAX_JOURNAL) state.journal.splice(0, state.journal.length - MAX_JOURNAL);
     return entry;
   }
+
+  async getStats(tenantId: string) {
+    const s = await this.store.read();
+    const items = (s as any)[Object.keys(s).find(k => Array.isArray((s as any)[k])) ?? ""]?.filter((x: any) => x.tenantId === tenantId) ?? [];
+    return { total: items.length };
+  }
+
+  // ═══ P3: Explainability ═══
+
+  async why(tenantId: string, entityId: string): Promise<{
+    entity: string; summary: string;
+    rationale: string[]; details: Record<string, unknown>;
+  }> {
+    const s = await this.store.read();
+    const keys = Object.keys(s);
+    const arrayKey = keys.find(k => Array.isArray((s as any)[k]));
+    const items: any[] = arrayKey ? ((s as any)[arrayKey] as any[]).filter((x: any) => x.tenantId === tenantId) : [];
+    const entity = items.find((x: any) => x.id === entityId);
+    if (!entity) throw new Error("Entity not found");
+    const rationale: string[] = [`Found entity: ${entity.name ?? entity.title ?? entity.id ?? entityId}`];
+    return { entity: entity.name ?? entity.title ?? entityId, summary: entity.description ?? entity.statement ?? "", rationale, details: entity };
+  }
 }
+
+
 
 export function cycleDigest(report: CognitiveCycleReport): string {
   return auroraDigest(report.phases.map((item) => `${item.phase}:${item.status}`).join("|"));

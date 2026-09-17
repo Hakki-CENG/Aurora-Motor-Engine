@@ -1,0 +1,358 @@
+openapi: 3.1.0
+info:
+  title: Aurora Motor Engine API
+  description: |
+    Aurora Motor Engine — Hybrid Agent Fabric Control API.
+    
+    Bu API, Aurora bilişsel motorunun tüm bileşenlerini yönetir:
+    - Session yönetimi ve sohbet
+    - Aurora hafıza grafı
+    - Dünya modeli
+    - Proaktif initiative motoru
+    - Evrim ve skill yönetimi
+    - Bilişsel orkestratör
+    - Topluluk (Society) sistemi
+    - Platform entegrasyonları (Telegram, Discord, Slack, vb.)
+    - MCP server yönetimi
+    - Öğrenme ve iyileştirme
+    - Otomasyon ve zamanlama
+  version: 1.64.0
+  contact:
+    name: Aurora Motor Engine
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:3000
+    description: Development server
+
+security:
+  - bearerAuth: []
+  - cookieAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      operationId: getHealth
+      tags: [System]
+      security: []
+      responses:
+        '200':
+          description: System health status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  engine:
+                    type: string
+                    example: hybrid-agent-fabric
+                  version:
+                    type: string
+                    example: 1.64.0
+                  provider:
+                    type: array
+                    items:
+                      type: object
+                  sandbox:
+                    type: string
+                  persistence:
+                    type: string
+
+  /v1/sessions:
+    post:
+      summary: Create a new session
+      operationId: createSession
+      tags: [Sessions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tenantId:
+                  type: string
+                  default: local
+                workspacePath:
+                  type: string
+                label:
+                  type: string
+                  maxLength: 200
+                agentProfileId:
+                  type: string
+                modelOverride:
+                  type: string
+      responses:
+        '201':
+          description: Session created
+    get:
+      summary: List sessions
+      operationId: listSessions
+      tags: [Sessions]
+      parameters:
+        - name: tenantId
+          in: query
+          schema:
+            type: string
+            default: local
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, stopped, all]
+            default: all
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Session list with pagination
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      type: object
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /v1/sessions/{sessionId}:
+    get:
+      summary: Get session details
+      operationId: getSession
+      tags: [Sessions]
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session details
+    delete:
+      summary: Delete session
+      operationId: deleteSession
+      tags: [Sessions]
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Session deleted
+
+  /v1/sessions/{sessionId}/chat:
+    post:
+      summary: Send chat message
+      operationId: chatSession
+      tags: [Sessions]
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message:
+                  type: string
+                  minLength: 1
+                  maxLength: 100000
+                attachments:
+                  type: array
+                  maxItems: 10
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      name:
+                        type: string
+                      content:
+                        type: string
+                      mimeType:
+                        type: string
+      responses:
+        '200':
+          description: Chat response
+
+  /v1/memory-graph/search:
+    get:
+      summary: Search memories
+      operationId: searchMemories
+      tags: [Memory]
+      parameters:
+        - name: tenantId
+          in: query
+          schema:
+            type: string
+            default: local
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 500
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Search results
+
+  /v1/world/entities:
+    get:
+      summary: List world entities
+      operationId: listEntities
+      tags: [World Model]
+      parameters:
+        - name: tenantId
+          in: query
+          schema:
+            type: string
+            default: local
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [global, project, session, ephemeral]
+      responses:
+        '200':
+          description: Entity list
+    post:
+      summary: Create or update entity
+      operationId: upsertEntity
+      tags: [World Model]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, name]
+              properties:
+                type:
+                  type: string
+                  enum: [person, place, project, file, task, tool, website, model, organization, document, device, service, concept, goal]
+                name:
+                  type: string
+                  maxLength: 300
+      responses:
+        '201':
+          description: Entity created
+
+  /v1/initiative:
+    get:
+      summary: List initiatives
+      operationId: listInitiatives
+      tags: [Initiative]
+      parameters:
+        - name: tenantId
+          in: query
+          schema:
+            type: string
+            default: local
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [proposed, accepted, dismissed, expired, all]
+            default: all
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [score, createdAt, priority]
+            default: score
+      responses:
+        '200':
+          description: Initiative list with pagination
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: haf_session
+
+  schemas:
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+        hasMore:
+          type: boolean
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: HAF-1001
+            message:
+              type: string
+            details:
+              type: object
+            requestId:
+              type: string
+            timestamp:
+              type: string
+              format: date-time

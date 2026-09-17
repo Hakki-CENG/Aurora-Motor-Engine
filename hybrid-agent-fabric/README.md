@@ -8,9 +8,14 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.64.0
+## Current milestone — 1.65.0
 
-Round-four audit wave three: **prompt-cache breakpoints**. Every assembled request now gets a derived
+Phase6: **Real-World Capabilities**. Nine new services adding multimodal understanding, real-world
+connectors, computer use automation, full SDLC pipeline, research engine, digital twin, domain
+experts, federated/edge computing and an agent SDK. 76 new API endpoints. 24 security/quality
+issues resolved (7 P0, 13 P1, 4 P2). See [`PHASE6-FEATURES.md`](PHASE6-FEATURES.md).
+
+Previous milestone: **prompt-cache breakpoints**. Every assembled request now gets a derived
 cache plan — stable system prefix, stable conversation prefix and volatile tail, with Harness-style
 internal markers (system end, last tool, last two messages) — and the plan is durable evidence with an
 honest `prefixHit`/miss verdict computed from content digests, so a session can say exactly what it
@@ -29,6 +34,15 @@ The current code is a **working integrated runtime and control-center foundation
 
 Implemented and tested:
 
+- multimodal service: OCR, document analysis, image/video/audio understanding, CAD/3D parsing, map/spatial analysis, time series analysis
+- real-world connectors: email, calendar, CRM, ERP, accounting, customer support, sales, social media, warehouse, IoT
+- computer use service: browser/desktop automation, visual grounding, safe form filling, long-running task rollback
+- code pipeline: full SDLC chain (issue → plan → branch → implement → test → security review → PR → CI → deploy) with rollback
+- research engine: multi-source search, source trust scoring, citation verification, contradiction analysis, report generation
+- digital twin: user project/tool/workflow/constraint/preference context with learning history and sync
+- domain experts: law, finance, health, tax, compliance with source-showing, controlled modes, risk assessment
+- federated/edge: local model management (GGUF/ONNX/SafeTensors), edge node management, data policies, air-gap mode
+- agent SDK: third-party extension framework with sandbox execution, signature verification, review system
 - durable session actor and supervisor
 - process-safe stale-lock-aware session leases
 - append-only event store with generation/sequence metadata
@@ -155,6 +169,15 @@ flowchart LR
   SESSION --> CHILDREN[Child Agent Family]
   SCHED[Durable Scheduler] --> SUP
   CHANNELS[Channel Gateway] --> SUP
+  SESSION --> MULTI[Multimodal Service]
+  SESSION --> CONN[Connector Service]
+  SESSION --> COMP[Computer Use]
+  SESSION --> PIPE[Code Pipeline]
+  SESSION --> RES[Research Engine]
+  SESSION --> TWIN[Digital Twin]
+  SESSION --> EXPERT[Domain Experts]
+  SESSION --> FED[Federated/Edge]
+  SESSION --> SDK[Agent SDK]
 ```
 
 ## Security model

@@ -321,7 +321,24 @@ export class AuroraDataGovernanceService {
       generatedAt: exported.generatedAt,
     };
   }
+
+  // ═══ P3: Stats ═══
+
+  getStats() {
+    return { status: "active" };
+  }
+
+  // ═══ P3: Explainability ═══
+
+  async why(tenantId: string, entityId: string): Promise<{
+    entity: string; summary: string;
+    rationale: string[]; details: Record<string, unknown>;
+  }> {
+    return { entity: entityId, summary: "N/A", rationale: ["Service does not support entity lookup"], details: {} };
+  }
 }
+
+
 
 export const AURORA_DATA_ROOT = (rootPath: string): string => join(rootPath);
 

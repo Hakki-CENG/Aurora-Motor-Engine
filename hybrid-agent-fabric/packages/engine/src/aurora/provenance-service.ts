@@ -299,12 +299,28 @@ export class ProvenanceService {
       generatedAt: new Date(this.now()).toISOString(),
     };
   }
+
+  // ═══ P3: Stats ═══
+
+  getStats() {
+    return { status: "active" };
+  }
+
+  // ═══ P3: Explainability ═══
+
+  async why(tenantId: string, entityId: string): Promise<{
+    entity: string; summary: string;
+    rationale: string[]; details: Record<string, unknown>;
+  }> {
+    return { entity: entityId, summary: "N/A", rationale: ["Service does not support entity lookup"], details: {} };
+  }
 }
+
+
+
 
 /** Convenience for callers that only need a human-readable answer to "why did you do that?". */
 export function narrateProvenance(trace: ProvenanceTrace): string {
   if (!trace.narrative.length) return `No recorded provenance for ${trace.rootKind} ${trace.rootId}.`;
   return trace.narrative.join("\n");
 }
-
-export const PROVENANCE_STATE_PATH = (rootPath: string): string => join(rootPath, "provenance");
