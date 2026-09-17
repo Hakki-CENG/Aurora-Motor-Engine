@@ -8,12 +8,41 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
-## Current milestone — 1.38.0
+## Current milestone — 1.65.0
+
+Phase6: **Real-World Capabilities**. Nine new services adding multimodal understanding, real-world
+connectors, computer use automation, full SDLC pipeline, research engine, digital twin, domain
+experts, federated/edge computing and an agent SDK. 76 new API endpoints. 24 security/quality
+issues resolved (7 P0, 13 P1, 4 P2). See [`PHASE6-FEATURES.md`](PHASE6-FEATURES.md).
+
+Previous milestone: **prompt-cache breakpoints**. Every assembled request now gets a derived
+cache plan — stable system prefix, stable conversation prefix and volatile tail, with Harness-style
+internal markers (system end, last tool, last two messages) — and the plan is durable evidence with an
+honest `prefixHit`/miss verdict computed from content digests, so a session can say exactly what it
+paid for and why. `AnthropicProvider` places the markers; providers with automatic caching ignore the
+hint. Governance: `session.cache.plan` / `session.cache.config`; REST under
+`/v1/sessions/:id/cache*`; Canvas Cache row.
+
+Previous wave: **code intelligence** — a real Language Server Protocol client (diagnostics, symbols,
+definition, references) per workspace, same shape as Hermes `agent/lsp/*`, with a sandboxed toolchain
+fallback (`tsc --noEmit`, `ruff`/Python AST, `go vet`, `cargo check`), structured and sanitized
+diagnostics and durable content-addressed evidence. Governance: `code.catalog`, `code.diagnostics.run`,
+`code.diagnostics.evidence`, `code.symbols`, `code.definition`, `code.references`; REST under
+`/v1/sessions/:id/code*`; Canvas Diagnostics row.
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
 Implemented and tested:
 
+- multimodal service: OCR, document analysis, image/video/audio understanding, CAD/3D parsing, map/spatial analysis, time series analysis
+- real-world connectors: email, calendar, CRM, ERP, accounting, customer support, sales, social media, warehouse, IoT
+- computer use service: browser/desktop automation, visual grounding, safe form filling, long-running task rollback
+- code pipeline: full SDLC chain (issue → plan → branch → implement → test → security review → PR → CI → deploy) with rollback
+- research engine: multi-source search, source trust scoring, citation verification, contradiction analysis, report generation
+- digital twin: user project/tool/workflow/constraint/preference context with learning history and sync
+- domain experts: law, finance, health, tax, compliance with source-showing, controlled modes, risk assessment
+- federated/edge: local model management (GGUF/ONNX/SafeTensors), edge node management, data policies, air-gap mode
+- agent SDK: third-party extension framework with sandbox execution, signature verification, review system
 - durable session actor and supervisor
 - process-safe stale-lock-aware session leases
 - append-only event store with generation/sequence metadata
@@ -25,6 +54,8 @@ Implemented and tested:
 - same-provider credential pools plus persistent audience-bound server-side model configurations
 - OpenAI, Azure OpenAI, AWS Bedrock, Anthropic, OpenRouter, Google AI Studio, Vertex AI, Groq, xAI, DeepSeek, Mistral and Ollama profiles
 - policy/approval-controlled capability broker
+- prompt-cache planner: derived breakpoints per request, digest-verified hit/miss evidence, Anthropic markers, privileged session config
+- language-server code intelligence: stdio LSP client (diagnostics, symbols, definition, references) with sandboxed toolchain fallback and durable content-addressed diagnostic evidence
 - confined text/binary filesystem, bounded multimodal attachment upload, typed local Git operations and process capabilities
 - local, hardened Docker and digest-pinned Singularity/Apptainer sandbox adapters
 - persistent Python kernel with JSON-safe snapshots
@@ -54,6 +85,57 @@ Implemented and tested:
 - signed external automation responder heartbeats/events with health, dedupe and uncertain no-replay journals
 - Aurora Society roles, task marketplace, reputation/resource budgets and dissent-preserving council consensus
 - Aurora Global Workspace cognitive objects, P0-P4 goal arbitration, attention budgets, modes and loop detection
+- Aurora automatic workspace intake, preemptive attention, reflection/Dream scheduling, curiosity queue and cognitive health checks
+- Aurora Agent Communication Bus and meta-agent monitoring with evidence-bound role retirement
+- Aurora memory pyramid, typed relation graph, consolidation, contradiction/staleness health and long-term thought anchors
+- Aurora world model entities/states/relations/events, causality, temporal windows, Brier-scored prediction calibration and bounded simulation
+- Aurora twelve-perspective Multi-World Model with debate, scenario future trees, reality alignment and dissent-preserving consensus
+- Aurora Proactive Initiative Engine with worthiness scoring, P0-P4 attention budget, silence rules, digests and trust feedback
+- Aurora governed user cognitive model with consent, correction, deletion, advice effectiveness and protected-topic refusal
+- Aurora staged skill/workflow evolution with gap detection, evidence gates, regression protection, retirement and evolution index
+- Aurora environment inventory, zone 0-4 action records with mandatory verification/rollback and tool execution reputation
+- Aurora constitutional identity core with versioned mission, governed amendments and a deterministic decision checker
+- Aurora Continual Harness: reviewable, snapshotted, rollback-capable self-improvement of prompts, memories, skill and sub-agent specs
+- Aurora microagent knowledge with trigger activation, recall budgets and injection-screening quarantine
+- Aurora escalation-only risk analyzer with destructive-pattern rules, confirmation policy and safe-zone hints
+- Aurora model-free stuck detection over the event log, feeding cognitive intake and capability-gap learning
+- Aurora ACOS control loop with cycle reports, thought journal and whole-organism status
+- Aurora decision records with weighted criteria, preserved dissent, review scheduling and calibration
+- Aurora dependency-ordered plans with critical path, verification steps and auditable replanning
+- Aurora experience distillation: reusable lessons proposed from real trajectories, never auto-applied
+- Aurora fleet supervision: explicit enrollment, fair bounded sweeps, per-tenant failure isolation and a circuit breaker
+- Aurora terminal operations: an allowlisted read-only CLI surface plus bounded actions in the headless client
+- Aurora execution bridge: ready plan steps delegated to society roles with recorded match evidence and evidence-bound completion
+- Aurora role authority templates: least-privilege capability allowlists bound to society roles, with drift audit
+- Aurora outcome harvesting: delegated work scored from recorded events, with an explicit review band for ambiguity
+- Aurora plan feedback: decision outcomes derived from finished plans, so calibration reflects execution
+- Aurora estimation calibration: plan estimates corrected by measured durations, applied as auditable revisions
+- Repository instruction files (AGENTS.md/CLAUDE.md) with injection screening, precedence and budgeting
+- Deterministic lifecycle hooks that can deny at the capability boundary and only run governed actions
+- Tool search over the capability catalog for progressive disclosure
+- Named permission modes (plan, manual, acceptEdits, auto, dontAsk, bypass) and sandbox modes per session
+- Session archive/restore with an honest cost surface, and repository command templates
+- Deterministic working-tree review and declarative subagent files resolved onto profiles and roles
+- Per-session effort levels that move both provider reasoning and harness budgets, and deliberate git worktrees
+- Signed artefact manifests with Ed25519 publisher keys, version pinning and per-agent lifecycle hooks
+- Layered settings with provenance and an immovable managed floor, plus structured questions to the human
+- MCP 2026-07-28 stateless client with server/discover, routing headers, cacheable listings and multi round-trip requests
+- Background task control (monitor, stop, resume) and model-callable plan mode with an evidence requirement
+- Long-running background shells with cursor-based output retrieval, honest loss reporting and a kill switch
+- Reviewed automatic approvals: named rules with a stored rationale, a use budget, expiry and a full decision log
+- Child-agent fan-out limits (concurrency, depth, lifetime) and per-command memory/CPU/file/process limits
+- Approval previews that cannot hide the command or destination, plus enforced session spend budgets
+- Tenant-wide agent directory with privileged cross-family messaging, and conversation-inheriting spawn
+- MCP 2026-07-28 in full: cache hints, named error codes, the Tasks extension and subscription streams
+- Workspace glob and grep primitives, all-or-nothing unified-diff patching
+- Project verification that runs the repository's own build and tests and keeps the evidence
+- Aurora autopilot: bounded unattended cadence with a durable run ledger
+- Aurora provenance explainer reconstructing why any artifact exists
+- Embedding-backed semantic memory recall
+- Aurora workspace checkpoints with reversible restore, giving destructive work a real recovery path
+- Content-free Aurora telemetry, derived operational alerts and a cross-store integrity self-check
+- Whole-tenant and per-user Aurora export plus governed user purge with stated retention
+- Aurora governance enforced at the capability boundary: evidence-driven, escalation-only, audited
 - AES-256-GCM/Vault/KMS credential brokers, scoped leases and pinned 1Password/Bitwarden/command secret sources
 - SSRF-checked bounded public web fetch and normalized Brave/Tavily web search
 - Playwright/CDP browser automation and browser-scoped computer-use
@@ -87,6 +169,15 @@ flowchart LR
   SESSION --> CHILDREN[Child Agent Family]
   SCHED[Durable Scheduler] --> SUP
   CHANNELS[Channel Gateway] --> SUP
+  SESSION --> MULTI[Multimodal Service]
+  SESSION --> CONN[Connector Service]
+  SESSION --> COMP[Computer Use]
+  SESSION --> PIPE[Code Pipeline]
+  SESSION --> RES[Research Engine]
+  SESSION --> TWIN[Digital Twin]
+  SESSION --> EXPERT[Domain Experts]
+  SESSION --> FED[Federated/Edge]
+  SESSION --> SDK[Agent SDK]
 ```
 
 ## Security model
@@ -604,6 +695,13 @@ forks inherit the parent's frozen profile, so delegation cannot recover hidden
 capabilities. Profiles may specialize behavior but cannot weaken policy,
 approvals, effect journals, sandbox or credential isolation.
 
+## Aurora architecture map
+
+[`docs/aurora-architecture.md`](docs/aurora-architecture.md) is the single reference for the Aurora
+system: every architectural layer with the service, capability, REST surface and test that implements
+it, where each constitutional invariant is enforced, the on-disk state layout, and the end-to-end
+journey test that carries one signal from observation to explained, verified action.
+
 ## Aurora Agent Society
 
 The 125-page Aurora architecture is tracked in
@@ -639,6 +737,16 @@ privileged capability and crosses normal policy/approval/effect-journal paths.
 Canvas includes a Society panel for tasks, bids, awards, execution, reputation,
 budget and council outcomes.
 
+The Phase A extension adds the Agent Communication Bus: an active role publishes
+a bounded topic/body message to named roles or to the whole society, recipients
+read their own inbox and acknowledge, and retention is capped per tenant.
+Meta-agent monitoring reports stalled or past-deadline work, duplicate
+objectives, unbid tasks, failing or never-used roles, budget saturation and
+concurrency starvation, each with a concrete recommendation. Role lifecycle
+governance can retire non-builtin roles whose evidence-bound failure rate crosses
+a policy threshold, but never Prime, never a builtin director and never a role
+with running work.
+
 ## Aurora Global Workspace and cognitive control
 
 Aurora PDF Phase B introduces first-class cognitive objects rather than treating
@@ -672,6 +780,618 @@ objects, attention, modes, arbitration and loop records. Privileged goal,
 attention and mode changes still cross policy/approval. Canvas's Cognitive panel
 shows the Global Workspace, priorities, confidence, horizons, focused/deferred
 state, daily budget and operating mode.
+
+The Phase B extension closes the loop between the environment and the workspace.
+`cognitive.intake` accepts automatic signals from memory, the world model, the
+society, the environment or the initiative engine, deduplicates them for six
+hours, enforces a daily intake quota and records only a SHA-256 digest of each
+signal. Preemptive allocation lets a constitutionally higher-ranked object
+reclaim a focused slot; the preempted thought returns to the queue with its
+reservation released rather than lost. Focus can be interrupted explicitly,
+mini/deep/meta/Dream-Mode reflections can be scheduled but only in a compatible
+cognitive mode, the curiosity queue ranks low-confidence high-impact questions,
+and `cognitive.health` reports repeated loops, focus overruns, stale strategic
+work, unsourced high-confidence claims, budget saturation and constitutional
+violations.
+
+## Aurora memory pyramid and temporal knowledge graph
+
+Aurora PDF Phase C adds the Memory Object standard above the existing candidate/
+active `MemoryStore`: every object carries ID, timestamps, pyramid layer
+(working, session, episodic, semantic, procedural, user, palace), claim type
+(observation, inference, hypothesis, prediction), source type/ID, confidence,
+importance, tags, evidence references and a temporal validity window. Identical
+content reinforces the existing object instead of duplicating it.
+
+Typed relations (`relates`, `causes`, `supports`, `contradicts`, `part-of`,
+`derived-from`, `precedes`) form the knowledge graph, strengthen with repetition
+and support bounded traversal. Recall is multi-strategy — semantic, graph,
+temporal, goal-scoped and user-scoped — and records usage so memory health can
+detect unused knowledge.
+
+Consolidation compresses near-duplicate episodes into one summary object,
+archives (never silently deletes) the sources, links them with `derived-from`
+edges and strengthens surrounding relations. Contradiction detection flags
+overlapping claims with opposite polarity, supersession preserves history, and
+`memory.graph.health` reports staleness, contradictions, low usage, low
+confidence, expiry and duplicate clusters. Long-term thought anchors keep an open
+problem alive for months with findings, next steps and scheduled reviews.
+Privacy deletion (`forget`) removes the object and every edge that referenced it.
+
+## Aurora world model and Multi-World Model
+
+Phase D represents reality as Entity → State → Relation → Event → Outcome. State
+facts are temporal: a new value closes the previous validity window instead of
+overwriting it, so `world.state.at` answers "what did Aurora believe at that
+time" and `world.temporal.view` returns past, present and open predictions.
+Entities carry a scope so the personal, environment, digital, project, human and
+goal sub-models from the PDF are queryable views rather than separate stores.
+
+Causal links are assertions, not truths: every confirmation or refutation
+recomputes their confidence. Predictions are falsifiable, are scored with Brier
+loss when resolved, expire when their horizon passes unanswered and feed a
+calibration report with probability buckets. The consistency engine surfaces
+conflicting current claims, and simulation/counterfactual branches project
+bounded causal chains with explicit terminal probability and uncertainty without
+writing any state.
+
+The Multi-World Model seeds the twelve PDF perspectives (technical, economic,
+risk, opportunity, human, strategic, security, scientific, creativity,
+user-centric, time, complexity). A meta layer weights them by problem type and by
+each perspective's own prediction reputation. Perspectives submit stance,
+confidence, rationale, risks and opportunities, may formally challenge each other,
+and can attach scenarios whose sibling probabilities cannot exceed 1, forming a
+future tree with cumulative probabilities. Recording a scenario outcome scores
+its endorsing perspectives with Brier loss. Consensus reports support/oppose/
+neutral weight, agreement, uncertainty, dissenting and missing perspectives and
+unresolved conflicts; close or contested calls resolve to `hold` or `uncertain`
+rather than manufacturing agreement.
+
+## Aurora proactive initiative and user model
+
+Phase E treats silence as a feature. Intake events (memory, world model, git,
+calendar, filesystem, weather, research, location, notifications, cognitive,
+society, skill) are stored as summaries plus payload digests. Watchers convert
+matching intake into initiative candidates. Each initiative is scored
+`importance × urgency × impact × confidence × user relevance`, classified P0–P4
+and routed to immediate, message, daily digest, weekly digest or archive.
+
+Delivery is bounded by a daily attention budget, quiet hours, 24-hour duplicate
+suppression and trust: unhelpful notifications lower the trust score, which
+raises every threshold until Aurora earns the bandwidth back. Escalation is
+explicit and audited, and daily briefings, weekly reviews and monthly strategic
+reviews are built from digested initiatives. Queued initiatives are also mirrored
+into the Global Workspace, so proactive work competes for the same attention
+budget as every other cognitive object instead of bypassing it.
+
+The user cognitive model is a behavioural twin, not surveillance. Claims are
+typed, evidence-backed and confidence-scored; inferred claims stay `proposed`
+until confirmed or consented; users can correct (with auditable history),
+retract, deny consent or delete everything, per category or entirely. Protected
+topics — health, belief, politics, ethnicity, sexuality and credentials — are
+rejected at write time. The model also tracks long/medium/short goals with
+progress and stall detection, behavioural signals, an explicitly
+uncertainty-labelled state estimate, frustration risk, a growth timeline, advice
+effectiveness and guardian alignment checks against the user's own goals.
+
+## Aurora skill and workflow evolution
+
+Phase F makes capability growth measurable and refuses self-promotion. Repeated
+friction, capability gaps, bottlenecks and error patterns are deduplicated by
+signature and recommend a candidate only after recurrence or high severity.
+Skills then walk a strictly staged path: blueprint → sandbox → test → beta →
+production. Each gate needs evidence — declared tests and risks, recorded
+evaluations, accuracy and safety floors, real beta usage, a regression baseline
+and an explicit production approval actor and reason. Safety is remediable but
+only through consecutive finding-free evaluations.
+
+Scores are recomputed from evidence (accuracy, reliability, speed, utility,
+safety and a composite), usage tracking reflects production behaviour, and the
+composition graph prevents retiring a skill that active composites depend on.
+Regression protection blocks promotion when any baseline suite loses ground.
+Workflow versions record steps, duration, success rate and bottleneck, and the
+Cognitive Evolution Index summarizes capability growth, quality, success rate,
+gap closure and workflow improvement with a delta against the previous
+measurement. Every change lands in the evolution journal.
+
+## Aurora environment awareness and embodiment
+
+Phase G inventories the digital body: filesystem, terminal, IDE, browser, Git,
+databases, APIs, devices, cloud, calendar, channels, kernels, sandboxes and MCP
+servers, each with a safe execution zone 0–4, capability IDs, approval
+requirement and execution reputation. Repeated failures degrade a resource
+automatically.
+
+Every action is a standard record: goal, plan, action, parameter digest,
+expected outcome, result, verification and the memory updates it produced. Zone
+3+ actions require a rollback plan and approval before they can start;
+verification is mandatory and tracked as debt when missing; unexpected outcomes
+are flagged for the cognitive layer. Workspace habits are learned with observed
+success rates, and continuous project awareness records open tasks, risks,
+progress and stale projects for the project watcher. This layer records and
+governs — execution itself still goes through the capability broker, policy
+engine, sandboxes, credential broker and approval service.
+
+## Aurora ACOS control loop
+
+Every Aurora subsystem is durable and independently governed; ACOS is what makes them one organism.
+`acos.cycle.run` executes one bounded tick — Observe, Update World, Prioritize, Allocate, Execute,
+Evaluate, Learn, Remember, Reflect, Evolve — in `full`, `maintenance`, `reflection`, `dream` or
+`emergency` mode. The cycle writes a durable report (phase results, attention allocation, health
+scores, signal counts, recommendations) plus thought-journal entries, and a failing phase degrades the
+cycle instead of aborting the organism.
+
+The loop is wired to real signals, not just metrics: stuck sessions and stalled projects become
+sourced cognitive objects, repeated-loop blocked thoughts become evidence-backed capability-gap
+observations, expired predictions and contradictions are swept, initiatives are evaluated against the
+attention budget and the harness is pruned. The cycle itself is constitution-checked, and it executes
+nothing directly — every phase calls an already-governed service.
+
+The cognitive economy splits the daily attention budget into named buckets (for example project 0.4,
+research 0.25, user support 0.2). Allocation enforces each bucket's cap in addition to the global
+budget and focus slots, reservations and consumption are accounted per bucket, and everything rolls
+over daily.
+
+`acos.status` returns the whole organism on one screen: identity version, cognitive mode and health,
+attention budget, memory health, initiative trust, evolution index, environment inventory, society
+advisories, constitutional compliance and the user-state estimate.
+
+## Aurora context composition
+
+All of this machinery only matters if it reaches the model. The Aurora context composer assembles one
+bounded block that is appended to the session system prompt on every turn:
+
+- `<AURORA_CONSTITUTION binding="true">` — mission plus principle summaries, governed system content;
+- `<AURORA_HARNESS trust="reviewable-guidance">` — agent-authored lessons that explicitly cannot
+  override policy, approvals or the constitution;
+- `<AURORA_KNOWLEDGE untrusted="true">` — trigger-activated microagent documents, marked as data;
+- `<AURORA_MEMORY untrusted="true">` — recalled memory-graph claims with their layer, type and
+  confidence. Recall is embedding-backed: semantic similarity is blended with lexical overlap,
+  importance, confidence and recency, and falls back to lexical scoring if the index is unavailable.
+
+Each section has its own character budget, so a growing knowledge base can never crowd out the user's
+own instructions; overflow is reported rather than silently dropped. Composition is fail-open (a
+failing source degrades quality, never the turn), the block is SHA-256 digested for audit, and its
+size/section count/digest appear in the context-projection stats of `model.request.started`. The whole
+block can be tuned or disabled with the `auroraContext` engine option.
+
+## Aurora constitution and identity core
+
+Sixteen principles are seeded per tenant: the twelve cross-cutting rules extracted from the Aurora
+architecture plus four ACOS operating principles, each with a stable code (`C1`–`C12`, `P1`–`P4`),
+category and `hard`/`soft` severity. The Long-Term Identity Core holds the mission, an identity
+version and an append-only continuity log.
+
+`constitution.check` is a deterministic rule engine over declared decision attributes — destructive,
+irreversible, external side effect, approval, evidence, rollback plan, verification, claim type,
+confidence, user relevance, self-modification, staged evolution, dissent, budget. Hard violations deny,
+soft violations require review, and every verdict is stored with the violated codes, remedies and an
+attribute digest. Amendments require an approver, a reason and a version bump; built-in hard
+principles can be clarified but never softened or retired — including by Aurora itself.
+
+## Aurora Continual Harness
+
+The harness is the scaffolding around the model — supplemental prompt notes, durable memories, skill
+descriptions and sub-agent specifications — and Aurora may improve it from its own trajectory through
+`harness.refine`. Refinements are batches (default maximum eight operations, rate-limited per day),
+each one snapshots the affected scope first, records its trigger, rationale and evidence, and can be
+rolled back by ID; newer refinements in the same scope must be rolled back first.
+
+Entries carry origin, use count, helpful/unhelpful feedback and effectiveness, so `harness.prune`
+removes agent-authored lessons that are unused or consistently unhelpful. Projection into a prompt is
+character-budgeted and priority-ordered. The immutable base system prompt, policy engine, agent
+profiles and capability allowlists are outside this surface by construction, so self-improvement can
+never widen authority.
+
+## Aurora microagents, risk analysis and stuck detection
+
+Microagents are small knowledge documents that load themselves when relevant: `always`, `keyword`,
+`glob` or `manual` activation, recall inside a character budget, effectiveness feedback and content
+digests. Because knowledge is prompt content, every write is screened for instruction override, role
+hijack, policy bypass, credential exfiltration, autonomy escalation and destructive instructions; a
+finding quarantines the document until a named human reviewer clears it.
+
+The risk analyzer scores a proposed capability call against eighteen built-in destructive-pattern
+rules plus tenant rules, returning `low`/`medium`/`high`/`critical`, a confirmation requirement from
+the tenant policy (`never`, `critical`, `high`, `medium`, `all`) and a safe execution zone hint. It is
+escalation-only — it can require more scrutiny but never grants authority — and built-in critical
+rules cannot be disabled.
+
+Stuck detection is model-free analysis over the durable event log: repeated actions, repeated error
+classes, two-capability oscillation, monologue, byte-identical output, approval starvation and fired
+runtime guardrails, each with evidence event IDs. ACOS turns those findings into cognitive objects and
+capability-gap observations, so being stuck becomes a learning signal instead of a silent stall.
+
+## Aurora reasoning: decisions and plans
+
+A decision record holds the options, the weighted criteria they were judged against, the dissent that
+was raised, the option that was chosen, the expected outcome and — after the review window — what
+actually happened. Ranking is computed, never asserted: choosing a lower-ranked option requires an
+explicit override reason, a decision denied by the constitution cannot be recorded as decided, and a
+"decision" with one option is rejected as a formality. Unscored criteria count as unknown rather than
+zero, so a thin analysis cannot masquerade as a thorough one.
+
+Calibration closes the loop. Every reviewed decision yields a surprise (expected value versus observed
+value) and a Brier score for the stated confidence, and the tenant report exposes success rate, mean
+surprise and **overconfidence** — how far Aurora's confidence runs ahead of its results, broken down by
+reversibility class.
+
+Plans are dependency graphs with per-step verification, estimates and risk. Cycles and unknown
+dependencies are rejected at write time, the critical path and a risk-weighted buffer are computed,
+steps cannot start before their dependencies are satisfied, and every change is a versioned revision
+with a mandatory trigger and reason. Completed work survives replanning, estimate accuracy is measured
+from actuals, and stalled plans with ready work become a proactive signal.
+
+## Aurora experience distillation
+
+After a substantial session, `experience.distill` reads the durable event log, measures complexity from
+tool-call volume, capability diversity and duration, and proposes: the effective capability sequence as
+a reusable procedure, recurring failure classes as pitfalls, and structural friction as capability
+gaps. Every proposal carries evidence event IDs, a confidence and a dedupe signature, and repeats
+strengthen the existing proposal instead of creating noise.
+
+Nothing is applied automatically. Applying a proposal routes it through the service that owns that kind
+of state: harness memories become a snapshotted, rollback-capable refinement; knowledge goes through
+injection screening; capability gaps become evolution observations that still need the staged pipeline.
+
+## Aurora autopilot
+
+Unattended operation is opt-in and bounded. Cadences — pulse, maintenance, reflection, dream, daily
+briefing, weekly review and monthly strategy — drive ACOS cycles and digests, subject to a daily run
+ceiling, quiet hours during which only the fast pulse may run, per-cadence enable/disable and
+exponential backoff on failure. Every run lands in a durable ledger with its outcome and duration, so
+what Aurora did while nobody was watching is always reviewable.
+
+## Aurora execution bridge
+
+A plan that names work nobody is asked to perform is a document, not a system. The execution bridge
+turns ready plan steps into society marketplace tasks and reconciles the results back into the plan.
+Only steps the planner reports as ready may be delegated, so the dependency graph still decides what
+can start. Role selection is deterministic — capability coverage, reputation and current load — and
+the resulting score is stored on the link, so the reason a role was chosen is recorded rather than
+narrated. The nomination bid says in plain words that it is machine-authored.
+
+Completion is evidence-bound: a step becomes `done` because a society task completed and carried its
+child session's event IDs back, not because anything asserted success. A failed task fails the step
+and blocks the plan. Spawning the child session is a separate privileged capability, and unattended
+delegation stays inert until a tenant enables it and names a root session.
+
+## Aurora outcome harvesting
+
+Delegation is only a loop if someone closes it. The harvester scores a settled child session from its
+recorded events — assistant output, tool-call reliability, session health, guardrail trips, budget
+adherence — as a stored scorecard with fixed weights, so every quality number can be recomputed from
+the criteria that produced it. Nothing in flight is scored: a task is only judged once its session is
+closed, failed, or idle and quiet.
+
+A delegated failure is also the cheapest lesson the system ever gets: the work is done, the trajectory
+is recorded and the verdict is evidence-bound. Failures and ambiguous outcomes become deduplicated
+capability-gap observations and candidate lessons, with the weakest scoring criterion named. Successes
+teach nothing here, and nothing is auto-applied.
+
+Two refusals matter more than the scoring. A session that failed or produced no output is a failure
+outright, not partial credit. And anything landing between the failure and success thresholds is
+**not** recorded at all — it becomes a review item with a reason, because a system that guesses at its
+own success rate poisons the calibration, reputation and evolution signals built on top of it. When a
+human resolves a review item, the machine scorecard stays attached to their verdict.
+
+## Aurora plan feedback
+
+Calibration is only honest if outcomes are recorded, and outcomes recorded by hand are outcomes not
+recorded at all. When a plan reaches a terminal state, Aurora derives the outcome of the decision that
+produced it: how much of the plan genuinely finished, blended with the measured quality of delegated
+work. It never overwrites a human verdict, never resolves a plan that is merely still executing (it
+marks the decision executed instead), and supports a dry run that shows exactly what would be written.
+Each record keeps its evidence, observed value, surprise and Brier score, so every calibration number
+traces back to the execution behind it.
+
+## Background tasks and model-callable plan mode
+
+`tasks.monitor` shows what is running within a session's family reach - status, whether a turn is in
+flight, usage, mode, effort and outstanding questions. `tasks.stop` separates `cancel` (end the turn)
+from `close` (end the agent) and is ungated on purpose: stopping only reduces activity, and needing an
+approval to halt a runaway agent would be backwards. `tasks.resume` sends a follow-up through the
+durable inbox.
+
+The agent can enter plan mode itself, because that only removes authority. Leaving requires approval
+*and* evidence: a plan id or a summary of what the exploration produced, so exploration earns execution
+rather than assuming it. A managed ceiling still caps where it can land.
+
+## Search, patch and proof
+
+`filesystem.glob` and `filesystem.grep` are the primitives a coding agent uses constantly: pattern match
+and content search, bounded, dependency directories skipped, symlinks never followed out, truncation
+reported, binary files named rather than dumped. `filesystem.patch` applies a unified diff with every
+hunk's context verified against disk and **all files or none** — stale context is refused, not fuzzily
+matched, because a half-applied patch is a silent corruption.
+
+`verify.run` executes the project's *own* build and test commands — detected from its lockfiles,
+manifests and script tables — and keeps the receipt: command, exit code, duration, output tail. It stops
+at the first failure, and `verified` requires that something was actually run: a project with no checks
+is `inconclusive`, never verified. `verify.evidence` is how an agent answers "prove it", and how a
+reviewer finds out that it cannot.
+
+## Agent directory and cross-family messaging
+
+`agent.directory` lists every live agent in the tenant — name, status, depth, and whether the name is
+unique — but listing is not permission. Messaging a child is ungated because the family tree *is* the
+authorisation; `agent.message.direct` reaches an agent outside that tree and is privileged, because it
+puts text into a session nobody here supervises. A tenant boundary is never crossed, an ambiguous name is
+refused rather than guessed at, and delivery reuses the family path exactly, receipts included.
+
+`agent.spawn` can also start a child from the parent's own conversation (`inheritConversation`), so
+delegation stops meaning "re-explain everything you already know". The transcript is copied, never
+shared: a child cannot rewrite its parent's history.
+
+## Fan-out, resource and spend limits
+
+Three ceilings that were missing. **Fan-out:** a session may hold 20 live children, the tree is one level
+deep by default (a subagent does not spawn subagents unless an operator says so), and 200 spawns per
+session over its life; the refusal names the limit, and `agent.fanout` lets an agent plan inside it.
+**Resources:** every command carries memory, CPU-second, file-size and process limits applied as a
+`ulimit` prefix in its own shell, so a runaway build cannot take the host down with the agent on it.
+**Spend:** `SessionBudgetService` caps a session in dollars or tokens, warns before the wall, refuses new
+turns at it without ever truncating a turn in flight, and reports `unpriced` rather than pretending a
+money cap holds for a model with no price entry.
+
+## Approval previews
+
+The preview *is* the question being asked, so it cannot hide the answer. Decision-relevant fields —
+command, path, url, host, target — are kept whole; when one must be shortened, both ends survive with the
+omission stated inline, because a head-only cut removes exactly the dangerous tail. Credentials are
+masked by key name and by value shape, every mask is counted, and non-decision keys are dropped first
+with each one named. An approver may be shown less content, never less intent.
+
+## Long-running shells
+
+`shell.start` runs a build or a test suite that outlives the call and returns a shell id immediately.
+`shell.output` reads from a cursor — an absolute produced-character offset — and can *wait* for new
+output instead of being polled. `shell.stop` kills it, ungated, because needing permission to stop a
+runaway build is backwards. `shell.list` shows what a session left running.
+
+It is the same sandboxed execution path as `process.exec`, so workspace confinement, environment
+scrubbing and the sandbox backend are not re-implemented and cannot drift; starting one carries the same
+`process` risk class. Output lives in a bounded ring buffer, and when a reader falls behind the loss is
+**reported** as `skippedChars` rather than stitched into a misleading transcript. Every shell has a
+timeout, a total-output ceiling and an owner: when the session closes, its shells are killed.
+
+## Reviewed automatic approvals
+
+`auto` and `dontAsk` answer by risk class — a dial, with nothing left behind. A reviewed auto-approval is
+a different thing: an operator names a capability or family, writes down *why* that class of request is
+safe, and that rationale is copied onto every decision the rule makes. Rules may carry argument patterns,
+refusal patterns that force an escalation even on a match, a session scope, an expiry and a use budget.
+
+The floors are absolute: `*` is refused, privileged capabilities are never answered automatically, and an
+installation can switch the whole mechanism off through managed settings. Escalations are logged next to
+approvals, so the record shows what the mechanism refused as well as what it waved through. An agent may
+`approvals.auto.propose` a rule, and the proposal arrives disabled — proposing is not granting.
+
+## MCP 2026-07-28
+
+Implemented in full, including the optional halves: server-supplied `ttlMs` / `cacheScope` drive the
+client cache (`none` disables it), the renumbered error codes are named and acted on — an endpoint that
+answers UnsupportedProtocolVersion is not asked again — the **Tasks extension** is polled through
+`tasks/get` with a bounded poll count and `tasks/update` for mid-task input, and `subscriptions/listen`
+is an opt-in, abortable, byte- and lifetime-bounded stream whose `toolsListChanged` invalidates exactly
+the cache it names. The log level rides per request, because `logging/setLevel` is gone.
+
+The stateless revision removed the `initialize` handshake and `Mcp-Session-Id` entirely. Aurora speaks it
+natively: `server/discover` for capabilities, `MCP-Protocol-Version` / `Mcp-Method` / `Mcp-Name` routing
+headers that the client refuses to let disagree with the body, cacheable list results, and Multi
+Round-Trip Requests in place of elicitation. `requestState` is treated as attacker-controlled input —
+bounded, never parsed, echoed back verbatim — and a mid-call input request is put to the *human* through
+the same bounded question service the agent uses, so a remote server cannot script its own confirmation.
+Discovery is optional in the revision, so a failing server degrades and registers what it could list
+rather than hanging a turn. The existing SDK-backed manager keeps serving servers on the older revision.
+
+## Managed settings and asking the human
+
+Settings merge through six published layers — defaults, user, project, project-local, runtime, managed —
+and every effective value reports the layer that produced it *and* every layer that had an opinion. The
+managed layer is an absolute floor: what it sets is locked, a lower layer's override is recorded as
+overridden rather than dropped, and a managed array replaces instead of merging so an administrator's
+deny list cannot be widened or narrowed from below. Two enforcement points prove it is not advisory: a
+permission-mode ceiling `session.mode.set` refuses to exceed, and a deny list applied as a policy layer.
+
+`user.ask` lets an uncertain agent ask rather than guess: two to six options, bounded outstanding
+questions, opt-in free text, attributed answers, and a timeout that returns `timedOut` instead of an
+invented choice. `dontAsk` denies it; plan mode allows it, because asking changes nothing.
+
+## Supply-chain trust
+
+A digest check proves the bytes match the index; it says nothing about who wrote the index. Publishers
+register Ed25519 keys, sign `kind:artifactId:version:sha256`, and tenants pin the exact version and
+digest they approved. A valid signature over a *different* version is still refused, because that is
+what a supply-chain attack looks like. Signature and pin states are reported separately — `valid`,
+`invalid`, `absent`, `unknown-publisher`; `matched`, `mismatched`, `absent` — and enforcement is opt-in
+per tenant, with verdicts recorded even while it is off so an operator can see what would be refused
+before switching it on. The skills hub consults the gate before downloading anything.
+
+## Effort and worktrees
+
+Effort is one dial with two jobs: it asks the provider for more reasoning *and* changes what the harness
+will spend. `low | medium | high | xhigh | max` selects an explicit profile — tool iterations, context
+scale, reasoning effort, continuation ceiling — and `session.effort` returns those exact numbers, so a
+turn that stopped after four tool calls can be explained rather than guessed at. Effort resolves once
+per turn, so a change never moves the ceiling under a running loop.
+
+`worktree.create` gives the main session what child sessions always had: a clean branch in an isolated
+git worktree, created inside the engine's workspace root and optionally bound to a fresh session in one
+call. References are validated as plain git names, removal is confined to the workspace root, and a
+session can never remove the tree it is running in.
+
+## Working-tree review and subagent files
+
+`review.worktree` answers "what changed and what should worry me?" mechanically: per-file statistics
+plus deterministic findings — added credentials, `.env` and CI workflow edits, a lockfile moving without
+its manifest, source changes with no test touched, a large deletion against a small addition. No model
+is consulted to produce the evidence, so no model can talk the evidence away. Everything is bounded and
+runs through the session's sandbox, and a clean tree degrades to "nothing to review".
+
+Subagent files (`.aurora/agents`, `.claude/agents`, `.codex/agents`) are read with the front matter the
+ecosystem already uses and resolved onto machinery Aurora had: an agent profile for instructions and the
+allowlist, a society role binding for identity and reputation, a declared permission mode for behaviour.
+Tools resolve against the live catalog, `disallowedTools` is applied and reported, and fields Aurora does
+not honour are named instead of dropped.
+
+## Session archive and cost
+
+Archiving a session keeps everything it recorded and refuses new work until it is restored, enforced on
+the engine's command path rather than in one client. Cost always states its source: a provider number,
+the operator's price table, or `unpriced` — an unpriced model is a configuration gap, and reporting it
+as free would produce a confidently wrong invoice. The tenant rollup breaks spend down by model and
+names the sessions that could not be priced.
+
+Repository command templates come from `.aurora/commands`, `.claude/commands`, `.codex/prompts` and
+`.github/prompts`, so an existing repository works unchanged. Arguments substitute into `$ARGUMENTS`
+and `$1`…`$9`, every placeholder filled or left over is reported, and a template that fails injection
+screening is refused with an error rather than quietly dropped. Rendering produces text; it never runs
+anything.
+
+## Session modes
+
+One word instead of four flags: `plan`, `manual`, `acceptEdits`, `auto`, `dontAsk`, `bypass`, plus a
+sandbox mode of `read-only`, `workspace-write` or `danger-full-access`. Plan mode is genuine read-only
+exploration that can still write plans and decisions, so a session can propose real work and then be
+switched out of plan mode to do it.
+
+The dial wraps the policy stack rather than joining it, which is what lets it both tighten and relax.
+Relaxation is deliberately narrow: only a base-policy approval requirement, only for the risk classes
+the mode names. A denial is never reversed, and a decision that came from Aurora governance, OPA or a
+lifecycle hook is never weakened — a mode is a preference, governance is not. `bypass` must be enabled
+per tenant, and every change of mode is recorded with an actor and a reason.
+
+## Repository instructions, hooks and tool search
+
+Aurora reads the instruction file a repository ships — `AGENTS.md`, `CLAUDE.md`, `AURORA.md`,
+`.cursorrules`, `.github/copilot-instructions.md` — because that file is the user's house rules. It
+reads them defensively: bounded discovery, no symlinks, no dependency directories, injection screening
+with quarantine, explicit precedence and a character budget that includes its own framing.
+
+Deterministic hooks cover what a model must not be trusted to remember. Rules on session start/stop,
+prompt submission and tool use can warn, require approval or deny, and the `tool.pre` half joins the
+policy stack as an escalation-only layer. A hook never shells out: its action invokes an allowlisted
+governed capability, so hook effects are policed and audited like everything else.
+
+With 275 capabilities, pushing the whole catalog at a model is wasteful, so `tool.search` ranks it
+deterministically with risk and side-effect filters and `tool.describe` returns a full schema only for
+the capability actually chosen.
+
+A full comparison against Claude Code, Codex CLI, OpenHands, Hermes and Prime — including the gaps
+still open and their order — is in [`docs/peer-system-gap-audit-2026-08-20.md`](docs/peer-system-gap-audit-2026-08-20.md).
+
+## Aurora estimation calibration
+
+Delegated work records how long it really took, so estimate accuracy is measured rather than assumed.
+The calibrator turns those pairs into a correction: the median actual/estimate ratio, clamped, bucketed
+by plan tag, gated on a minimum sample count and reported with a confidence. Applying it is a plan
+revision that names the factor and the sample count, so a machine-corrected estimate never passes as a
+human's — and a plan with no history is left exactly as written, with the reason stated.
+
+When a finished plan lands far from what its decision expected, Aurora raises a candidate replanning
+initiative with the expected and observed values attached. It never replans on its own, and it stays
+quiet when the plan went as expected.
+
+## Aurora role authority
+
+Without a profile, a delegated child session inherits the parent's entire capability set — the
+opposite of what a role-specialised society should do. Aurora ships eight reviewed least-authority
+templates (prime, researcher, coder, planner, memory-keeper, guardian, communicator, evolver). Each
+declares allow patterns, deny patterns and a hard risk ceiling, and resolves against the live
+capability catalog, so a template can never grant a capability that does not exist and never quietly
+misses a new one in its family. Everything the ceiling removes is reported, and a pattern that
+matches nothing is surfaced as drift. The guardian template is provably read-only: every capability
+it grants is side-effect free. Tenants can define their own templates too — validated, resolved
+against the same live catalog, rejected if they grant nothing, and audited for drift exactly like the
+built-ins, which stay immutable.
+
+## Aurora fleet supervision
+
+The autopilot drives one tenant. The fleet supervisor drives many, and it is the layer that makes
+unattended cognition safe at scale. A tenant is only driven after explicit enrollment; sweeps serve
+the highest priority band first and, within a band, the least recently swept tenant, so a busy tenant
+cannot starve a quiet one. Each sweep is bounded by tenants-per-sweep and runs-per-tenant, and the
+fleet as a whole by a daily sweep ceiling. A tenant whose autopilot throws is contained, not fatal:
+the sweep continues, the failure is recorded, and three consecutive failing sweeps open a circuit
+breaker with an exponential pause that only an operator resume clears. The sweep ledger is durable,
+so cross-tenant background activity is reviewable after the fact.
+
+When the budget only allows a few tasks, the longest pole goes first: critical-path steps, then risk,
+then size. And a role that keeps failing stops being nominated for high-risk work — soft, reversible
+probation that still lets it earn its record back on routine steps.
+
+Delegation also respects the society's economics before it posts: the daily token budget and the
+concurrency ceiling are checked up front, so a task that could never be awarded today is never
+created, and the unattended path serves the plan that has waited longest first.
+
+Because the fleet is cross-tenant, its REST surface is system-admin only. A tenant's own agents can
+see and change only their own membership, through the tenant-scoped `aurora.fleet.*` capabilities.
+
+Day-two operations — health checks, tuning tables, the alert playbook and recovery procedures — are
+documented in [`docs/aurora-operator-runbook.md`](docs/aurora-operator-runbook.md), and the whole
+Aurora surface is reachable from a terminal with `haf-client aurora`.
+
+## Aurora provenance
+
+`aurora.explain` answers "why does this exist?" by walking recorded provenance across subsystems: an
+environment action to its resource, verification and memory updates; an initiative to the intake signal
+that raised it; a memory to its graph neighbourhood; a decision to its constitutional verdict; a plan to
+the decision that justified it. The trace is reconstructed from durable state only — no model is asked
+to narrate causality after the fact — and it reports unresolved references instead of guessing.
+
+## Aurora governance at the capability boundary
+
+Everything above is only real if it binds when a tool actually runs. `AuroraPolicyEngine` sits in the
+layered policy stack next to the default engine and OPA, and it is evidence-driven and
+escalation-only:
+
+- it escalates when a **destructive pattern matches the call's own arguments**, not because a
+  capability belongs to a risky class — so `allowProcessExecution` and `autoApproveWorkspaceWrites`
+  keep meaning exactly what the operator configured;
+- critical matches are denied, high matches require confirmation, and both thresholds are
+  configurable (`confirmAtOrAbove`, `denyAtOrAbove`);
+- consequential calls additionally pass the constitutional checker, which can deny or require review;
+- it can raise `allow` to `require_approval` and `require_approval` to `deny`, but it can never grant
+  authority another layer withheld, and a failing analyzer degrades to no escalation rather than an
+  open gate.
+
+Every decision lands in a durable enforcement trail with the matched rules and violated principles,
+summarized as an escalation rate per tenant. The whole layer is opt-out via
+`auroraGovernance.enabled: false`.
+
+Closing a session automatically runs candidate-only experience distillation, so the learning loop
+happens by default rather than by discipline.
+
+## Aurora operations: checkpoints, telemetry and governance
+
+A rollback plan written in prose is not a recovery path. `checkpoint.capture` takes a bounded,
+content-addressed snapshot of the session workspace: limited by file count, per-file size and total
+size, excluding dependency and build directories, confining every path to the workspace root and
+refusing symlinks. `checkpoint.restore` puts the workspace back exactly, takes an automatic safety
+checkpoint first so the rollback is itself reversible, verifies blob integrity before writing, and can
+remove files that were added after the snapshot. Content is deduplicated by digest and reclaimed only
+when no checkpoint still references it. An environment action can bind a checkpoint as its
+`rollbackCheckpointId`, and a recorded rollback names the checkpoint it restored.
+
+Aurora telemetry is content-free by construction: counts, rates and bounded scores across cognition,
+memory, world calibration, initiative trust, society, evolution, environment, decisions, plans,
+constitution, autopilot and ACOS. It is exposed as JSON and as Prometheus gauges on the existing
+`/metrics` scrape, and it is paired with derived alerts — degraded health, exhausted attention budget,
+world inconsistency, miscalibrated predictions, low proactive trust, verification debt, decision
+overconfidence, stalled plans, low constitutional compliance, failing autopilot.
+
+Data governance closes the loop that constitution rule C10 opens: `aurora.export` returns everything
+Aurora holds for a tenant or one user with per-section digests, and `aurora.purge.user` deletes a
+user's stored inferences — defaulting to a dry run and stating exactly which audit-grade records are
+retained rather than silently keeping them.
+
+`aurora.selfcheck` is the cross-store audit no single service can perform: dangling memory relations,
+broken thought anchors, focus without a reservation, attention-reservation drift, verification debt,
+high-zone actions that progressed without approval, decisions referencing a missing option or lacking a
+falsifiable expectation, plans completed with open steps, tasks assigned to removed roles, quarantine
+bypass, ungated production skills and damage to the constitutional hard floor. Critical findings
+degrade the next ACOS cycle instead of sitting in a dashboard nobody reads.
 
 ## Repository bootstrap
 

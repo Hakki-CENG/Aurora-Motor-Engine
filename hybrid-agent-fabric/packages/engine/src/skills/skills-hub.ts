@@ -25,6 +25,9 @@ export interface SkillHubEntry {
   sha256: string;
   tags: string[];
   trust: SkillHubSource["trust"];
+  /** Optional supply-chain metadata: an Ed25519 signature over the artefact digest, and its publisher. */
+  signature?: string;
+  publisherId?: string;
 }
 
 interface HubState {
@@ -66,6 +69,10 @@ export class SkillsHub {
   constructor(
     private readonly rootPath: string,
     private readonly registry: SkillRegistry,
+    /** Optional supply-chain gate. Absent means the previous behaviour: digest checking only. */
+    private readonly trustGate?: {
+      assertInstallable(input: { tenantId: string; kind: "skill"; artifactId: string; version: string; sha256: string; signature?: string; publisherId?: string }): Promise<unknown>;
+    },
   ) {}
 
   private get statePath(): string { return join(this.rootPath, "skills", ".hub", "state.json"); }
@@ -173,11 +180,24 @@ export class SkillsHub {
       .map(({ entry }) => structuredClone(entry));
   }
 
-  async install(input: { sourceId: string; name: string; version?: string }): Promise<SkillManifest> {
+  async install(input: { sourceId: string; name: string; version?: string; tenantId?: string }): Promise<SkillManifest> {
     await this.load();
     const candidates = this.state.entries.filter((entry) => entry.sourceId === input.sourceId && entry.name === input.name && (!input.version || entry.version === input.version));
     const entry = candidates.sort((a, b) => b.version.localeCompare(a.version))[0];
     if (!entry) throw new Error("Skill Hub entry not found.");
+    // Supply-chain trust is evaluated before a single byte is fetched: a refused artefact should not
+    // even be downloaded, let alone extracted.
+    if (this.trustGate) {
+      await this.trustGate.assertInstallable({
+        tenantId: input.tenantId ?? "local",
+        kind: "skill",
+        artifactId: `${entry.sourceId}:${entry.name}`,
+        version: entry.version,
+        sha256: entry.sha256,
+        ...(entry.signature ? { signature: entry.signature } : {}),
+        ...(entry.publisherId ? { publisherId: entry.publisherId } : {}),
+      });
+    }
     const downloadUrl = await assertSafeUrl(entry.bundleUrl);
     const bytes = await boundedDownload(downloadUrl, 10 * 1024 * 1024);
     const hash = createHash("sha256").update(bytes).digest("hex");

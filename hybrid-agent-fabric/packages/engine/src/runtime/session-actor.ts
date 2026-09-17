@@ -18,7 +18,9 @@ import type {
   TaskItem,
   TaskPriority,
   TaskStatus,
+  PromptCacheHint,
 } from "../types.js";
+import type { PromptCachePlanRecord } from "../prompt-cache/prompt-cache-service.js";
 import type { EventStore } from "../persistence/event-store.js";
 import type { SnapshotStore } from "../persistence/snapshot-store.js";
 import type { CapabilityBroker, CapabilityLifecycleEvent } from "../capabilities/capability-broker.js";
@@ -43,6 +45,13 @@ export interface SessionActorOptions {
   context: ContextManager;
   frozenContext: FrozenSessionContext;
   maxToolIterations?: number;
+  /** Per-session effort resolution: the tool-iteration ceiling and the reasoning effort to request. */
+  resolveEffort?: (tenantId: string, sessionId: string) => Promise<{ toolIterations: number; reasoningEffort: "low" | "medium" | "high" | "max" }>;
+  /**
+   * Optional prompt-cache planner: computes the breakpoint plan for the
+   * assembled system prompt and messages and records it as durable evidence.
+   */
+  resolvePromptCache?: (input: { tenantId: string; sessionId: string; systemPrompt: string; messages: AgentMessage[] }) => Promise<{ plan: PromptCachePlanRecord; hint?: PromptCacheHint | undefined } | undefined>;
   modelName?: string;
   modelFallbacks?: string[];
   claimSteeringMessages?: (sessionId: string) => Promise<AgentInboxMessage[]>;
@@ -604,7 +613,12 @@ export class SessionActor {
     let finalText = "";
     let finalAssistantTimestamp = userMessage.timestamp;
     let exhaustedToolIterations = true;
-    for (let iteration = 0; iteration < this.maxToolIterations; iteration++) {
+    // Effort is resolved once per turn: a mid-turn change must not move the ceiling under the loop.
+    const effort = this.options.resolveEffort
+      ? await this.options.resolveEffort(this.snapshot.tenantId, this.snapshot.sessionId).catch(() => undefined)
+      : undefined;
+    const toolIterationCeiling = effort?.toolIterations ?? this.maxToolIterations;
+    for (let iteration = 0; iteration < toolIterationCeiling; iteration++) {
       this.activeAbort.signal.throwIfAborted();
       await this.appendSteeringMessages(turnId, traceId);
       const availableCapabilities = this.availableCapabilities();
@@ -616,11 +630,21 @@ export class SessionActor {
       const selectedModel = this.snapshot.modelName ?? this.options.modelName;
       const fallbackModels = this.snapshot.modelFallbacks ?? this.options.modelFallbacks ?? [];
       const taskContext = this.activeTaskContext();
+      const systemPrompt = taskContext ? `${context.systemPrompt}\n\n${taskContext}` : context.systemPrompt;
+      const cachePlan = this.options.resolvePromptCache
+        ? await this.options.resolvePromptCache({
+            tenantId: this.snapshot.tenantId,
+            sessionId: this.snapshot.sessionId,
+            systemPrompt,
+            messages: context.messages,
+          }).catch(() => undefined)
+        : undefined;
       await this.emit("model.request.started", {
         iteration,
         model: selectedModel ?? "default",
         fallbackCount: fallbackModels.length,
         contextProjection: asJsonValue(context.projection),
+        ...(cachePlan ? { promptCache: asJsonValue(cachePlan.plan) } : {}),
       }, "audit", "metadata-only", turnId, traceId);
       let textOutput = "";
       const toolCalls: ToolCallContent[] = [];
@@ -632,10 +656,12 @@ export class SessionActor {
         turnId,
         ...(selectedModel ? { model: selectedModel } : {}),
         ...(fallbackModels.length ? { fallbackModels } : {}),
-        systemPrompt: taskContext ? `${context.systemPrompt}\n\n${taskContext}` : context.systemPrompt,
+        systemPrompt,
         messages: context.messages,
         workspacePath: this.snapshot.workspacePath,
         tools: availableCapabilities,
+        ...(effort ? { reasoningEffort: effort.reasoningEffort } : {}),
+        ...(cachePlan?.hint ? { promptCache: cachePlan.hint } : {}),
         signal: this.activeAbort.signal,
       })) {
         if (event.type === "text_delta") {
@@ -782,6 +808,7 @@ export class SessionActor {
           ...(this.snapshot.agentProfile?.allowedCapabilityIds
             ? { allowedCapabilityIds: [...this.snapshot.agentProfile.allowedCapabilityIds] }
             : {}),
+          ...(this.snapshot.agentProfile?.id ? { agentProfileId: this.snapshot.agentProfile.id } : {}),
           signal: this.activeAbort.signal,
           idempotencyKey: `${command.commandId}:${call.id}`,
         };
@@ -809,7 +836,7 @@ export class SessionActor {
     }
 
     if (exhaustedToolIterations) {
-      await this.emit("guardrail.tool_loop_limit", { maxIterations: this.maxToolIterations }, "user", "metadata-only", turnId, traceId);
+      await this.emit("guardrail.tool_loop_limit", { maxIterations: toolIterationCeiling, effort: effort ? effort.reasoningEffort : "default" }, "user", "metadata-only", turnId, traceId);
     }
     delete this.snapshot.activeTurnId;
     this.activeAbort = undefined;

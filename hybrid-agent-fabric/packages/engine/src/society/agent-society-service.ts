@@ -96,7 +96,35 @@ interface SocietyBudget {
   reservedTokens: number;
   maxConcurrentTasks: number;
 }
-interface SocietyState { schemaVersion: 1; roles: SocietyRole[]; tasks: SocietyTask[]; deliberations: SocietyDeliberation[]; budgets: SocietyBudget[] }
+/** Agent Communication Bus message: bounded, durable, role-addressed and retention-capped. */
+export interface SocietyMessage {
+  id: string;
+  tenantId: string;
+  fromRoleId: string;
+  audienceRoleIds: string[];
+  topic: string;
+  body: string;
+  taskId?: string;
+  deliberationId?: string;
+  importance: number;
+  acknowledgedBy: string[];
+  createdAt: string;
+}
+export interface SocietyAdvisory {
+  code: "stalled-task" | "unbid-task" | "failing-role" | "idle-role" | "budget-saturated" | "concurrency-starved" | "duplicate-task" | "loop-risk";
+  severity: "info" | "warning" | "critical";
+  subjectId?: string;
+  detail: string;
+  recommendation: string;
+}
+export interface SocietyMetaReport {
+  tenantId: string;
+  advisories: SocietyAdvisory[];
+  utilization: { openTasks: number; runningTasks: number; completedTasks: number; failedTasks: number; averageQuality: number };
+  budgetSaturation: number;
+  generatedAt: string;
+}
+interface SocietyState { schemaVersion: 1; roles: SocietyRole[]; tasks: SocietyTask[]; deliberations: SocietyDeliberation[]; budgets: SocietyBudget[]; messages: SocietyMessage[] }
 
 const BUILTIN_ROLES: Array<{ id: string; name: string; layer: SocietyLayer; purpose: string; tags: string[]; parent?: string }> = [
   { id: "aurora-prime", name: "Aurora Prime", layer: "prime", purpose: "Synthesize plans, priorities, reports and resource allocations without bypassing policy.", tags: ["coordination", "synthesis", "prioritization"] },
@@ -125,7 +153,7 @@ const BUILTIN_ROLES: Array<{ id: string; name: string; layer: SocietyLayer; purp
 ];
 
 export class AgentSocietyService {
-  private state: SocietyState = { schemaVersion: 1, roles: [], tasks: [], deliberations: [], budgets: [] };
+  private state: SocietyState = { schemaVersion: 1, roles: [], tasks: [], deliberations: [], budgets: [], messages: [] };
   private loaded = false;
   constructor(private readonly rootPath: string, private readonly supervisor: Supervisor, private readonly profiles: AgentProfileRegistry, private readonly events: EventStore) {}
 
@@ -196,6 +224,150 @@ export class AgentSocietyService {
   }
   async deliberations(tenantId: string): Promise<SocietyDeliberation[]> { await this.load(); return this.state.deliberations.filter((item) => item.tenantId === tenantId).map((item) => structuredClone(item)); }
 
+  /** Agent Communication Bus: a role publishes a bounded message to named peers or the whole society. */
+  async broadcast(input: { tenantId: string; fromRoleId: string; topic: string; body: string; audienceRoleIds?: string[]; taskId?: string; deliberationId?: string; importance?: number }): Promise<SocietyMessage> {
+    const from = await this.role(input.tenantId, input.fromRoleId);
+    if (from.status !== "active") throw new Error("Retired roles cannot publish to the communication bus.");
+    const audience = [...new Set(input.audienceRoleIds ?? [])].slice(0, 50);
+    for (const roleId of audience) await this.role(input.tenantId, roleId);
+    if (input.taskId) await this.task(input.tenantId, input.taskId);
+    if (input.deliberationId) await this.deliberation(input.tenantId, input.deliberationId);
+    const message: SocietyMessage = {
+      id: randomUUID(),
+      tenantId: input.tenantId,
+      fromRoleId: from.id,
+      audienceRoleIds: audience,
+      topic: bounded(input.topic, 200, "Society message topic"),
+      body: bounded(input.body, 20_000, "Society message body"),
+      ...(input.taskId ? { taskId: input.taskId } : {}),
+      ...(input.deliberationId ? { deliberationId: input.deliberationId } : {}),
+      importance: score(input.importance ?? 0.5, "Society message importance"),
+      acknowledgedBy: [],
+      createdAt: new Date(this.now()).toISOString(),
+    };
+    this.state.messages.push(message);
+    const tenantMessages = this.state.messages.filter((item) => item.tenantId === input.tenantId);
+    if (tenantMessages.length > 20_000) {
+      const drop = new Set(tenantMessages.sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(0, tenantMessages.length - 20_000).map((item) => item.id));
+      this.state.messages = this.state.messages.filter((item) => !drop.has(item.id));
+    }
+    await this.save();
+    return structuredClone(message);
+  }
+  /** Messages addressed to a role (or broadcast to everyone), newest first. */
+  async inbox(tenantId: string, roleId: string, options?: { unacknowledgedOnly?: boolean; limit?: number }): Promise<SocietyMessage[]> {
+    await this.role(tenantId, roleId);
+    const limit = integer(options?.limit ?? 100, 1, 1000, "Society inbox limit");
+    return this.state.messages
+      .filter((item) => item.tenantId === tenantId && (item.audienceRoleIds.length === 0 || item.audienceRoleIds.includes(roleId)) && item.fromRoleId !== roleId)
+      .filter((item) => !options?.unacknowledgedOnly || !item.acknowledgedBy.includes(roleId))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, limit)
+      .map((item) => structuredClone(item));
+  }
+  async acknowledgeMessage(tenantId: string, messageId: string, roleId: string): Promise<SocietyMessage> {
+    await this.role(tenantId, roleId);
+    const message = this.state.messages.find((item) => item.tenantId === tenantId && item.id === messageId);
+    if (!message) throw new Error("Society message not found in tenant.");
+    if (!message.acknowledgedBy.includes(roleId)) message.acknowledgedBy.push(roleId);
+    await this.save();
+    return structuredClone(message);
+  }
+
+  /**
+   * Meta-agent monitoring: stalled work, unbid tasks, failing or idle roles, duplicate objectives,
+   * budget saturation and concurrency starvation. It only advises; retirement stays an explicit call.
+   */
+  async metaMonitor(tenantId: string, options?: { stalledAfterMs?: number; idleAfterMs?: number }): Promise<SocietyMetaReport> {
+    await this.load(); await this.seed(tenantId);
+    const now = this.now();
+    const stalledAfterMs = integer(options?.stalledAfterMs ?? 6 * 60 * 60_000, 60_000, 30 * 24 * 60 * 60_000, "Stalled task window");
+    const idleAfterMs = integer(options?.idleAfterMs ?? 30 * 24 * 60 * 60_000, 60_000, 365 * 24 * 60 * 60_000, "Idle role window");
+    const tasks = this.state.tasks.filter((item) => item.tenantId === tenantId);
+    const roles = this.state.roles.filter((item) => item.tenantId === tenantId && item.status === "active");
+    const budget = await this.mutableBudget(tenantId);
+    const advisories: SocietyAdvisory[] = [];
+    for (const task of tasks.filter((item) => ["assigned", "running"].includes(item.status))) {
+      const overDeadline = task.deadline ? Date.parse(task.deadline) < now : false;
+      if (overDeadline || now - Date.parse(task.updatedAt) > stalledAfterMs) {
+        advisories.push({
+          code: "stalled-task",
+          severity: overDeadline ? "critical" : "warning",
+          subjectId: task.id,
+          detail: `Task "${task.title}" has been ${task.status} without progress${overDeadline ? " and is past its deadline" : ""}.`,
+          recommendation: "Re-plan, split the objective or record a failed outcome so the reservation is released.",
+        });
+      }
+    }
+    for (const task of tasks.filter((item) => item.status === "open" && !item.bids.length && now - Date.parse(item.createdAt) > stalledAfterMs)) {
+      advisories.push({
+        code: "unbid-task",
+        severity: "warning",
+        subjectId: task.id,
+        detail: `Task "${task.title}" received no bids; required tags: ${task.requiredCapabilityTags.join(", ") || "none"}.`,
+        recommendation: "Relax the required capability tags or create/bind a specialist role that covers them.",
+      });
+    }
+    const titles = new Map<string, string[]>();
+    for (const task of tasks.filter((item) => ["open", "assigned", "running"].includes(item.status))) {
+      const key = task.title.trim().toLowerCase();
+      titles.set(key, [...(titles.get(key) ?? []), task.id]);
+    }
+    for (const [title, ids] of titles) {
+      if (ids.length < 2) continue;
+      advisories.push({ code: "duplicate-task", severity: "info", subjectId: ids[0]!, detail: `${ids.length} active tasks share the objective "${title}".`, recommendation: "Merge duplicates to avoid parallel loops burning the same budget." });
+    }
+    for (const role of roles) {
+      const attempts = role.completedTasks + role.failedTasks;
+      if (attempts >= 3 && role.failedTasks / attempts > 0.5) {
+        advisories.push({ code: "failing-role", severity: "warning", subjectId: role.id, detail: `${role.name} failed ${role.failedTasks}/${attempts} tasks (reputation ${role.reputation}).`, recommendation: "Narrow its capability tags, bind a stronger profile, or retire the role." });
+      }
+      if (!role.builtin && attempts === 0 && now - Date.parse(role.createdAt) > idleAfterMs) {
+        advisories.push({ code: "idle-role", severity: "info", subjectId: role.id, detail: `${role.name} has never been awarded a task.`, recommendation: "Retire the role or give it distinguishing capability tags." });
+      }
+    }
+    const saturation = budget.dailyTokenBudget ? Number(((budget.usedTokens + budget.reservedTokens) / budget.dailyTokenBudget).toFixed(6)) : 0;
+    if (saturation >= 0.9) advisories.push({ code: "budget-saturated", severity: "critical", detail: `Society token budget is ${(saturation * 100).toFixed(1)}% consumed.`, recommendation: "Raise the daily budget deliberately or defer non-critical tasks to tomorrow." });
+    const running = tasks.filter((item) => ["assigned", "running"].includes(item.status)).length;
+    if (running >= budget.maxConcurrentTasks && tasks.some((item) => item.status === "open")) {
+      advisories.push({ code: "concurrency-starved", severity: "warning", detail: `Concurrency limit ${budget.maxConcurrentTasks} reached while open tasks are waiting.`, recommendation: "Complete or cancel running tasks before awarding more work." });
+    }
+    const completed = tasks.filter((item) => item.status === "completed");
+    return {
+      tenantId,
+      advisories,
+      utilization: {
+        openTasks: tasks.filter((item) => item.status === "open").length,
+        runningTasks: running,
+        completedTasks: completed.length,
+        failedTasks: tasks.filter((item) => item.status === "failed").length,
+        averageQuality: completed.length ? Number((completed.reduce((sum, item) => sum + (item.quality ?? 0), 0) / completed.length).toFixed(6)) : 0,
+      },
+      budgetSaturation: saturation,
+      generatedAt: new Date(now).toISOString(),
+    };
+  }
+
+  /** Evidence-bound lifecycle governance: retire non-builtin roles that keep failing. */
+  async retireUnderperformers(tenantId: string, options?: { minAttempts?: number; maxFailureRate?: number }): Promise<Array<{ roleId: string; reason: string }>> {
+    await this.load(); await this.seed(tenantId);
+    const minAttempts = integer(options?.minAttempts ?? 5, 1, 1000, "Minimum attempts");
+    const maxFailureRate = score(options?.maxFailureRate ?? 0.6, "Maximum failure rate");
+    const retired: Array<{ roleId: string; reason: string }> = [];
+    for (const role of this.state.roles.filter((item) => item.tenantId === tenantId && item.status === "active" && !item.builtin)) {
+      const attempts = role.completedTasks + role.failedTasks;
+      if (attempts < minAttempts) continue;
+      const failureRate = role.failedTasks / attempts;
+      if (failureRate <= maxFailureRate) continue;
+      if (this.state.tasks.some((item) => item.tenantId === tenantId && item.assignedRoleId === role.id && ["assigned", "running"].includes(item.status))) continue;
+      role.status = "retired";
+      role.updatedAt = new Date(this.now()).toISOString();
+      retired.push({ roleId: role.id, reason: `Failure rate ${failureRate.toFixed(2)} over ${attempts} evidence-bound outcomes.` });
+    }
+    if (retired.length) await this.save();
+    return retired;
+  }
+
   private now(): number { return Date.now(); }
   private async seed(tenantId: string): Promise<void> { if (this.state.roles.some((item) => item.tenantId === tenantId && item.builtin)) return; const now = new Date().toISOString(); for (const role of BUILTIN_ROLES) this.state.roles.push({ id: role.id, tenantId, name: role.name, layer: role.layer, purpose: role.purpose, capabilityTags: role.tags, ...(role.parent ? { parentRoleId: role.parent } : {}), builtin: true, status: "active", reputation: 0.5, completedTasks: 0, failedTasks: 0, createdAt: now, updatedAt: now }); await this.save(); }
   private async role(tenantId: string, id: string): Promise<SocietyRole> { await this.load(); await this.seed(tenantId); const role = this.state.roles.find((item) => item.tenantId === tenantId && item.id === id); if (!role) throw new Error("Society role not found in tenant."); return role; }
@@ -204,7 +376,7 @@ export class AgentSocietyService {
   private async mutableBudget(tenantId: string): Promise<SocietyBudget> { await this.load(); let value = this.state.budgets.find((item) => item.tenantId === tenantId); if (!value) { await this.configureBudget(tenantId, 1_000_000, 8); value = this.state.budgets.find((item) => item.tenantId === tenantId)!; } this.rollBudget(value); return value; }
   private rollBudget(value: SocietyBudget): void { const current = day(this.now()); if (value.date !== current) { value.date = current; value.usedTokens = 0; value.reservedTokens = 0; } }
   private get path(): string { return join(this.rootPath, "society", "state.json"); }
-  private async load(): Promise<void> { if (this.loaded) return; try { const raw = await readFile(this.path, "utf8"); if (Buffer.byteLength(raw) > MAX_STATE_BYTES) throw new Error("Society state exceeds its safety bound."); const parsed = JSON.parse(raw) as SocietyState; if (parsed.schemaVersion !== 1 || !Array.isArray(parsed.roles) || !Array.isArray(parsed.tasks) || !Array.isArray(parsed.deliberations) || !Array.isArray(parsed.budgets)) throw new Error("Society state is malformed."); this.state = parsed; } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; } this.loaded = true; }
+  private async load(): Promise<void> { if (this.loaded) return; try { const raw = await readFile(this.path, "utf8"); if (Buffer.byteLength(raw) > MAX_STATE_BYTES) throw new Error("Society state exceeds its safety bound."); const parsed = JSON.parse(raw) as SocietyState; if (parsed.schemaVersion !== 1 || !Array.isArray(parsed.roles) || !Array.isArray(parsed.tasks) || !Array.isArray(parsed.deliberations) || !Array.isArray(parsed.budgets)) throw new Error("Society state is malformed."); if (!Array.isArray(parsed.messages)) parsed.messages = []; this.state = parsed; } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; } this.loaded = true; }
   private async save(): Promise<void> { const encoded = `${JSON.stringify(this.state, null, 2)}\n`; if (Buffer.byteLength(encoded) > MAX_STATE_BYTES) throw new Error("Society state exceeds its safety bound."); await atomicWrite(this.path, encoded); }
 }
 

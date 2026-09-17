@@ -5,7 +5,8 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { CapabilityBroker } from "../capabilities/capability-broker.js";
 import type { ContextManager } from "../context/context-manager.js";
-import type { ModelProvider } from "../types.js";
+import type { AgentMessage, ModelProvider, PromptCacheHint } from "../types.js";
+import type { PromptCachePlanRecord } from "../prompt-cache/prompt-cache-service.js";
 import type {
   AgentInboxMessage,
   AgentMessageDeliveryMode,
@@ -51,6 +52,20 @@ export interface CreateSessionInput {
   skipParentLink?: boolean;
 }
 
+export interface AgentDirectoryEntry {
+  sessionId: string;
+  name: string;
+  familyId: string;
+  status: SessionSnapshot["status"];
+  busy: boolean;
+  resident: boolean;
+  depth: number;
+  updatedAt: string;
+  createdAt: string;
+  /** False when another live agent in the tenant answers to the same name; address those by id. */
+  nameIsUnique: boolean;
+}
+
 export interface AgentFamilyRosterEntry {
   sessionId: string;
   name: string;
@@ -58,6 +73,40 @@ export interface AgentFamilyRosterEntry {
   status: SessionSnapshot["status"];
   generation: number;
 }
+
+/**
+ * Fan-out limits for child agents.
+ *
+ * A single instruction can otherwise turn into an unbounded tree: every child is free to spawn its
+ * own children, and nothing counts how many are alive at once. Peers hit this and added exactly three
+ * dials, with a notable default - a subagent does *not* spawn subagents unless an operator says so.
+ */
+export interface AgentFanoutLimits {
+  /** Live children one session may hold at once. */
+  maxConcurrentChildren?: number;
+  /** How deep the tree may go. 1 means a root session may spawn children, and those children may not. */
+  maxDepth?: number;
+  /** Children one session may spawn over its whole life, live or finished. 0 disables the cap. */
+  maxLifetimeChildren?: number;
+}
+
+export interface AgentFanoutStatus {
+  sessionId: string;
+  depth: number;
+  liveChildren: number;
+  lifetimeChildren: number;
+  limits: Required<AgentFanoutLimits>;
+  canSpawn: boolean;
+  reason?: string;
+}
+
+const DEFAULT_FANOUT: Required<AgentFanoutLimits> = {
+  maxConcurrentChildren: 20,
+  // Nested spawning is off by default: it is the difference between "delegate this" and an
+  // exponential tree nobody asked for. An operator who wants deeper trees can say so.
+  maxDepth: 1,
+  maxLifetimeChildren: 200,
+};
 
 export interface SupervisorOptions {
   dataRoot: string;
@@ -74,9 +123,14 @@ export interface SupervisorOptions {
   model: ModelProvider;
   capabilities: CapabilityBroker;
   context: ContextManager;
+  /** Optional per-session effort resolution, consulted once per turn. */
+  resolveEffort?: (tenantId: string, sessionId: string) => Promise<{ toolIterations: number; reasoningEffort: "low" | "medium" | "high" | "max" }>;
+  /** Optional prompt-cache planner forwarded to every actor. */
+  resolvePromptCache?: (input: { tenantId: string; sessionId: string; systemPrompt: string; messages: AgentMessage[] }) => Promise<{ plan: PromptCachePlanRecord; hint?: PromptCacheHint | undefined } | undefined>;
   modelName?: string;
   modelFallbacks?: string[];
   onSessionClose?: (sessionId: string) => Promise<void>;
+  fanout?: AgentFanoutLimits;
 }
 
 export class Supervisor {
@@ -91,8 +145,14 @@ export class Supervisor {
   private readonly inboxDrains = new Set<string>();
   private readonly messageRate = new Map<string, { tokens: number; updatedAt: number }>();
   private readonly deliveryWaiters = new Map<string, { resolve: (message: AgentInboxMessage) => void; reject: (error: Error) => void }>();
+  private readonly fanout: Required<AgentFanoutLimits>;
 
   constructor(private readonly options: SupervisorOptions) {
+    this.fanout = {
+      maxConcurrentChildren: Math.max(0, Math.floor(options.fanout?.maxConcurrentChildren ?? DEFAULT_FANOUT.maxConcurrentChildren)),
+      maxDepth: Math.max(0, Math.floor(options.fanout?.maxDepth ?? DEFAULT_FANOUT.maxDepth)),
+      maxLifetimeChildren: Math.max(0, Math.floor(options.fanout?.maxLifetimeChildren ?? DEFAULT_FANOUT.maxLifetimeChildren)),
+    };
     this.leases = options.leaseManager ?? new SessionLeaseManager(options.dataRoot);
     this.agentInbox = options.agentInbox ?? new FileAgentInboxStore(options.dataRoot);
     this.capabilityUnsubscribe = options.capabilities.subscribe(async (event) => {
@@ -159,6 +219,52 @@ export class Supervisor {
     return actor.state;
   }
 
+  /** How deep a session sits under its family root. A root session is depth 0. */
+  private depthOf(sessionId: string): number {
+    let depth = 0;
+    let current = this.catalog.find((item) => item.sessionId === sessionId);
+    const seen = new Set<string>();
+    while (current?.parentSessionId && !seen.has(current.sessionId)) {
+      seen.add(current.sessionId);
+      depth++;
+      current = this.catalog.find((item) => item.sessionId === current!.parentSessionId);
+    }
+    return depth;
+  }
+
+  /** What a session's fan-out budget looks like right now, and whether it may spawn at all. */
+  async fanoutStatus(sessionId: string): Promise<AgentFanoutStatus> {
+    await this.loadCatalog();
+    if (!this.catalog.some((item) => item.sessionId === sessionId)) throw new Error(`Session ${sessionId} does not exist.`);
+    const children = this.catalog.filter((item) => item.parentSessionId === sessionId);
+    let live = 0;
+    for (const child of children) {
+      const active = this.actors.get(child.sessionId)?.state;
+      const persisted = active ?? await this.options.snapshotStore.load(child.sessionId);
+      if (persisted && persisted.status !== "closed") live++;
+    }
+    const depth = this.depthOf(sessionId);
+    const status: AgentFanoutStatus = {
+      sessionId,
+      depth,
+      liveChildren: live,
+      lifetimeChildren: children.length,
+      limits: { ...this.fanout },
+      canSpawn: true,
+    };
+    if (depth >= this.fanout.maxDepth) {
+      status.canSpawn = false;
+      status.reason = `Nesting depth ${depth} is at the limit of ${this.fanout.maxDepth}; this agent may not spawn its own agents.`;
+    } else if (live >= this.fanout.maxConcurrentChildren) {
+      status.canSpawn = false;
+      status.reason = `${live} child agent(s) are already live, at the concurrency limit of ${this.fanout.maxConcurrentChildren}.`;
+    } else if (this.fanout.maxLifetimeChildren > 0 && children.length >= this.fanout.maxLifetimeChildren) {
+      status.canSpawn = false;
+      status.reason = `This session has spawned ${children.length} agent(s), at its lifetime limit of ${this.fanout.maxLifetimeChildren}.`;
+    }
+    return status;
+  }
+
   async spawnChild(input: {
     parentSessionId: string;
     name?: string;
@@ -166,8 +272,19 @@ export class Supervisor {
     source?: CommandEnvelope["source"];
     insideParentTurn?: boolean;
     agentProfile?: SessionAgentProfile;
+    /**
+     * Start the child from the parent's own conversation instead of an empty one. A number carries
+     * that many trailing messages; `true` carries a bounded default. Delegation stops meaning
+     * "re-explain everything you already know" - but the transcript is *copied*, never shared, so the
+     * child cannot rewrite the parent's history.
+     */
+    inheritConversation?: boolean | number;
   }): Promise<SessionSnapshot> {
     const parent = await this.getActor(input.parentSessionId);
+    // Checked before any workspace is created: refusing after a git worktree exists leaves litter,
+    // and the refusal has to name which limit stopped it so an operator can raise the right one.
+    const fanout = await this.fanoutStatus(input.parentSessionId);
+    if (!fanout.canSpawn) throw new Error(fanout.reason ?? "Fan-out limit reached.");
     const childId = randomUUID();
     const childWorkspace = join(this.options.workspaceRoot, childId);
     await mkdir(childWorkspace, { recursive: true });
@@ -188,6 +305,12 @@ export class Supervisor {
         // Empty workspace remains a safe isolation fallback.
       }
     }
+    const inheritCount = input.inheritConversation === true
+      ? 40
+      : typeof input.inheritConversation === "number" ? Math.min(200, Math.max(1, Math.floor(input.inheritConversation))) : 0;
+    const inherited = inheritCount > 0
+      ? structuredClone(parent.state.messages.filter((message) => message.role !== "system").slice(-inheritCount))
+      : undefined;
     const child = await this.createSession({
       tenantId: parent.state.tenantId,
       name: input.name ?? `child-${childId.slice(0, 8)}`,
@@ -196,6 +319,7 @@ export class Supervisor {
       parentSessionId: parent.state.sessionId,
       ...((input.agentProfile ?? parent.state.agentProfile) ? { agentProfile: input.agentProfile ?? parent.state.agentProfile } : {}),
       ...(input.insideParentTurn ? { skipParentLink: true } : {}),
+      ...(inherited?.length ? { initialMessages: inherited } : {}),
     });
     if (input.insideParentTurn) await parent.linkChildFromCapability(child.sessionId);
     queueMicrotask(() => {
@@ -208,7 +332,7 @@ export class Supervisor {
         kind: "session.prompt",
         source: input.source ?? "agent",
         issuedAt: new Date().toISOString(),
-        payload: { text: input.task, isolation },
+        payload: { text: input.task, isolation, ...(inherited?.length ? { inheritedMessages: inherited.length } : {}) },
       });
     });
     return child;
@@ -311,7 +435,7 @@ export class Supervisor {
         generation: persisted.generation,
       });
     }
-    const order: Record<AgentMessageRelationship, number> = { parent: 0, sibling: 1, child: 2 };
+    const order: Record<AgentMessageRelationship, number> = { parent: 0, sibling: 1, child: 2, external: 3 };
     return entries.sort((left, right) => order[left.relationship] - order[right.relationship] || left.name.localeCompare(right.name));
   }
 
@@ -387,6 +511,17 @@ export class Supervisor {
     if (sender.status === "closed") throw new Error("Closed agents cannot send messages.");
     this.consumeAgentMessageRate(input.senderSessionId);
     const targets = await this.resolveMessageTargets(input);
+    return await this.deliverAgentMessages({ sender, targets, requestedMode: input.mode ?? "auto", text });
+  }
+
+  /** Shared delivery path for family and directed messages: one set of limits, one set of receipts. */
+  private async deliverAgentMessages(input: {
+    sender: SessionSnapshot;
+    targets: AgentFamilyRosterEntry[];
+    requestedMode: AgentMessageDeliveryMode;
+    text: string;
+  }): Promise<{ receipts: AgentMessageReceipt[] }> {
+    const { sender, targets, requestedMode, text } = input;
     const maxPending = this.options.agentMessageMaxPending ?? 20;
     for (const target of targets) {
       if (await this.agentInbox.pendingCount(target.sessionId) >= maxPending) {
@@ -394,7 +529,6 @@ export class Supervisor {
       }
     }
 
-    const requestedMode = input.mode ?? "auto";
     const records: AgentInboxMessage[] = [];
     for (const target of targets) {
       const busy = !["idle", "ready"].includes(target.status);
@@ -406,7 +540,7 @@ export class Supervisor {
         senderName: sender.name,
         targetSessionId: target.sessionId,
         targetName: target.name,
-        relationship: target.relationship === "parent" ? "child" : target.relationship === "child" ? "parent" : "sibling",
+        relationship: target.relationship === "parent" ? "child" : target.relationship === "child" ? "parent" : target.relationship === "external" ? "external" : "sibling",
         requestedMode,
         effectiveMode,
         text,
@@ -434,6 +568,96 @@ export class Supervisor {
     }
     const current = await Promise.all(records.map(async (record) => await this.agentInbox.get(record.id, record.targetSessionId) ?? record));
     return { receipts: current.map((record) => this.receipt(record)) };
+  }
+
+  /**
+   * Every agent in the tenant, family or not, with the facts a sender needs before choosing one:
+   * whether the name is unique, whether it is reachable by kinship, and whether it is still alive.
+   *
+   * A directory is not a grant. Being listed here says the agent exists, not that anyone may message
+   * it - crossing a family boundary is a separate, governed act.
+   */
+  async directory(tenantId: string, filter: { query?: string; includeClosed?: boolean; limit?: number } = {}): Promise<AgentDirectoryEntry[]> {
+    await this.loadCatalog();
+    const source = filter.query?.trim().toLowerCase();
+    const entries: AgentDirectoryEntry[] = [];
+    const nameCounts = new Map<string, number>();
+    for (const record of this.catalog) {
+      if (record.tenantId !== tenantId) continue;
+      if (source && !record.name.toLowerCase().includes(source) && !record.sessionId.startsWith(source)) continue;
+      const active = this.actors.get(record.sessionId)?.state;
+      const snapshot = active ?? await this.options.snapshotStore.load(record.sessionId);
+      if (!snapshot) continue;
+      if (!filter.includeClosed && snapshot.status === "closed") continue;
+      nameCounts.set(record.name, (nameCounts.get(record.name) ?? 0) + 1);
+      entries.push({
+        sessionId: record.sessionId,
+        name: record.name,
+        familyId: record.familyId,
+        status: snapshot.status,
+        busy: Boolean(snapshot.activeTurnId),
+        // "Loaded" means the actor is resident here; a session known only from disk is reachable but cold.
+        resident: Boolean(active),
+        depth: this.depthOf(record.sessionId),
+        updatedAt: snapshot.updatedAt,
+        nameIsUnique: true,
+        createdAt: record.createdAt,
+      });
+    }
+    for (const entry of entries) entry.nameIsUnique = (nameCounts.get(entry.name) ?? 0) === 1;
+    return entries
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .slice(0, Math.min(Math.max(1, Math.floor(filter.limit ?? 100)), 500));
+  }
+
+  /**
+   * Message a same-tenant agent outside family reach, addressed by session id or by unique name.
+   *
+   * The refusals are the design. A tenant boundary is never crossed. A name that matches two live
+   * agents is ambiguous and is refused rather than guessed at - "I sent it to the other one called
+   * builder" is not an acceptable outcome. Everything else - rate limit, pending-inbox cap, delivery
+   * receipts, uncertain-delivery handling - is the machinery family messages already use, because a
+   * second delivery path would be a second thing to get wrong.
+   */
+  async sendDirectedMessage(input: {
+    senderSessionId: string;
+    message: string;
+    targetSessionId?: string;
+    targetName?: string;
+    mode?: AgentMessageDeliveryMode;
+  }): Promise<{ receipts: AgentMessageReceipt[] }> {
+    const text = input.message.trim();
+    const maxChars = this.options.agentMessageMaxChars ?? 16_384;
+    if (!text || text.length > maxChars) throw new Error(`Agent message must contain 1 to ${maxChars} characters.`);
+    const sender = await this.getSession(input.senderSessionId);
+    if (sender.status === "closed") throw new Error("Closed agents cannot send messages.");
+    if (!input.targetSessionId && !input.targetName?.trim()) throw new Error("A targetSessionId or targetName is required.");
+
+    const directory = await this.directory(sender.tenantId, {});
+    const candidates = input.targetSessionId
+      ? directory.filter((entry) => entry.sessionId === input.targetSessionId)
+      : directory.filter((entry) => entry.name === input.targetName!.trim());
+    if (candidates.length === 0) throw new Error("No live agent in this tenant matches that id or name.");
+    if (candidates.length > 1) throw new Error(`The name ${JSON.stringify(input.targetName)} matches ${candidates.length} live agents; address it by session id.`);
+    const target = candidates[0]!;
+    if (target.sessionId === sender.sessionId) throw new Error("An agent cannot message itself.");
+
+    this.consumeAgentMessageRate(input.senderSessionId);
+    const roster = await this.familyRoster(sender.sessionId);
+    const kinship = roster.find((entry) => entry.sessionId === target.sessionId)?.relationship;
+    return await this.deliverAgentMessages({
+      sender,
+      targets: [{
+        sessionId: target.sessionId,
+        name: target.name,
+        status: target.status,
+        generation: 0,
+        // Kinship is reported when it exists, so a receipt never claims a family tie that is not there.
+        relationship: kinship ?? "external",
+      }],
+      requestedMode: input.mode ?? "auto",
+      text,
+    });
   }
 
   async listAgentInbox(sessionId: string, states?: AgentInboxMessage["state"][]): Promise<AgentInboxMessage[]> {
@@ -588,7 +812,7 @@ export class Supervisor {
   }
 
   private async buildActor(snapshot: SessionSnapshot, _recovered: boolean): Promise<SessionActor> {
-    const frozenContext = await this.options.context.freeze(snapshot.tenantId, snapshot.sessionId, snapshot.agentProfile);
+    const frozenContext = await this.options.context.freeze(snapshot.tenantId, snapshot.sessionId, snapshot.agentProfile, snapshot.workspacePath);
     return new SessionActor({
       snapshot,
       eventStore: this.options.eventStore,
@@ -599,6 +823,8 @@ export class Supervisor {
       frozenContext,
       ...(this.options.modelName ? { modelName: this.options.modelName } : {}),
       ...(this.options.modelFallbacks?.length ? { modelFallbacks: this.options.modelFallbacks } : {}),
+      ...(this.options.resolveEffort ? { resolveEffort: this.options.resolveEffort } : {}),
+      ...(this.options.resolvePromptCache ? { resolvePromptCache: this.options.resolvePromptCache } : {}),
       claimSteeringMessages: async (sessionId) => await this.claimSteeringMessages(sessionId),
       markInboxDelivered: async (message, deliveredAt) => await this.markInboxDelivered(message, deliveredAt),
       markInboxUncertain: async (message, reason) => await this.markInboxUncertain(message, reason),

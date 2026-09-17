@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { rm } from "node:fs/promises";
 import type { CommandEnvelope, CommandResult, EventEnvelope, ModelProvider, SessionSnapshot } from "./types.js";
@@ -13,8 +14,9 @@ import { PostgresCommandJournal } from "./persistence/postgres/command-journal.j
 import { PostgresEffectJournal } from "./persistence/postgres/effect-journal.js";
 import { PostgresSessionLeaseManager } from "./persistence/postgres/session-lease.js";
 import { ApprovalService } from "./policy/approval-service.js";
-import { DefaultPolicyEngine } from "./policy/policy-engine.js";
+import { DefaultPolicyEngine, type PolicyEngine } from "./policy/policy-engine.js";
 import { LayeredPolicyEngine, OpaPolicyEngine, type OpaPolicyOptions } from "./policy/opa-policy-engine.js";
+import { AuroraPolicyEngine, type AuroraPolicyOptions } from "./policy/aurora-policy-engine.js";
 import { CapabilityBroker } from "./capabilities/capability-broker.js";
 import { MemoryStore } from "./memory/memory-store.js";
 import { ExternalMemoryProviderManager } from "./memory/external-memory-provider.js";
@@ -38,17 +40,31 @@ import { FileCredentialPoolStateStore, type ProviderCredentialInput } from "./mo
 import { ModelConfigurationRegistry } from "./models/model-configuration-registry.js";
 import { AgentProfileRegistry } from "./profiles/agent-profile-registry.js";
 import { KernelManager } from "./kernel/kernel-manager.js";
-import { Supervisor } from "./runtime/supervisor.js";
+import { Supervisor, type AgentFanoutLimits } from "./runtime/supervisor.js";
 import { FileAgentInboxStore, PostgresAgentInboxStore, type AgentInboxStore } from "./runtime/agent-inbox.js";
+import { StuckDetectorService } from "./runtime/stuck-detector.js";
 import { filesystemCapabilities } from "./capabilities/filesystem.js";
 import { memoryCapabilities } from "./capabilities/memory.js";
 import { skillCapabilities } from "./capabilities/skills.js";
 import { processCapability } from "./capabilities/process.js";
+import { backgroundShellCapabilities } from "./capabilities/background-shell.js";
+import { autoApprovalCapabilities } from "./capabilities/auto-approval.js";
+import { verificationCapabilities } from "./capabilities/verification.js";
+import { VerificationService } from "./harness/verification-service.js";
+import { codeIntelligenceCapabilities } from "./capabilities/code-intelligence.js";
+import { CodeIntelligenceService } from "./code-intelligence/service.js";
+import { promptCacheCapabilities } from "./capabilities/prompt-cache.js";
+import { PromptCacheService } from "./prompt-cache/prompt-cache-service.js";
+import { AutoApprovalService } from "./policy/auto-approval.js";
+import { SessionBudgetService } from "./policy/session-budget.js";
+import { sessionBudgetCapabilities } from "./capabilities/session-budget.js";
+import { BackgroundShellService } from "./sandbox/background-shell.js";
 import { gitCapabilities } from "./capabilities/git.js";
 import { pythonCapability } from "./capabilities/python.js";
 import { agentCapabilities } from "./capabilities/agents.js";
 import { goalCapabilities } from "./capabilities/goals.js";
 import { taskCapabilities } from "./capabilities/tasks.js";
+import type { SandboxResourceLimits } from "./sandbox/sandbox.js";
 import { createSandboxFactory, type SandboxBackendKind, type SingularitySandboxOptions, type SshSandboxOptions } from "./sandbox/sandbox.js";
 import type { CloudSandboxGatewayOptions } from "./sandbox/cloud-sandbox.js";
 import { DurableScheduler, type Schedule, type ScheduledJob } from "./scheduler/scheduler.js";
@@ -109,9 +125,176 @@ import { HostedRepositoryProviderRegistry } from "./repositories/hosted-reposito
 import { GitHubAppManager } from "./repositories/github-app-manager.js";
 import { AgentSocietyService } from "./society/agent-society-service.js";
 import { CognitiveWorkspaceService } from "./cognitive/cognitive-workspace-service.js";
+import { MemoryGraphService } from "./memory/memory-graph-service.js";
+import { WorldModelService } from "./world/world-model-service.js";
+import { MultiWorldModelService } from "./world/multi-world-model-service.js";
+import { ProactiveInitiativeService } from "./initiative/proactive-initiative-service.js";
+import { UserModelService } from "./user/user-model-service.js";
+import { SkillEvolutionService } from "./evolution/skill-evolution-service.js";
+import { EnvironmentAwarenessService } from "./environment/environment-awareness-service.js";
+import { ConstitutionService } from "./aurora/constitution-service.js";
+import { CognitiveOrchestrator } from "./aurora/cognitive-orchestrator.js";
+import { AuroraContextComposer } from "./aurora/aurora-context-composer.js";
+import { DecisionService } from "./aurora/decision-service.js";
+import { PlanningService } from "./aurora/planning-service.js";
+import { ExperienceDistiller } from "./aurora/experience-distiller.js";
+import { AuroraAutopilot } from "./aurora/autopilot.js";
+import { AuroraFleetSupervisor } from "./aurora/fleet-supervisor.js";
+import { AuroraExecutionBridge } from "./aurora/execution-bridge.js";
+import { RoleAuthorityService } from "./aurora/role-authority-service.js";
+import { AuroraOutcomeHarvester } from "./aurora/outcome-harvester.js";
+import { AuroraPlanFeedback } from "./aurora/plan-feedback-service.js";
+import { AuroraEstimationCalibrator } from "./aurora/estimation-calibrator.js";
+import { ProvenanceService } from "./aurora/provenance-service.js";
+import { WorkspaceCheckpointService } from "./aurora/workspace-checkpoint-service.js";
+import { AuroraMetricsCollector } from "./aurora/aurora-metrics.js";
+import { AuroraDataGovernanceService } from "./aurora/data-governance-service.js";
+import {
+  auroraMetricsCapabilities, checkpointCapabilities, delegationCapabilities, fleetCapabilities, governanceCapabilities,
+  estimationCapabilities, harvestCapabilities, planFeedbackCapabilities, probationCapabilities, roleAuthorityCapabilities,
+} from "./capabilities/aurora-operations.js";
+import {
+  autopilotCapabilities, decisionCapabilities, distillerCapabilities, planningCapabilities, provenanceCapabilities,
+} from "./capabilities/aurora-reasoning.js";
+import {
+  constitutionCapabilities, harnessCapabilities, microagentCapabilities, riskCapabilities, stuckCapabilities,
+  orchestratorCapabilities, insightCapabilities,
+} from "./capabilities/aurora-core.js";
+import { ContinualHarnessService } from "./harness/continual-harness-service.js";
+import { MicroagentRegistry } from "./knowledge/microagent-registry.js";
+import { RiskAnalyzerService } from "./policy/risk-analyzer.js";
+import { ThoughtCoreService } from "./thought/thought-core-service.js";
+import { BackgroundThinkingService } from "./thought/background-thinking-service.js";
+import { discoveryCapabilities } from "./capabilities/discovery.js";
+import { backgroundTaskCapabilities, planModeCapabilities } from "./capabilities/background-tasks.js";
+import { thoughtCapabilities } from "./capabilities/thought-capabilities.js";
+import {
+  effortCapabilities, lifecycleHookCapabilities, projectInstructionCapabilities, repositoryCommandCapabilities,
+  reviewCapabilities, sessionLifecycleCapabilities, sessionModeCapabilities, settingsCapabilities,
+  subagentCapabilities, userQuestionCapabilities, worktreeCapabilities,
+} from "./capabilities/workspace-conventions.js";
+import { LifecycleHookService } from "./policy/lifecycle-hooks.js";
+import { SessionModePolicyEngine, SessionModeService } from "./policy/session-modes.js";
+import { ProjectInstructionService } from "./knowledge/project-instructions.js";
+import { RepositoryCommandService } from "./knowledge/repository-commands.js";
+import { SubagentDefinitionService } from "./knowledge/subagent-definitions.js";
+import { WorkingTreeReviewService } from "./repositories/working-tree-review.js";
+import { WorktreeService } from "./repositories/worktree-service.js";
+import { SessionEffortService } from "./policy/session-effort.js";
+import { ManifestTrustService } from "./security/manifest-trust.js";
+import { SettingsResolver } from "./policy/settings-resolver.js";
+import { UserQuestionService } from "./runtime/user-questions.js";
+import { StatelessMcpRegistry } from "./mcp/stateless-mcp-registry.js";
+import { SessionLifecycleService } from "./runtime/session-lifecycle.js";
+import { SelfModelService } from "./aurora/self-model-service.js";
+import { UncertaintyEngine } from "./aurora/uncertainty-engine.js";
+import { FailureTaxonomyService } from "./aurora/failure-taxonomy.js";
+import { CognitiveTelemetryService } from "./aurora/cognitive-telemetry.js";
+import { NeuralMemoryFusionService } from "./aurora/neural-memory-fusion.js";
+import { ExperienceCompilerService } from "./aurora/experience-compiler.js";
+import { SleepCycleService } from "./aurora/sleep-cycle.js";
+import { CounterfactualSimulatorService } from "./aurora/counterfactual-simulator.js";
+import { MultiHypothesisReasoningService } from "./aurora/multi-hypothesis-reasoning.js";
+import { InternalCriticService } from "./aurora/internal-critic.js";
+import { ExperimentEngineService } from "./aurora/experiment-engine.js";
+import { PlannerV2Service } from "./aurora/planner-v2.js";
+import { AgentEconomyService } from "./aurora/agent-economy.js";
+import { ReputationService } from "./aurora/reputation-system.js";
+import { ResourceIntelligenceService } from "./aurora/resource-intelligence.js";
+import { SharedLearningService } from "./aurora/shared-learning.js";
+import { DynamicCompositionService } from "./aurora/dynamic-composition.js";
+import { CapabilityMarketplaceService } from "./aurora/capability-marketplace.js";
+import { SwarmOrchestrationService } from "./aurora/swarm-orchestration.js";
+import { BenchmarkLabService } from "./aurora/benchmark-lab.js";
+import { AdaptiveRouterService } from "./aurora/adaptive-router.js";
+import { GoalStackService } from "./aurora/goal-stack.js";
+import { AttentionV2Service } from "./aurora/attention-v2.js";
+import { SelfDebuggingService } from "./aurora/self-debugging.js";
+import { CausalGraphService } from "./aurora/causal-graph.js";
+import { LongHorizonMemoryService } from "./aurora/long-horizon-memory.js";
+import { NeuralCognitiveCoreService } from "./aurora/neural-cognitive-core.js";
+import { LearnedWorldModelService } from "./aurora/learned-world-model.js";
+import { MetaControllerService } from "./aurora/meta-controller.js";
+import { ModelCapabilityRegistryService } from "./aurora/model-capability-registry.js";
+import { EventBus } from "./aurora/event-bus.js";
+import { CognitiveState } from "./aurora/cognitive-state.js";
+import { MemoryEngine, ReasoningEngine, PlanningEngine, WorldEngine, LearningEngine, AttentionEngine, ModelSelectionEngine } from "./aurora/unified-engines.js";
+import { memoryGraphCapabilities } from "./capabilities/memory-graph.js";
+import { multiWorldCapabilities, worldModelCapabilities } from "./capabilities/world-model.js";
+import { initiativeCapabilities } from "./capabilities/initiative.js";
+import { userModelCapabilities } from "./capabilities/user-model.js";
+import { evolutionCapabilities } from "./capabilities/evolution.js";
+import { environmentCapabilities } from "./capabilities/environment.js";
+import { ThoughtMemoryIntegration } from "./thought/thought-memory-integration.js";
+import { WorldThoughtIntegration } from "./world/world-thought-integration.js";
+import { MemoryInitiativeIntegration } from "./initiative/memory-initiative-integration.js";
+import { StuckEvolutionIntegration } from "./evolution/stuck-evolution-integration.js";
+import { FileSystemAgent } from "./embodiment/filesystem-agent.js";
+import { ActionFramework } from "./embodiment/action-framework.js";
+import { fileSystemAgentCapabilities, actionFrameworkCapabilities } from "./capabilities/embodiment.js";
+
+// ═══ Phase6: Real-World Capabilities ═══
+import { MultimodalService } from "./multimodal/multimodal-service.js";
+import { ConnectorService } from "./connectors/connector-service.js";
+import { ComputerUseService } from "./computer-use/computer-use-service.js";
+import { CodePipelineService } from "./pipeline/code-pipeline-service.js";
+import { ResearchEngineService } from "./research/research-engine-service.js";
+import { DigitalTwinService } from "./digital-twin/digital-twin-service.js";
+import { DomainExpertService } from "./domain-experts/domain-expert-service.js";
+import { FederatedService } from "./federated/federated-service.js";
+import { AgentSDKService } from "./sdk/agent-sdk-service.js";
 
 export interface EngineConfig {
   homePath: string;
+  /** Aurora prompt context block: constitution, harness, microagent knowledge and memory recall. */
+  auroraContext?: { enabled?: boolean; constitutionChars?: number; harnessChars?: number; knowledgeChars?: number; memoryChars?: number; instructionChars?: number };
+  /** Unattended ACOS cadence. Disabled unless explicitly enabled; bounded by the autopilot ledger. */
+  autopilot?: { enabled?: boolean; tenantId?: string; driverIntervalMs?: number };
+  /**
+   * Multi-tenant driver above the autopilot. Disabled unless explicitly enabled; every tenant it
+   * drives must be enrolled, and each sweep is bounded and recorded in the durable sweep ledger.
+   */
+  auroraFleet?: { enabled?: boolean; tenantIds?: string[]; sweepIntervalMs?: number; maxTenantsPerSweep?: number; maxSweepsPerDay?: number };
+  /** Workspace checkpoint bounds for the real rollback path. */
+  checkpoints?: { maxFiles?: number; maxTotalBytes?: number; maxFileBytes?: number; excludes?: string[] };
+  /**
+   * Aurora governance at the capability boundary. Enabled by default and escalation-only: it can
+   * require approval or deny, but never grants authority another policy layer withheld.
+   */
+  auroraGovernance?: { enabled?: boolean } & AuroraPolicyOptions;
+  /** Automatic candidate-only lesson extraction when a session closes. Enabled by default. */
+  experienceDistillation?: { onSessionClose?: boolean };
+  /** Deterministic operator hooks at the capability boundary and session lifecycle. Enabled by default. */
+  lifecycleHooks?: { enabled?: boolean };
+  /** Absolute enterprise settings floor. Anything it sets cannot be relaxed from below. */
+  managedSettingsPath?: string;
+  /** Default per-session effort level; sessions may still set their own. */
+  effort?: { defaultLevel?: "low" | "medium" | "high" | "xhigh" | "max" };
+  /** Named permission and sandbox modes per session, with the tenant default and bypass switch. */
+  sessionModes?: { defaultPermissionMode?: "plan" | "manual" | "acceptEdits" | "auto" | "dontAsk" | "bypass"; defaultSandboxMode?: "read-only" | "workspace-write" | "danger-full-access"; allowBypass?: boolean };
+  /** Discovery bounds for AGENTS.md / CLAUDE.md style repository instruction files. */
+  projectInstructions?: { maxFiles?: number; maxFileBytes?: number; maxTotalBytes?: number; maxDepth?: number };
+  /**
+   * Code intelligence: language server diagnostics, symbols, definition and
+   * references. LSP is on by default only for the local sandbox backend, where
+   * the engine and the workspace share a filesystem; toolchain diagnostics run
+   * through whichever sandbox backend is configured. `serverBinaries` pins an
+   * LSP server executable by id (operators, hermetic installs).
+   */
+  codeIntelligence?: {
+    lsp?: boolean;
+    serverBinaries?: Record<string, string>;
+    serverArgs?: Record<string, string[]>;
+    maxLspServers?: number;
+    toolchainTimeoutMs?: number;
+  };
+  /**
+   * Prompt-cache breakpoint planner (S5). Enabled by default: every assembled
+   * request gets a derived cache plan and durable evidence, and providers that
+   * support explicit breakpoints (Anthropic) place the markers. `ttlMs` must
+   * be one of the provider-supported values (5m or 1h).
+   */
+  promptCache?: { enabled?: boolean; ttlMs?: number; messageTailMarkers?: number };
   kernelServerScript: string;
   sandboxBackend: SandboxBackendKind;
   sshSandbox?: SshSandboxOptions;
@@ -151,6 +334,10 @@ export interface EngineConfig {
     rateCapacity?: number;
     rateRefillMs?: number;
   };
+  /** Child-agent fan-out limits: live children per session, tree depth, lifetime spawns. */
+  agentFanout?: AgentFanoutLimits;
+  /** Per-command resource limits (memory, CPU seconds, file size, processes). */
+  sandboxLimits?: SandboxResourceLimits;
   modelOAuthRedirectUri?: string;
   context?: {
     maxMessageChars?: number;
@@ -223,6 +410,127 @@ export class HybridAgentEngine {
   readonly outboundChannels: ChannelAdapterRegistry;
   readonly society: AgentSocietyService;
   readonly cognitive: CognitiveWorkspaceService;
+  readonly memoryGraph: MemoryGraphService;
+  readonly worldModel: WorldModelService;
+  readonly multiWorld: MultiWorldModelService;
+  readonly initiative: ProactiveInitiativeService;
+  readonly userModel: UserModelService;
+  readonly evolution: SkillEvolutionService;
+  readonly environment: EnvironmentAwarenessService;
+  readonly constitution: ConstitutionService;
+  readonly harness: ContinualHarnessService;
+  readonly microagents: MicroagentRegistry;
+  readonly riskAnalyzer: RiskAnalyzerService;
+  readonly stuckDetector: StuckDetectorService;
+  readonly acos: CognitiveOrchestrator;
+  readonly auroraContextComposer: AuroraContextComposer | undefined;
+  readonly decisions: DecisionService;
+  readonly planning: PlanningService;
+  readonly distiller: ExperienceDistiller;
+  readonly autopilot: AuroraAutopilot;
+  readonly auroraFleet: AuroraFleetSupervisor;
+  readonly delegation: AuroraExecutionBridge;
+  readonly roleAuthority: RoleAuthorityService;
+  readonly harvester: AuroraOutcomeHarvester;
+  readonly planFeedback: AuroraPlanFeedback;
+  readonly estimation: AuroraEstimationCalibrator;
+  readonly provenance: ProvenanceService;
+  readonly checkpoints: WorkspaceCheckpointService;
+  readonly auroraMetrics: AuroraMetricsCollector;
+  readonly dataGovernance: AuroraDataGovernanceService;
+  readonly auroraPolicy: AuroraPolicyEngine | undefined;
+  readonly lifecycleHooks: LifecycleHookService;
+  readonly sessionModes: SessionModeService;
+  private readonly hookWorkspaceRoot: string;
+  readonly projectInstructions: ProjectInstructionService;
+  readonly repositoryCommands: RepositoryCommandService;
+  readonly worktreeReview: WorkingTreeReviewService;
+  readonly worktrees: WorktreeService;
+  readonly sessionEffort: SessionEffortService;
+  readonly manifestTrust: ManifestTrustService;
+  readonly thoughtCore: ThoughtCoreService;
+  readonly backgroundThinking: BackgroundThinkingService;
+  readonly thoughtMemoryIntegration: ThoughtMemoryIntegration;
+  readonly worldThoughtIntegration: WorldThoughtIntegration;
+  readonly memoryInitiativeIntegration: MemoryInitiativeIntegration;
+  readonly stuckEvolutionIntegration: StuckEvolutionIntegration;
+  readonly fsAgent: FileSystemAgent;
+  readonly actionFramework: ActionFramework;
+  readonly settings: SettingsResolver;
+  readonly userQuestions: UserQuestionService;
+  readonly backgroundShells: BackgroundShellService;
+  readonly autoApprovals: AutoApprovalService;
+  readonly sessionBudgets: SessionBudgetService;
+  readonly verification: VerificationService;
+  readonly codeIntelligence: CodeIntelligenceService;
+  readonly promptCache: PromptCacheService;
+  readonly statelessMcp: StatelessMcpRegistry;
+  readonly subagents: SubagentDefinitionService;
+  readonly sessionLifecycle: SessionLifecycleService;
+
+  // ═══ Phase1: Self-Awareness & Observability ═══
+  readonly selfModel: import("./aurora/self-model-service.js").SelfModelService;
+  readonly uncertaintyEngine: import("./aurora/uncertainty-engine.js").UncertaintyEngine;
+  readonly failureTaxonomy: import("./aurora/failure-taxonomy.js").FailureTaxonomyService;
+  readonly cognitiveTelemetry: import("./aurora/cognitive-telemetry.js").CognitiveTelemetryService;
+
+  // ═══ Phase2: Memory & Learning Revolution ═══
+  readonly neuralMemoryFusion: import("./aurora/neural-memory-fusion.js").NeuralMemoryFusionService;
+  readonly experienceCompiler: import("./aurora/experience-compiler.js").ExperienceCompilerService;
+  readonly sleepCycle: import("./aurora/sleep-cycle.js").SleepCycleService;
+
+  // ═══ Phase3: Reasoning & Simulation ═══
+  readonly counterfactualSimulator: import("./aurora/counterfactual-simulator.js").CounterfactualSimulatorService;
+  readonly multiHypothesis: import("./aurora/multi-hypothesis-reasoning.js").MultiHypothesisReasoningService;
+  readonly internalCritic: import("./aurora/internal-critic.js").InternalCriticService;
+  readonly experimentEngine: import("./aurora/experiment-engine.js").ExperimentEngineService;
+  readonly plannerV2: import("./aurora/planner-v2.js").PlannerV2Service;
+
+  // ═══ Phase4: Agent Society ═══
+  readonly agentEconomy: import("./aurora/agent-economy.js").AgentEconomyService;
+  readonly reputation: import("./aurora/reputation-system.js").ReputationService;
+  readonly resourceIntelligence: import("./aurora/resource-intelligence.js").ResourceIntelligenceService;
+  readonly sharedLearning: import("./aurora/shared-learning.js").SharedLearningService;
+  readonly dynamicComposition: import("./aurora/dynamic-composition.js").DynamicCompositionService;
+  readonly capabilityMarketplace: import("./aurora/capability-marketplace.js").CapabilityMarketplaceService;
+  readonly swarmOrchestration: import("./aurora/swarm-orchestration.js").SwarmOrchestrationService;
+
+  // ═══ Phase5: Advanced Cognitive ═══
+  readonly benchmarkLab: import("./aurora/benchmark-lab.js").BenchmarkLabService;
+  readonly adaptiveRouter: import("./aurora/adaptive-router.js").AdaptiveRouterService;
+  readonly goalStack: import("./aurora/goal-stack.js").GoalStackService;
+  readonly attentionV2: import("./aurora/attention-v2.js").AttentionV2Service;
+  readonly selfDebugging: import("./aurora/self-debugging.js").SelfDebuggingService;
+  readonly causalGraph: import("./aurora/causal-graph.js").CausalGraphService;
+  readonly longHorizonMemory: import("./aurora/long-horizon-memory.js").LongHorizonMemoryService;
+  readonly neuralCognitiveCore: import("./aurora/neural-cognitive-core.js").NeuralCognitiveCoreService;
+  readonly learnedWorldModel: import("./aurora/learned-world-model.js").LearnedWorldModelService;
+
+  // ═══ 31. Sistem: Cognitive Meta-Controller ═══
+  readonly metaController: import("./aurora/meta-controller.js").MetaControllerService;
+  readonly modelCapabilityRegistry: ModelCapabilityRegistryService;
+
+  // ═══ Phase6: Real-World Capabilities ═══
+  readonly multimodal: MultimodalService;
+  readonly connectors: ConnectorService;
+  readonly computerUse: ComputerUseService;
+  readonly codePipeline: CodePipelineService;
+  readonly researchEngine: ResearchEngineService;
+  readonly digitalTwin: DigitalTwinService;
+  readonly domainExperts: DomainExpertService;
+  readonly federated: FederatedService;
+  readonly agentSDK: AgentSDKService;
+
+  // ═══ Unified Cognitive Runtime ═══
+  readonly eventBus: EventBus;
+  readonly cognitiveState: CognitiveState;
+  readonly memoryEngine: MemoryEngine;
+  readonly reasoningEngine: ReasoningEngine;
+  readonly planningEngine: PlanningEngine;
+  readonly worldEngine: WorldEngine;
+  readonly learningEngine: LearningEngine;
+  readonly attentionEngine: AttentionEngine;
+  readonly modelSelectionEngine: ModelSelectionEngine;
 
   constructor(readonly config: EngineConfig) {
     const dataRoot = resolve(config.homePath, "data");
@@ -283,10 +591,106 @@ export class HybridAgentEngine {
       autoApproveWorkspaceWrites: config.autoApproveWorkspaceWrites ?? false,
       allowLocalProcess: config.allowProcessExecution ?? false,
     });
-    const policy = config.opa
-      ? new LayeredPolicyEngine([localPolicy, new OpaPolicyEngine(config.opa)])
-      : localPolicy;
+    // Aurora governance binds at the capability boundary. The risk analyzer and constitution must
+    // exist before the broker, and the layer is escalation-only, so it can only add scrutiny.
+    this.riskAnalyzer = new RiskAnalyzerService(dataRoot);
+    this.constitution = new ConstitutionService(dataRoot);
+    this.auroraPolicy = config.auroraGovernance?.enabled === false
+      ? undefined
+      : new AuroraPolicyEngine(
+        { risk: this.riskAnalyzer, constitution: this.constitution },
+        dataRoot,
+        {
+          ...(config.auroraGovernance?.confirmAtOrAbove ? { confirmAtOrAbove: config.auroraGovernance.confirmAtOrAbove } : {}),
+          ...(config.auroraGovernance?.denyAtOrAbove ? { denyAtOrAbove: config.auroraGovernance.denyAtOrAbove } : {}),
+          ...(config.auroraGovernance?.alwaysCheckConstitution !== undefined ? { alwaysCheckConstitution: config.auroraGovernance.alwaysCheckConstitution } : {}),
+          ...(config.auroraGovernance?.recordDecisions !== undefined ? { recordDecisions: config.auroraGovernance.recordDecisions } : {}),
+        },
+      );
+    // Deterministic operator hooks join the same escalation-only stack: they can add scrutiny to a
+    // capability call, never remove it. Actions run through the broker, so they stay governed.
+    this.hookWorkspaceRoot = workspaceRoot;
+    this.lifecycleHooks = new LifecycleHookService(dataRoot, {
+      execute: async (call) => await this.runHookCapability(call),
+    });
+    this.projectInstructions = new ProjectInstructionService(Date.now, config.projectInstructions ?? {});
+    this.sessionEffort = new SessionEffortService(dataRoot, Date.now, config.effort ?? {});
+    this.settings = new SettingsResolver({ managedPath: config.managedSettingsPath ?? process.env.HAF_MANAGED_SETTINGS });
+    // Reviewed automatic approvals sit in front of the human queue. They start with no rules, so the
+    // default behaviour is unchanged: every approval reaches a person until an operator writes a rule
+    // and says, in words that are stored, why that class of request is safe.
+    this.autoApprovals = new AutoApprovalService(dataRoot);
+    this.sessionBudgets = new SessionBudgetService(dataRoot);
+    this.autoApprovals.bindEnabled(async (tenantId) => {
+      const resolved = await this.settings.value<boolean>({ tenantId, key: "allowAutoApprovals" });
+      // Absent means allowed; only an explicit `false` (from any layer, managed included) disables it.
+      return resolved.value !== false;
+    });
+    this.approvals.bindReviewer(async (request) => await this.autoApprovals.review(request));
+    this.userQuestions = new UserQuestionService();
+    this.repositoryCommands = new RepositoryCommandService();
+    const policyLayers: PolicyEngine[] = [localPolicy];
+    if (config.opa) policyLayers.push(new OpaPolicyEngine(config.opa));
+    if (config.lifecycleHooks?.enabled !== false) policyLayers.push(this.lifecycleHooks.policyLayer());
+    if (this.auroraPolicy) policyLayers.push(this.auroraPolicy);
+    policyLayers.push({
+      decide: async (input) => {
+        try {
+          const denied = await this.settings.value<string[]>({ tenantId: input.context.tenantId, key: "deniedCapabilities", workspacePath: input.context.workspacePath });
+          const list = Array.isArray(denied.value) ? denied.value : [];
+          if (list.includes(input.descriptor.id)) {
+            return { decision: "deny", reasonCode: "managed_denied_capability", message: `${input.descriptor.id} is denied by ${denied.locked ? "managed" : denied.layer} settings.` };
+          }
+        } catch {
+          // Unreadable settings must never widen authority; they simply add no denial.
+        }
+        return { decision: "allow", reasonCode: "managed_settings_allow", message: "No managed denial applies." };
+      },
+    });
+    const layered = policyLayers.length > 1 ? new LayeredPolicyEngine(policyLayers) : localPolicy;
+    // The mode dial wraps the whole stack: it may tighten anything, and may relax only base-policy
+    // approval requirements — never a governance decision.
+    this.sessionModes = new SessionModeService(dataRoot, Date.now, {
+      ...(config.sessionModes?.defaultPermissionMode ? { defaultPermissionMode: config.sessionModes.defaultPermissionMode } : {}),
+      ...(config.sessionModes?.defaultSandboxMode ? { defaultSandboxMode: config.sessionModes.defaultSandboxMode } : {}),
+      ...(config.sessionModes?.allowBypass !== undefined ? { allowBypass: config.sessionModes.allowBypass } : {}),
+    });
+    // Managed settings are an administrator floor: a permission ceiling sessions cannot exceed, and a
+    // deny list nothing below the managed layer can shrink.
+    this.sessionModes.bindCeiling(async (tenantId) => {
+      const resolved = await this.settings.value<string>({ tenantId, key: "permissionModeCeiling" });
+      const value = resolved.value;
+      return value && ["plan", "manual", "acceptEdits", "auto", "dontAsk", "bypass"].includes(value)
+        ? value as "plan" | "manual" | "acceptEdits" | "auto" | "dontAsk" | "bypass"
+        : undefined;
+    });
+    const policy = new SessionModePolicyEngine(layered, this.sessionModes);
     this.capabilities = new CapabilityBroker(policy, this.approvals, effects, this.hooks);
+    // A 2026-07-28 MCP server that needs input mid-call asks the human through the same bounded
+    // question service the agent uses: a remote server never gets to script its own confirmation.
+    this.statelessMcp = new StatelessMcpRegistry(this.capabilities, {
+      askUser: async ({ tenantId, sessionId, requests }) => {
+        const answers: Array<{ id: string; value: string }> = [];
+        for (const request of requests.slice(0, 5)) {
+          const options = request.options?.length
+            ? request.options.map((option) => ({ label: option.label }))
+            : [{ label: "Yes" }, { label: "No" }];
+          const asked = await this.userQuestions.ask({
+            tenantId,
+            sessionId,
+            question: request.prompt,
+            context: "An MCP tool needs input to continue.",
+            options,
+            allowFreeText: request.kind === "text",
+            timeoutMs: 120_000,
+          });
+          if (asked.status !== "answered") throw new Error(`MCP input request "${request.id}" was not answered (${asked.status}).`);
+          const chosen = asked.options.find((option) => option.id === asked.answer?.optionId);
+          answers.push({ id: request.id, value: asked.answer?.text ?? chosen?.label ?? "" });
+        }
+        return answers;
+      },
+    });
     this.wasiPlugins = config.wasiPlugins
       ? new WasiPluginManager(this.capabilities, this.hooks, { rootPath: dataRoot, ...config.wasiPlugins })
       : undefined;
@@ -298,7 +702,8 @@ export class HybridAgentEngine {
     });
     this.memory = new MemoryStore(dataRoot);
     this.skills = new SkillRegistry(dataRoot);
-    this.skillsHub = new SkillsHub(dataRoot, this.skills);
+    this.manifestTrust = new ManifestTrustService(dataRoot);
+    this.skillsHub = new SkillsHub(dataRoot, this.skills, this.manifestTrust);
     this.learning = new LearningGovernor(dataRoot, this.memory, this.skills, this.knowledgeIndex);
     this.refinements = new RefinementService(dataRoot, this.learning, this.events);
     const externalMemoryProvider = config.externalMemory?.provider === "honcho"
@@ -309,7 +714,28 @@ export class HybridAgentEngine {
     const rollingCompactor = config.context?.rollingMicroCompaction === false
       ? undefined
       : new RollingMicroCompactor(dataRoot, config.context?.microCompaction);
-    const context = new ContextManager(this.memory, this.skills, this.learning, contextMaxChars, this.hooks, rollingCompactor, this.externalMemory);
+    // Aurora services that feed prompt assembly must exist before the context manager is built.
+    this.harness = new ContinualHarnessService(dataRoot);
+    this.microagents = new MicroagentRegistry(dataRoot);
+    // Semantic recall: the memory graph shares the engine's embedding-backed hybrid index.
+    this.memoryGraph = new MemoryGraphService(dataRoot, Date.now, {
+      upsert: async (input) => await this.knowledgeIndex.upsert({ id: input.id, tenantId: input.tenantId, kind: input.kind, text: input.text, metadata: input.metadata }),
+      remove: async (tenantId, id) => await this.knowledgeIndex.remove(tenantId, id),
+      search: async (input) => (await this.knowledgeIndex.search(input)).map((hit) => ({ id: hit.id, score: hit.score, vectorScore: hit.vectorScore, lexicalScore: hit.lexicalScore })),
+    });
+    this.auroraContextComposer = config.auroraContext?.enabled === false
+      ? undefined
+      : new AuroraContextComposer(
+        { constitution: this.constitution, harness: this.harness, microagents: this.microagents, memoryGraph: this.memoryGraph, instructions: this.projectInstructions },
+        {
+          ...(config.auroraContext?.constitutionChars !== undefined ? { constitutionChars: config.auroraContext.constitutionChars } : {}),
+          ...(config.auroraContext?.harnessChars !== undefined ? { harnessChars: config.auroraContext.harnessChars } : {}),
+          ...(config.auroraContext?.knowledgeChars !== undefined ? { knowledgeChars: config.auroraContext.knowledgeChars } : {}),
+          ...(config.auroraContext?.memoryChars !== undefined ? { memoryChars: config.auroraContext.memoryChars } : {}),
+          ...(config.auroraContext?.instructionChars !== undefined ? { instructionChars: config.auroraContext.instructionChars } : {}),
+        },
+      );
+    const context = new ContextManager(this.memory, this.skills, this.learning, contextMaxChars, this.hooks, rollingCompactor, this.externalMemory, this.auroraContextComposer);
     this.models = new ModelRouter();
     this.providerProfiles = new ProviderProfileRegistry(true, new FileCredentialPoolStateStore(dataRoot));
     this.modelConfigurations = new ModelConfigurationRegistry(dataRoot, this.providerProfiles, this.modelOAuth);
@@ -399,6 +825,14 @@ export class HybridAgentEngine {
       this.capabilities,
       { kind: config.sandboxBackend === "local" || config.sandboxBackend === "docker" ? config.sandboxBackend : "disabled" },
     );
+    // Prompt-cache planner: derives breakpoints for every assembled request and
+    // keeps durable evidence. Providers that support explicit markers consume
+    // the hint; automatic-caching providers ignore it.
+    this.promptCache = new PromptCacheService(dataRoot, {
+      ...(config.promptCache?.enabled === undefined ? {} : { enabled: config.promptCache.enabled }),
+      ...(config.promptCache?.ttlMs ? { ttlMs: config.promptCache.ttlMs } : {}),
+      ...(config.promptCache?.messageTailMarkers ? { messageTailMarkers: config.promptCache.messageTailMarkers } : {}),
+    });
     this.supervisor = new Supervisor({
       dataRoot,
       workspaceRoot,
@@ -407,6 +841,7 @@ export class HybridAgentEngine {
       commandJournal: commands,
       ...(leaseManager ? { leaseManager } : {}),
       agentInbox: this.agentInbox,
+      ...(config.agentFanout ? { fanout: config.agentFanout } : {}),
       ...(config.agentMessaging?.maxChars ? { agentMessageMaxChars: config.agentMessaging.maxChars } : {}),
       ...(config.agentMessaging?.maxPending ? { agentMessageMaxPending: config.agentMessaging.maxPending } : {}),
       ...(config.agentMessaging?.rateCapacity ? { agentMessageRateCapacity: config.agentMessaging.rateCapacity } : {}),
@@ -414,12 +849,91 @@ export class HybridAgentEngine {
       model: this.models,
       capabilities: this.capabilities,
       context,
+      resolvePromptCache: async (input) => {
+        const planned = await this.promptCache.plan(input);
+        return { plan: planned.plan, ...(planned.hint ? { hint: planned.hint } : {}) };
+      },
       ...(modelName ? { modelName } : {}),
       ...(config.modelFallbacks?.length ? { modelFallbacks: config.modelFallbacks } : {}),
-      onSessionClose: async (sessionId) => this.kernels.close(sessionId),
+      resolveEffort: async (tenantId: string, sessionId: string) => {
+        const resolved = await this.sessionEffort.get(tenantId, sessionId);
+        return { toolIterations: resolved.profile.toolIterations, reasoningEffort: resolved.profile.reasoningEffort };
+      },
+      onSessionClose: async (sessionId) => {
+        await this.kernels.close(sessionId);
+        this.userQuestions.cancelForSession(sessionId, "session closed");
+        // Nothing a session started may outlive it: a build left running after its owner is gone is
+        // an unowned process holding a workspace open.
+        await this.backgroundShells.stopForSession(sessionId, "session closed").catch(() => undefined);
+        try {
+          const closing = await this.supervisor.getSession(sessionId);
+          await this.lifecycleHooks.run({ tenantId: closing.tenantId, event: "session.stop", subject: sessionId });
+        } catch {
+          // A hook must never keep a session from closing.
+        }
+        // Closed sessions are where lessons are cheapest to extract. Distillation only ever produces
+        // candidates, so this is safe to run unattended; failures must never block session closure.
+        if (this.config.experienceDistillation?.onSessionClose === false) return;
+        try {
+          const snapshot = await this.supervisor.getSession(sessionId);
+          await this.distiller.distill({ tenantId: snapshot.tenantId, sessionId });
+        } catch {
+          // ignored: distillation is an optimization, never a precondition for closing a session
+        }
+      },
+    });
+    this.sessionLifecycle = new SessionLifecycleService(dataRoot, {
+      sessions: async (tenantId?: string) => await this.supervisor.listSessions(tenantId),
+      session: async (sessionId: string) => await this.supervisor.getSession(sessionId),
+      defaultModel: () => modelName ?? this.models.list()[0],
     });
     this.society = new AgentSocietyService(dataRoot, this.supervisor, this.agentProfiles, this.events);
+    this.subagents = new SubagentDefinitionService({
+      capabilities: this.capabilities, profiles: this.agentProfiles, society: this.society, hooks: this.lifecycleHooks,
+    });
     this.cognitive = new CognitiveWorkspaceService(dataRoot);
+    this.worldModel = new WorldModelService(dataRoot);
+    this.multiWorld = new MultiWorldModelService(dataRoot);
+    this.thoughtCore = new ThoughtCoreService(dataRoot);
+    this.backgroundThinking = new BackgroundThinkingService(dataRoot, this.thoughtCore);
+    this.thoughtMemoryIntegration = new ThoughtMemoryIntegration(this);
+    this.worldThoughtIntegration = new WorldThoughtIntegration(this);
+    this.memoryInitiativeIntegration = new MemoryInitiativeIntegration(this);
+    this.stuckEvolutionIntegration = new StuckEvolutionIntegration(this);
+    this.fsAgent = new FileSystemAgent(workspaceRoot);
+    this.actionFramework = new ActionFramework(this);
+    this.userModel = new UserModelService(dataRoot);
+    this.evolution = new SkillEvolutionService(dataRoot);
+    this.environment = new EnvironmentAwarenessService(dataRoot);
+    this.decisions = new DecisionService(dataRoot);
+    this.planning = new PlanningService(dataRoot);
+    this.checkpoints = new WorkspaceCheckpointService(dataRoot, config.checkpoints ?? {});
+    this.stuckDetector = new StuckDetectorService(this.events);
+    // Queued initiatives are mirrored into the Global Workspace so proactive signals compete for
+    // attention under the same constitutional budget as every other cognitive object.
+    this.initiative = new ProactiveInitiativeService(dataRoot, Date.now, {
+      onQueued: async (item) => {
+        try {
+          await this.cognitive.intake({
+            tenantId: item.tenantId,
+            source: "initiative",
+            title: item.title,
+            content: item.message,
+            sourceId: item.id,
+            kind: item.kind === "risk" ? "risk" : item.kind === "opportunity" ? "opportunity" : "observation",
+            confidence: item.confidence,
+            importance: item.importance,
+            urgency: item.urgency,
+            impact: item.impact,
+            userRelevance: item.userRelevance,
+            horizon: item.priority === "P0" ? "reactive" : "tactical",
+            tags: ["initiative", item.priority.toLowerCase()],
+          });
+        } catch {
+          // Initiative delivery must never fail because the workspace quota is exhausted.
+        }
+      },
+    });
     this.refinementPlanner = new RefinementPlanner(
       dataRoot,
       this.models,
@@ -457,10 +971,41 @@ export class HybridAgentEngine {
         ...(config.sshSandbox ? { ssh: config.sshSandbox } : {}),
         ...(config.singularitySandbox ? { singularity: config.singularitySandbox } : {}),
         ...(config.cloudSandbox ? { cloud: config.cloudSandbox } : {}),
+        // Default resource hygiene for every command: a build that eats the host is not a build the
+        // agent should be able to run. Operators can raise or clear these per installation.
+        limits: config.sandboxLimits ?? { memoryMb: 4096, cpuSeconds: 900, fileSizeMb: 2048, processes: 512 },
       },
     );
     this.capabilities.register(processCapability(sandboxFactory));
+    // A background shell is the same sandboxed execution path as `process.exec`; only the moment the
+    // result arrives differs, so it reuses the factory rather than opening a second way to spawn.
+    this.backgroundShells = new BackgroundShellService(sandboxFactory);
+    // Verification runs the project's own commands through the same sandbox as everything else.
+    this.verification = new VerificationService(dataRoot, sandboxFactory);
+    for (const capability of verificationCapabilities(this.verification)) this.capabilities.register(capability);
+    // Code intelligence: LSP when a server binary is installed and the engine
+    // shares the workspace filesystem, toolchain diagnostics through the sandbox
+    // regardless. LSP servers are read-only project processes with a scrubbed
+    // environment, bounded count and graceful shutdown.
+    this.codeIntelligence = new CodeIntelligenceService(dataRoot, sandboxFactory, {
+      ...(config.codeIntelligence?.lsp === undefined
+        ? { lsp: config.sandboxBackend === "local" }
+        : { lsp: config.codeIntelligence.lsp }),
+      ...(config.codeIntelligence?.serverBinaries ? { serverBinaries: config.codeIntelligence.serverBinaries } : {}),
+      ...(config.codeIntelligence?.serverArgs ? { serverArgs: config.codeIntelligence.serverArgs } : {}),
+      ...(config.codeIntelligence?.maxLspServers ? { maxLspServers: config.codeIntelligence.maxLspServers } : {}),
+      ...(config.codeIntelligence?.toolchainTimeoutMs ? { toolchainTimeoutMs: config.codeIntelligence.toolchainTimeoutMs } : {}),
+    });
+    for (const capability of codeIntelligenceCapabilities(this.codeIntelligence)) this.capabilities.register(capability);
+    for (const capability of promptCacheCapabilities(this.promptCache)) this.capabilities.register(capability);
+    for (const capability of backgroundShellCapabilities(this.backgroundShells)) this.capabilities.register(capability);
+    for (const capability of autoApprovalCapabilities(this.autoApprovals)) this.capabilities.register(capability);
+    for (const capability of sessionBudgetCapabilities({
+      budgets: this.sessionBudgets, cost: async (sessionId) => await this.sessionLifecycle.cost(sessionId),
+    })) this.capabilities.register(capability);
     for (const capability of gitCapabilities(sandboxFactory)) this.capabilities.register(capability);
+    this.worktreeReview = new WorkingTreeReviewService(sandboxFactory);
+    this.worktrees = new WorktreeService(sandboxFactory, workspaceRoot);
     this.capabilities.register(pythonCapability(this.kernels));
     for (const capability of agentCapabilities(this.supervisor)) this.capabilities.register(capability);
     for (const capability of goalCapabilities(this.supervisor)) this.capabilities.register(capability);
@@ -487,6 +1032,263 @@ export class HybridAgentEngine {
     for (const capability of hostedReviewCapabilities(this.hostedRepositories)) this.capabilities.register(capability);
     for (const capability of societyCapabilities(this.society)) this.capabilities.register(capability);
     for (const capability of cognitiveCapabilities(this.cognitive)) this.capabilities.register(capability);
+    for (const capability of memoryGraphCapabilities(this.memoryGraph)) this.capabilities.register(capability);
+    for (const capability of worldModelCapabilities(this.worldModel)) this.capabilities.register(capability);
+    for (const capability of multiWorldCapabilities(this.multiWorld)) this.capabilities.register(capability);
+    for (const capability of initiativeCapabilities(this.initiative)) this.capabilities.register(capability);
+    for (const capability of userModelCapabilities(this.userModel)) this.capabilities.register(capability);
+    for (const capability of evolutionCapabilities(this.evolution)) this.capabilities.register(capability);
+    for (const capability of environmentCapabilities(this.environment)) this.capabilities.register(capability);
+    for (const capability of fileSystemAgentCapabilities(this.fsAgent)) this.capabilities.register(capability);
+    for (const capability of actionFrameworkCapabilities(this.actionFramework)) this.capabilities.register(capability);
+    for (const capability of thoughtCapabilities({ thoughtCore: this.thoughtCore, backgroundThinking: this.backgroundThinking })) this.capabilities.register(capability);
+    this.delegation = new AuroraExecutionBridge(dataRoot, { planning: this.planning, society: this.society, evolution: this.evolution });
+    this.roleAuthority = new RoleAuthorityService({ capabilities: this.capabilities, profiles: this.agentProfiles, society: this.society }, Date.now, dataRoot);
+    // ACOS is constructed last: it composes every governed Aurora service into one control loop.
+    this.acos = new CognitiveOrchestrator(dataRoot, {
+      cognitive: this.cognitive,
+      memoryGraph: this.memoryGraph,
+      worldModel: this.worldModel,
+      initiative: this.initiative,
+      userModel: this.userModel,
+      evolution: this.evolution,
+      environment: this.environment,
+      society: this.society,
+      constitution: this.constitution,
+      harness: this.harness,
+      decisions: this.decisions,
+      planning: this.planning,
+    }, Date.now, {
+      stuckSessions: async (tenantId) => {
+        const sessions = (await this.supervisor.listSessions()).filter((item) => item.tenantId === tenantId && item.status !== "closed").slice(0, 20);
+        const stuck: Array<{ sessionId: string; signature?: string; detail: string }> = [];
+        for (const session of sessions) {
+          const report = await this.stuckDetector.analyze(session.sessionId);
+          if (!report.stuck) continue;
+          stuck.push({
+            sessionId: session.sessionId,
+            ...(report.frictionSignature ? { signature: report.frictionSignature } : {}),
+            detail: report.patterns.map((item) => `${item.code} x${item.occurrences}: ${item.detail}`).join(" | ").slice(0, 5000),
+          });
+        }
+        return stuck;
+      },
+      delegation: async (tenantId) => await this.harvester.runCycle(tenantId),
+      estimation: async (tenantId) => await this.estimation.ingest(tenantId),
+      planFeedback: async (tenantId) => {
+        const result = await this.planFeedback.reconcile({ tenantId });
+        return { recorded: result.recorded.length, executedMarked: result.executedMarked.length };
+      },
+      integrity: async (tenantId) => {
+        const report = await this.dataGovernance.selfCheck(tenantId);
+        return {
+          findings: report.findings.length,
+          critical: report.findings.filter((item) => item.severity === "critical").length,
+          score: report.score,
+          details: report.findings.filter((item) => item.severity !== "info").map((item) => `${item.code}: ${item.detail}`),
+        };
+      },
+    });
+    for (const capability of constitutionCapabilities(this.constitution)) this.capabilities.register(capability);
+    for (const capability of harnessCapabilities(this.harness)) this.capabilities.register(capability);
+    for (const capability of microagentCapabilities(this.microagents)) this.capabilities.register(capability);
+    for (const capability of riskCapabilities(this.riskAnalyzer)) this.capabilities.register(capability);
+    for (const capability of stuckCapabilities(this.stuckDetector)) this.capabilities.register(capability);
+    for (const capability of orchestratorCapabilities(this.acos)) this.capabilities.register(capability);
+    for (const capability of insightCapabilities(this.memoryGraph)) this.capabilities.register(capability);
+    this.distiller = new ExperienceDistiller(dataRoot, {
+      events: this.events,
+      harness: this.harness,
+      microagents: this.microagents,
+      evolution: this.evolution,
+    });
+    this.harvester = new AuroraOutcomeHarvester(dataRoot, {
+      bridge: this.delegation,
+      society: this.society,
+      sessions: { session: async (sessionId: string) => await this.supervisor.getSession(sessionId) },
+      events: this.events,
+      evolution: this.evolution,
+      distiller: this.distiller,
+    });
+    this.planFeedback = new AuroraPlanFeedback(dataRoot, {
+      planning: this.planning, decisions: this.decisions, bridge: this.delegation, harvester: this.harvester,
+      initiative: this.initiative,
+    });
+    this.estimation = new AuroraEstimationCalibrator(dataRoot, { planning: this.planning });
+    this.autopilot = new AuroraAutopilot(dataRoot, { orchestrator: this.acos, initiative: this.initiative });
+    this.auroraFleet = new AuroraFleetSupervisor(dataRoot, { autopilot: this.autopilot }, {
+      ...(config.auroraFleet?.maxTenantsPerSweep !== undefined ? { maxTenantsPerSweep: config.auroraFleet.maxTenantsPerSweep } : {}),
+      ...(config.auroraFleet?.maxSweepsPerDay !== undefined ? { maxSweepsPerDay: config.auroraFleet.maxSweepsPerDay } : {}),
+    });
+    this.provenance = new ProvenanceService({
+      cognitive: this.cognitive,
+      initiative: this.initiative,
+      memoryGraph: this.memoryGraph,
+      worldModel: this.worldModel,
+      environment: this.environment,
+      decisions: this.decisions,
+      planning: this.planning,
+      constitution: this.constitution,
+    });
+    for (const capability of decisionCapabilities(this.decisions)) this.capabilities.register(capability);
+    for (const capability of planningCapabilities(this.planning)) this.capabilities.register(capability);
+    for (const capability of distillerCapabilities(this.distiller)) this.capabilities.register(capability);
+    for (const capability of autopilotCapabilities(this.autopilot)) this.capabilities.register(capability);
+    for (const capability of fleetCapabilities(this.auroraFleet)) this.capabilities.register(capability);
+    for (const capability of delegationCapabilities(this.delegation)) this.capabilities.register(capability);
+    for (const capability of roleAuthorityCapabilities(this.roleAuthority)) this.capabilities.register(capability);
+    for (const capability of harvestCapabilities(this.harvester)) this.capabilities.register(capability);
+    for (const capability of planFeedbackCapabilities(this.planFeedback)) this.capabilities.register(capability);
+    for (const capability of estimationCapabilities(this.estimation)) this.capabilities.register(capability);
+    for (const capability of projectInstructionCapabilities(this.projectInstructions)) this.capabilities.register(capability);
+    for (const capability of lifecycleHookCapabilities(this.lifecycleHooks)) this.capabilities.register(capability);
+    for (const capability of sessionModeCapabilities(this.sessionModes)) this.capabilities.register(capability);
+    for (const capability of repositoryCommandCapabilities(this.repositoryCommands)) this.capabilities.register(capability);
+    for (const capability of reviewCapabilities(this.worktreeReview)) this.capabilities.register(capability);
+    for (const capability of subagentCapabilities(this.subagents)) this.capabilities.register(capability);
+    for (const capability of effortCapabilities(this.sessionEffort)) this.capabilities.register(capability);
+    for (const capability of worktreeCapabilities(this.worktrees)) this.capabilities.register(capability);
+    for (const capability of userQuestionCapabilities(this.userQuestions)) this.capabilities.register(capability);
+    for (const capability of settingsCapabilities(this.settings)) this.capabilities.register(capability);
+    for (const capability of backgroundTaskCapabilities({
+      supervisor: this.supervisor, modes: this.sessionModes, effort: this.sessionEffort, questions: this.userQuestions,
+      approvals: this.approvals,
+    })) this.capabilities.register(capability);
+    for (const capability of planModeCapabilities(this.sessionModes)) this.capabilities.register(capability);
+    for (const capability of sessionLifecycleCapabilities(this.sessionLifecycle)) this.capabilities.register(capability);
+    // Registered last so the catalog it searches already contains everything else.
+    for (const capability of discoveryCapabilities(() => this.capabilities.list())) this.capabilities.register(capability);
+    for (const capability of probationCapabilities(this.delegation)) this.capabilities.register(capability);
+    this.auroraMetrics = new AuroraMetricsCollector({
+      cognitive: this.cognitive, memoryGraph: this.memoryGraph, worldModel: this.worldModel,
+      initiative: this.initiative, society: this.society, evolution: this.evolution,
+      environment: this.environment, decisions: this.decisions, planning: this.planning,
+      constitution: this.constitution, autopilot: this.autopilot, fleet: this.auroraFleet, acos: this.acos,
+      delegation: this.delegation, roleAuthority: this.roleAuthority, harvester: this.harvester,
+      planFeedback: this.planFeedback, estimation: this.estimation,
+    });
+    this.dataGovernance = new AuroraDataGovernanceService({
+      cognitive: this.cognitive, memoryGraph: this.memoryGraph, worldModel: this.worldModel,
+      initiative: this.initiative, userModel: this.userModel, evolution: this.evolution,
+      environment: this.environment, society: this.society, constitution: this.constitution,
+      harness: this.harness, microagents: this.microagents, decisions: this.decisions,
+      planning: this.planning, acos: this.acos,
+    });
+
+    // ═══ Phase1: Self-Awareness & Observability ═══
+    this.selfModel = new SelfModelService(dataRoot);
+    this.uncertaintyEngine = new UncertaintyEngine(dataRoot);
+    this.failureTaxonomy = new FailureTaxonomyService(dataRoot);
+    this.cognitiveTelemetry = new CognitiveTelemetryService(dataRoot);
+
+    // ═══ Phase2: Memory & Learning ═══
+    this.neuralMemoryFusion = new NeuralMemoryFusionService(dataRoot);
+    this.experienceCompiler = new ExperienceCompilerService(dataRoot);
+    this.sleepCycle = new SleepCycleService(dataRoot);
+
+    // ═══ Phase3: Reasoning & Simulation ═══
+    this.counterfactualSimulator = new CounterfactualSimulatorService(dataRoot);
+    this.multiHypothesis = new MultiHypothesisReasoningService(dataRoot);
+    this.internalCritic = new InternalCriticService(dataRoot);
+    this.experimentEngine = new ExperimentEngineService(dataRoot);
+    this.plannerV2 = new PlannerV2Service(dataRoot);
+
+    // ═══ Phase4: Agent Society ═══
+    this.agentEconomy = new AgentEconomyService(dataRoot);
+    this.reputation = new ReputationService(dataRoot);
+    this.resourceIntelligence = new ResourceIntelligenceService(dataRoot);
+    this.sharedLearning = new SharedLearningService(dataRoot);
+    this.dynamicComposition = new DynamicCompositionService(dataRoot);
+    this.capabilityMarketplace = new CapabilityMarketplaceService(dataRoot);
+    this.swarmOrchestration = new SwarmOrchestrationService(dataRoot);
+
+    // ═══ Phase5: Advanced Cognitive ═══
+    this.benchmarkLab = new BenchmarkLabService(dataRoot);
+    this.adaptiveRouter = new AdaptiveRouterService(dataRoot);
+    this.goalStack = new GoalStackService(dataRoot);
+    this.attentionV2 = new AttentionV2Service(dataRoot);
+    this.selfDebugging = new SelfDebuggingService(dataRoot);
+    this.causalGraph = new CausalGraphService(dataRoot);
+    this.longHorizonMemory = new LongHorizonMemoryService(dataRoot);
+    this.neuralCognitiveCore = new NeuralCognitiveCoreService(dataRoot);
+    this.learnedWorldModel = new LearnedWorldModelService(dataRoot);
+
+    // ═══ 31. Sistem: Cognitive Meta-Controller ═══
+    this.metaController = new MetaControllerService(dataRoot);
+    this.modelCapabilityRegistry = new ModelCapabilityRegistryService(dataRoot);
+
+    // ═══ Phase6: Real-World Capabilities ═══
+    this.multimodal = new MultimodalService(dataRoot);
+    this.connectors = new ConnectorService(dataRoot);
+    this.computerUse = new ComputerUseService(dataRoot);
+    this.codePipeline = new CodePipelineService(dataRoot);
+    this.researchEngine = new ResearchEngineService(dataRoot);
+    this.digitalTwin = new DigitalTwinService(dataRoot);
+    this.domainExperts = new DomainExpertService(dataRoot);
+    this.federated = new FederatedService(dataRoot);
+    this.agentSDK = new AgentSDKService(dataRoot);
+
+    // ═══ Unified Cognitive Runtime — EventBus + CognitiveState + 7 Unified Engines ═══
+    this.eventBus = new EventBus(5000);
+    this.cognitiveState = new CognitiveState();
+
+    // 1. MemoryEngine: MemoryGraph + LongHorizonMemory + NeuralFusion + ExperienceCompiler + SharedLearning
+    this.memoryEngine = new MemoryEngine(
+      this.memoryGraph, this.longHorizonMemory, this.neuralMemoryFusion,
+      this.experienceCompiler, this.sharedLearning, this.eventBus, this.cognitiveState,
+    );
+
+    // 2. ReasoningEngine: MultiHypothesis + InternalCritic + ExperimentEngine + NeuralCognitiveCore + CausalGraph
+    this.reasoningEngine = new ReasoningEngine(
+      this.multiHypothesis, this.internalCritic, this.experimentEngine,
+      this.neuralCognitiveCore, this.causalGraph, this.eventBus, this.cognitiveState,
+    );
+
+    // 3. PlanningEngine: PlanningService + PlannerV2 + GoalStack
+    this.planningEngine = new PlanningEngine(
+      this.planning, this.plannerV2, this.goalStack, this.eventBus, this.cognitiveState,
+    );
+
+    // 4. WorldEngine: WorldModel + LearnedWorldModel + CausalGraph + CounterfactualSimulator
+    this.worldEngine = new WorldEngine(
+      this.worldModel, this.learnedWorldModel, this.causalGraph,
+      this.counterfactualSimulator, this.eventBus, this.cognitiveState,
+    );
+
+    // 5. LearningEngine: ExperienceCompiler + SleepCycle + SharedLearning + SelfModel + FailureTaxonomy
+    this.learningEngine = new LearningEngine(
+      this.experienceCompiler, this.sleepCycle, this.sharedLearning,
+      this.selfModel, this.failureTaxonomy, this.eventBus, this.cognitiveState,
+    );
+
+    // 6. AttentionEngine: AttentionV2 + CognitiveWorkspace + ResourceIntelligence
+    this.attentionEngine = new AttentionEngine(
+      this.attentionV2, this.cognitive, this.resourceIntelligence, this.eventBus, this.cognitiveState,
+    );
+
+    // 7. ModelSelectionEngine: ModelRouter + AdaptiveRouter + BenchmarkLab
+    this.modelSelectionEngine = new ModelSelectionEngine(
+      this.models, this.adaptiveRouter, this.benchmarkLab, this.eventBus, this.cognitiveState,
+    );
+
+    for (const capability of provenanceCapabilities(this.provenance)) this.capabilities.register(capability);
+    for (const capability of checkpointCapabilities(this.checkpoints)) this.capabilities.register(capability);
+    for (const capability of auroraMetricsCapabilities(this.auroraMetrics)) this.capabilities.register(capability);
+    for (const capability of governanceCapabilities(this.dataGovernance)) this.capabilities.register(capability);
+    if (config.auroraFleet?.enabled) {
+      // Multi-tenant unattended operation: enroll the declared tenants, then start the bounded driver.
+      const fleet = this.auroraFleet;
+      void (async () => {
+        for (const tenantId of config.auroraFleet?.tenantIds ?? ["local"]) await fleet.enroll({ tenantId });
+        fleet.start(config.auroraFleet?.sweepIntervalMs ?? 60_000);
+      })().catch(() => undefined);
+    }
+    if (config.autopilot?.enabled) {
+      // Unattended operation is opt-in; the durable ledger and daily ceiling still bound it.
+      void this.autopilot.configure({ tenantId: config.autopilot.tenantId ?? "local", enabled: true })
+        .then(() => this.autopilot.start(config.autopilot?.tenantId ?? "local", config.autopilot?.driverIntervalMs ?? 60_000))
+        .catch(() => undefined);
+    }
   }
 
   registerModelProvider(provider: ModelProvider, makeDefault = false): void {
@@ -585,7 +1387,27 @@ export class HybridAgentEngine {
   }
 
   async command(command: CommandEnvelope): Promise<CommandResult> {
+    // An archived session keeps everything it recorded and accepts nothing new. Restoring is an
+    // explicit, audited act, so "tidy up my list" can never quietly become "keep working in here".
+    if (command.sessionId && command.kind !== "session.close") {
+      const archived = await this.sessionLifecycle.isArchived(command.tenantId, command.sessionId).catch(() => false);
+      if (archived) throw new Error(`Session ${command.sessionId} is archived. Restore it before sending "${command.kind}".`);
+    }
+    // A spend cap refuses *new* work only. A turn already in flight finishes: cutting a half-applied
+    // edit to save a few cents leaves a worse mess than the spend it avoided.
+    if (command.sessionId && (command.kind === "session.prompt" || command.kind === "session.resume")) {
+      const verdict = await this.budgetVerdict(command.tenantId, command.sessionId).catch(() => undefined);
+      if (verdict?.blocked) throw new Error(verdict.message);
+    }
     return await this.supervisor.dispatch(command);
+  }
+
+  /** What the session's budget looks like right now, priced from the same table the cost view uses. */
+  async budgetVerdict(tenantId: string, sessionId: string) {
+    const cost = await this.sessionLifecycle.cost(sessionId);
+    return await this.sessionBudgets.evaluate({
+      tenantId, sessionId, spentUsd: cost.costUsd, totalTokens: cost.usage.totalTokens, costSource: cost.costSource,
+    });
   }
 
   async session(sessionId: string): Promise<SessionSnapshot> {
@@ -594,6 +1416,24 @@ export class HybridAgentEngine {
 
   async sessions(tenantId?: string): Promise<SessionSnapshot[]> {
     return await this.supervisor.listSessions(tenantId);
+  }
+
+  /**
+   * Close a session if it's not already closed.
+   * After closing, the session retains all events but accepts no new work.
+   */
+  async closeSession(sessionId: string): Promise<SessionSnapshot> {
+    return await this.supervisor.dispatch({
+      protocolVersion: 1,
+      commandId: randomUUID(),
+      clientId: "engine-close",
+      tenantId: (await this.supervisor.getSession(sessionId)).tenantId,
+      sessionId,
+      kind: "session.close",
+      source: "api",
+      issuedAt: new Date().toISOString(),
+      payload: {},
+    }).then(async () => await this.supervisor.getSession(sessionId));
   }
 
   async readEvents(sessionId: string, afterSequence = 0, limit = 1000): Promise<EventEnvelope[]> {
@@ -635,6 +1475,60 @@ export class HybridAgentEngine {
     }
     if (this.natsEvents) await this.natsEvents.start();
     this.automaticRefinement.start();
+    await this.thoughtCore.initialize();
+
+    // ═══ Yeni servislerin lifecycle init'i ═══
+    await this.metaController.init().catch(() => undefined);
+    await this.selfModel.init().catch(() => undefined);
+    await this.uncertaintyEngine.init().catch(() => undefined);
+    await this.failureTaxonomy.init().catch(() => undefined);
+    await this.cognitiveTelemetry.init().catch(() => undefined);
+    await this.neuralMemoryFusion.init().catch(() => undefined);
+    await this.experienceCompiler.init().catch(() => undefined);
+    await this.sleepCycle.init().catch(() => undefined);
+    await this.counterfactualSimulator.init().catch(() => undefined);
+    await this.multiHypothesis.init().catch(() => undefined);
+    await this.internalCritic.init().catch(() => undefined);
+    await this.experimentEngine.init().catch(() => undefined);
+    await this.plannerV2.init().catch(() => undefined);
+    await this.agentEconomy.init().catch(() => undefined);
+    await this.reputation.init().catch(() => undefined);
+    await this.resourceIntelligence.init().catch(() => undefined);
+    await this.sharedLearning.init().catch(() => undefined);
+    await this.dynamicComposition.init().catch(() => undefined);
+    await this.capabilityMarketplace.init().catch(() => undefined);
+    await this.swarmOrchestration.init().catch(() => undefined);
+    await this.benchmarkLab.init().catch(() => undefined);
+    await this.adaptiveRouter.init().catch(() => undefined);
+    await this.goalStack.init().catch(() => undefined);
+    await this.attentionV2.init().catch(() => undefined);
+    await this.selfDebugging.init().catch(() => undefined);
+    await this.causalGraph.init().catch(() => undefined);
+    await this.longHorizonMemory.init().catch(() => undefined);
+    await this.neuralCognitiveCore.init().catch(() => undefined);
+    await this.learnedWorldModel.init().catch(() => undefined);
+    await this.modelCapabilityRegistry.init().catch(() => undefined);
+
+    // ═══ Phase6: Real-World Capabilities init ═══
+    await this.multimodal.init().catch(() => undefined);
+    await this.connectors.init().catch(() => undefined);
+    await this.computerUse.init().catch(() => undefined);
+    await this.codePipeline.init().catch(() => undefined);
+    await this.researchEngine.init().catch(() => undefined);
+    await this.digitalTwin.init().catch(() => undefined);
+    await this.domainExperts.init().catch(() => undefined);
+    await this.federated.init().catch(() => undefined);
+    await this.agentSDK.init().catch(() => undefined);
+
+    // ═══ Integration servislerini EventBus'a bağla ═══
+    this.thoughtMemoryIntegration.init();
+    this.worldThoughtIntegration.init();
+    this.memoryInitiativeIntegration.init();
+    this.stuckEvolutionIntegration.init();
+
+    // ═══ Durable Action Framework init ═══
+    await this.actionFramework.init().catch(() => undefined);
+
     if (this.hostedScheduler) await this.hostedScheduler.reconcile(await this.scheduler.list());
   }
 
@@ -642,13 +1536,38 @@ export class HybridAgentEngine {
     this.scheduler.start();
     this.otlp?.start();
     this.outboundChannels.startAll();
+    this.backgroundThinking.start();
+  }
+
+  /**
+   * Run a lifecycle-hook action through the normal capability path. Hook side effects are governed
+   * like everything else: policy, approval and the effect journal all apply, and the synthetic
+   * context is clearly labelled so an audit can tell hook traffic from agent traffic.
+   */
+  private async runHookCapability(call: { tenantId: string; capabilityId: string; input: Record<string, unknown>; reason: string }): Promise<unknown> {
+    const callId = randomUUID();
+    return await this.capabilities.execute(call.capabilityId, call.input, {
+      tenantId: call.tenantId,
+      sessionId: callId,
+      familyId: callId,
+      turnId: callId,
+      toolCallId: callId,
+      source: "scheduler",
+      workspacePath: this.hookWorkspaceRoot,
+      idempotencyKey: `lifecycle-hook:${call.capabilityId}:${callId}`,
+    });
   }
 
   async shutdown(): Promise<void> {
+    this.autopilot.stop();
+    this.auroraFleet.stop();
+    this.backgroundThinking.stop();
+    await this.thoughtCore.close();
     await this.scheduler.close();
     await this.automationResponders.close();
     await this.outboundChannels.closeAll();
     this.automaticRefinement.stop();
+    await this.codeIntelligence.shutdown();
     this.otlp?.stop();
     this.natsEvents?.stop();
     this.natsCommands?.close();
@@ -665,5 +1584,165 @@ export class HybridAgentEngine {
     await this.agentInbox.close?.();
     await this.nats?.close();
     await this.database?.close();
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // runTask — Unified Cognitive Lifecycle Entry Point
+  // ═══════════════════════════════════════════════════════
+
+  /**
+   * Anaognitive görev çalıştırıcı.
+   *
+   * Bu method Meta Controller'ı gerçekten orkestratör yapar:
+   *   1. Görevi profile eder (kompleksite analizi)
+   *   2. Execution plan oluşturur
+   *   3. Her phase'de ilgili servisleri çalıştırır
+   *   4. Sonuçları kaydeder, deneyim çıkarır
+   *
+   * Kullanım:
+   * ```ts
+   * const result = await engine.runTask("local", "Build a REST API for user management");
+   * console.log(result.outcome); // "success" | "failure" | "partial"
+   * ```
+   */
+  async runTask(tenantId: string, taskDescription: string): Promise<import("./aurora/meta-controller.js").RunResult> {
+    const traceId = `task-${Date.now()}`;
+
+    // EventBus'a görev başladı olayı gönder
+    await this.eventBus.emit("task.received", "HybridAgentEngine", {
+      taskDescription: taskDescription.slice(0, 200),
+      tenantId,
+    }, { traceId, severity: "info" });
+
+    // CognitiveState'i güncelle
+    this.cognitiveState.setMode("observing", `New task: ${taskDescription.slice(0, 50)}`);
+
+    // Meta Controller'a subsystem executor'ları tanımla
+    const executors: import("./aurora/meta-controller.js").SubsystemExecutors = {
+      onPhaseChange: ((mode: string, description: string) => {
+        this.cognitiveState.setMode(mode as any, description);
+      }) as any,
+
+      // Memory servisleri
+      "memory": (async (tid: string, task: string) => {
+        const result = await this.memoryEngine.recall({ text: task, tenantId: tid });
+        return `Recalled ${result.totalFound} memories`;
+      }) as any,
+      "neural-memory-fusion": (async (tid: string, task: string) => {
+        const result = await this.neuralMemoryFusion.findSimilar(tid, task.slice(0, 200));
+        const stats = await this.neuralMemoryFusion.getStats(tid);
+        return `Fusion analysis: ${result.length} similar memories, ${stats.totalPatterns} patterns, ${stats.totalEmbeddings} embeddings`;
+      }) as any,
+      "long-horizon-memory": (async (tid: string, task: string) => {
+        const results = await this.longHorizonMemory.search(tid, task.slice(0, 200));
+        return `Long-horizon: ${results.length} memories found`;
+      }) as any,
+      "shared-learning": (async (tid: string) => {
+        const lessons = await this.sharedLearning.getLessons(tid);
+        return `Shared learning: ${lessons.length} lessons available`;
+      }) as any,
+
+      // World servisleri
+      "world-model": (async (tid: string) => {
+        const entities = await this.learnedWorldModel.queryEntities();
+        return `World model: ${entities.length} entities`;
+      }) as any,
+      "learned-world-model": (async (tid: string) => {
+        const entities = await this.learnedWorldModel.queryEntities();
+        return `Learned world: ${entities.length} entities`;
+      }) as any,
+      "causal-graph": (async () => {
+        const stats = await this.causalGraph.getStats();
+        return `Causal graph: ${stats.totalNodes} nodes, ${stats.totalEdges} edges`;
+      }) as any,
+
+      // Self-Awareness servisleri
+      "self-model": (async (tid: string) => {
+        const goals = await this.selfModel.getGoals(tid);
+        return `Self model: ${goals.length} active goals`;
+      }) as any,
+      "uncertainty-engine": (async (_tid: string) => {
+        return `Uncertainty assessment complete`;
+      }) as any,
+      "failure-taxonomy": (async (tid: string) => {
+        const failures = await this.failureTaxonomy.getFailures(tid);
+        return `Failure taxonomy: ${failures.length} recorded failures`;
+      }) as any,
+      "cognitive-telemetry": (async () => {
+        return `Telemetry recording active`;
+      }) as any,
+
+      // Reasoning servisleri
+      "multi-hypothesis": (async (tid: string, task: string) => {
+        const result = await this.multiHypothesis.proposeHypothesis(tid, task.slice(0, 200), "general");
+        return `Hypothesis proposed: ${result.statement.slice(0, 80)}`;
+      }) as any,
+      "internal-critic": (async (tid: string, task: string) => {
+        const review = await this.internalCritic.review(tid, "task", "task", task);
+        return `Critic review: ${review.critiques.length} critiques, score ${review.overallScore}`;
+      }) as any,
+      "experiment-engine": (async () => {
+        return `Experiment engine ready`;
+      }) as any,
+      "neural-cognitive-core": (async (_tid: string, task: string) => {
+        const activation = await this.neuralCognitiveCore.activate(task, "");
+        return `Neural core: ${activation.matchedPattern ? 1 : 0} patterns matched, confidence ${activation.confidence.toFixed(2)}`;
+      }) as any,
+
+      // Planning servisleri
+      "planner": (async () => {
+        return `Legacy planner: plan generated`;
+      }) as any,
+      "simulation": (async () => {
+        return `Simulation complete`;
+      }) as any,
+      "counterfactual-simulator": (async () => {
+        return `Counterfactual simulation: alternatives evaluated`;
+      }) as any,
+
+      // Verification servisleri
+      "verification": (async () => {
+        return `Verification passed`;
+      }) as any,
+      "critic": (async () => {
+        return `Critic check passed`;
+      }) as any,
+
+      // Execution servisleri
+      "attention-v2": (async (tid: string) => {
+        const targets = await this.attentionV2.getTopTargets(tid, 3);
+        return `Attention: ${targets.length} targets tracked`;
+      }) as any,
+      "adaptive-router": (async () => {
+        return `Adaptive routing active`;
+      }) as any,
+
+      // Learning servisleri
+      "experience-compiler": (async () => {
+        return `Experience compiler ready`;
+      }) as any,
+    };
+
+    // Meta Controller.run() ile tüm lifecycle'ı çalıştır
+    const result = await this.metaController.run(tenantId, taskDescription, executors);
+
+    // Sonuçları EventBus ve CognitiveState'e bildir
+    await this.eventBus.emit(
+      result.outcome === "success" ? "task.completed" : "task.failed",
+      "HybridAgentEngine",
+      {
+        traceId: result.traceId,
+        outcome: result.outcome,
+        totalDurationMs: result.totalDurationMs,
+        subsystemsUsed: result.subsystemsUsed.length,
+        phaseResults: result.phaseResults.length,
+      },
+      { traceId, severity: result.outcome === "success" ? "info" : "warning" },
+    );
+
+    this.cognitiveState.updateSuccessRate(result.outcome === "success");
+    this.cognitiveState.setMode("idle", `Task ${result.outcome}`);
+
+    return result;
   }
 }

@@ -146,6 +146,22 @@ export interface ModelUsage {
   costUsd?: number;
 }
 
+/**
+ * Prompt-cache marker hints for providers that support explicit breakpoints
+ * (Anthropic and compatible APIs). Providers with automatic caching ignore it.
+ * `scopeId` identifies the conversation's cache scope: Aurora compacts in
+ * place, so the physical session id is the scope, and fork/delegate children
+ * own their own id and therefore their own isolated scope.
+ */
+export interface PromptCacheHint {
+  planId: string;
+  scopeId: string;
+  ttlMs: number;
+  systemBreakpoint: boolean;
+  toolBreakpoint: boolean;
+  messageTailMarkers: number;
+}
+
 export interface ModelRequest {
   tenantId?: string;
   sessionId: UUID;
@@ -157,6 +173,10 @@ export interface ModelRequest {
   tools: CapabilityDescriptor[];
   /** Explicit, ordered provider:model routes. They are never inferred across data-policy boundaries. */
   fallbackModels?: string[];
+  /** Requested reasoning effort. Providers that do not support it ignore it; none may be broken by it. */
+  reasoningEffort?: "low" | "medium" | "high" | "max";
+  /** Explicit prompt-cache breakpoints computed by the prompt-cache planner. */
+  promptCache?: PromptCacheHint;
   signal?: AbortSignal;
 }
 
@@ -202,6 +222,8 @@ export interface CapabilityContext {
   source: InputSource;
   workspacePath: string;
   allowedCapabilityIds?: string[];
+  /** The agent profile this call runs under, so a hook can be scoped to one subagent. */
+  agentProfileId?: string;
   signal?: AbortSignal;
   idempotencyKey: string;
 }
@@ -233,6 +255,14 @@ export interface ApprovalRequest {
   createdAt: string;
   expiresAt: string;
   status: "pending" | "approved" | "denied" | "expired";
+  /** Present when a reviewed auto-approval rule answered instead of a human. */
+  autoApproval?: { ruleId?: string; rationale: string };
+  /** What the preview masked, shortened or dropped. An approver is told, never left to guess. */
+  previewIntegrity?: {
+    maskedValues: number;
+    shortened: Array<{ key: string; originalChars: number; keptChars: number }>;
+    droppedKeys: string[];
+  };
 }
 
 export interface GoalState {
@@ -285,7 +315,8 @@ export interface SessionTreeState {
 }
 
 export type AgentMessageDeliveryMode = "auto" | "steer" | "follow_up";
-export type AgentMessageRelationship = "parent" | "sibling" | "child";
+/** `external` is a same-tenant agent outside the sender's family: reachable by name, not by kinship. */
+export type AgentMessageRelationship = "parent" | "sibling" | "child" | "external";
 export type AgentInboxState = "pending" | "claimed" | "delivered" | "uncertain";
 
 export interface AgentInboxMessage {

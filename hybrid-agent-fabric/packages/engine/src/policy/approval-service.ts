@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { ApprovalRequest, CapabilityContext, CapabilityDescriptor, JsonValue } from "../types.js";
-import { safePreview } from "../util/json.js";
+import { buildApprovalPreview } from "../util/json.js";
 
 interface PendingApproval {
   request: ApprovalRequest;
@@ -10,12 +10,24 @@ interface PendingApproval {
 
 export type ApprovalListener = (request: ApprovalRequest) => void;
 
+/**
+ * A reviewer may answer an approval before a human sees it. It must always produce a rationale, and
+ * declining is the default: any failure inside the reviewer leaves the request in front of a person.
+ */
+export type ApprovalReviewer = (request: ApprovalRequest) => Promise<{ autoApproved: boolean; rationale: string; ruleId?: string }>;
+
 export class ApprovalService {
   private readonly pending = new Map<string, PendingApproval>();
   private readonly listeners = new Set<ApprovalListener>();
   private readonly sessionGrants = new Set<string>();
+  private reviewer?: ApprovalReviewer;
 
   constructor(private readonly defaultTimeoutMs = 5 * 60_000) {}
+
+  /** Install the reviewed auto-approval policy. Without one, every request reaches a human. */
+  bindReviewer(reviewer: ApprovalReviewer): void {
+    this.reviewer = reviewer;
+  }
 
   subscribe(listener: ApprovalListener): () => void {
     this.listeners.add(listener);
@@ -41,6 +53,7 @@ export class ApprovalService {
     if (this.hasSessionGrant(context.sessionId, descriptor.id)) return true;
     const id = randomUUID();
     const now = Date.now();
+    const preview = buildApprovalPreview(argumentsValue);
     const request: ApprovalRequest = {
       id,
       tenantId: context.tenantId,
@@ -49,12 +62,30 @@ export class ApprovalService {
       toolCallId: context.toolCallId,
       capabilityId: descriptor.id,
       risk: descriptor.risk,
-      argumentsPreview: safePreview(argumentsValue),
+      // The preview is the question being asked, so it keeps the decision-relevant fields whole and
+      // reports what it masked or dropped rather than silently shrinking the thing under review.
+      argumentsPreview: preview.preview,
+      previewIntegrity: preview.integrity,
       reason,
       createdAt: new Date(now).toISOString(),
       expiresAt: new Date(now + this.defaultTimeoutMs).toISOString(),
       status: "pending",
     };
+
+    if (this.reviewer) {
+      try {
+        const review = await this.reviewer(request);
+        if (review.autoApproved) {
+          request.status = "approved";
+          request.autoApproval = { rationale: review.rationale, ...(review.ruleId ? { ruleId: review.ruleId } : {}) };
+          // Notified like any other resolution: an automatic answer must be as visible as a human one.
+          this.notify(request);
+          return true;
+        }
+      } catch {
+        // A reviewer that throws has not approved anything; the request goes to a human.
+      }
+    }
 
     return await new Promise<boolean>((resolve) => {
       const timer = setTimeout(() => {

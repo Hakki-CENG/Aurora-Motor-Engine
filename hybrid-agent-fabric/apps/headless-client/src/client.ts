@@ -29,6 +29,55 @@ export class HafApiError extends Error {
   }
 }
 
+export const AURORA_VIEWS = {
+  status: "/v1/acos/status",
+  journal: "/v1/acos/journal",
+  metrics: "/v1/aurora/metrics",
+  alerts: "/v1/aurora/alerts",
+  selfcheck: "/v1/aurora/selfcheck",
+  footprint: "/v1/aurora/footprint",
+  enforcement: "/v1/aurora/enforcement",
+  "enforcement-summary": "/v1/aurora/enforcement-summary",
+  autopilot: "/v1/autopilot",
+  "autopilot-runs": "/v1/autopilot/runs",
+  delegations: "/v1/delegations",
+  "role-authority": "/v1/society/authority/audit",
+  "harvest-review": "/v1/harvest-review",
+  "harvest-assessments": "/v1/harvest-assessments",
+  "decision-feedback": "/v1/decision-feedback",
+  "decision-feedback-summary": "/v1/decision-feedback/summary",
+  "estimation-profile": "/v1/estimation/profile",
+  probation: "/v1/society/probation",
+  hooks: "/v1/hooks",
+  "hook-firings": "/v1/hooks/firings",
+  "session-modes": "/v1/session-modes",
+  "mode-defaults": "/v1/session-modes/defaults",
+  usage: "/v1/usage",
+  "session-archives": "/v1/session-archives",
+  "model-prices": "/v1/model-prices",
+  "effort-levels": "/v1/effort-levels",
+  "trust-publishers": "/v1/trust/publishers",
+  "trust-pins": "/v1/trust/pins",
+  "trust-decisions": "/v1/trust/decisions",
+  settings: "/v1/settings/effective",
+  questions: "/v1/questions",
+  "auto-approvals": "/v1/auto-approvals",
+  "session-budgets": "/v1/session-budgets",
+  "agent-directory": "/v1/agent-directory",
+  "auto-approval-decisions": "/v1/auto-approvals/decisions",
+  "mcp-stateless": "/v1/mcp/stateless",
+  "delegation-policy": "/v1/delegation-policy",
+  fleet: "/v1/aurora/fleet",
+  "fleet-members": "/v1/aurora/fleet/members",
+  "fleet-sweeps": "/v1/aurora/fleet/sweeps",
+  compliance: "/v1/constitution/compliance",
+  initiatives: "/v1/initiative/initiatives",
+  checkpoints: "/v1/checkpoints",
+} as const satisfies Record<string, string>;
+
+export type AuroraView = keyof typeof AURORA_VIEWS;
+export type AuroraAction = "cycle" | "autopilot-run-due" | "fleet-sweep" | "delegation-sync" | "harvest" | "decision-feedback-reconcile";
+
 export class HafApiClient {
   private readonly origin: string;
   private readonly fetchImpl: typeof fetch;
@@ -89,6 +138,42 @@ export class HafApiClient {
   }
   async resolveApproval(approvalId: string, resolution: "approve_once" | "approve_session" | "deny"): Promise<any> {
     return await this.request(`/v1/approvals/${segment(approvalId)}/resolve`, { method: "POST", body: { resolution } });
+  }
+
+  /**
+   * Read-only Aurora views, exposed to the CLI through a fixed allowlist so a typo can never turn
+   * into an arbitrary Control API call and no mutating endpoint is reachable by accident.
+   */
+  async auroraView(view: AuroraView, options: { limit?: number } = {}): Promise<unknown> {
+    const path = AURORA_VIEWS[view];
+    if (!path) throw new Error(`Unknown Aurora view "${view}". Known views: ${Object.keys(AURORA_VIEWS).join(", ")}.`);
+    const url = new URL(path, "http://placeholder.invalid");
+    url.searchParams.set("tenantId", this.tenantId);
+    if (options.limit !== undefined) url.searchParams.set("limit", String(Math.min(1000, Math.max(1, Math.floor(options.limit)))));
+    return await this.request(`${url.pathname}${url.search}`, { method: "GET" });
+  }
+
+  /** The three explicitly bounded Aurora actions the CLI may trigger. Everything else stays in the API. */
+  async auroraAction(action: AuroraAction, options: { mode?: string } = {}): Promise<unknown> {
+    if (action === "cycle") {
+      return await this.request("/v1/acos/cycles", { method: "POST", timeoutMs: 10 * 60_000, body: { tenantId: this.tenantId, mode: options.mode ?? "maintenance" } });
+    }
+    if (action === "autopilot-run-due") {
+      return await this.request("/v1/autopilot/run-due", { method: "POST", timeoutMs: 10 * 60_000, body: { tenantId: this.tenantId } });
+    }
+    if (action === "fleet-sweep") {
+      return await this.request("/v1/aurora/fleet/sweep", { method: "POST", timeoutMs: 10 * 60_000, body: { tenantId: this.tenantId } });
+    }
+    if (action === "delegation-sync") {
+      return await this.request("/v1/delegations/sync", { method: "POST", timeoutMs: 10 * 60_000, body: { tenantId: this.tenantId } });
+    }
+    if (action === "harvest") {
+      return await this.request("/v1/delegations/harvest", { method: "POST", timeoutMs: 10 * 60_000, body: { tenantId: this.tenantId } });
+    }
+    if (action === "decision-feedback-reconcile") {
+      return await this.request("/v1/decision-feedback/reconcile", { method: "POST", timeoutMs: 10 * 60_000, body: { tenantId: this.tenantId } });
+    }
+    throw new Error(`Unknown Aurora action "${action}". Known actions: cycle, autopilot-run-due, fleet-sweep, delegation-sync, harvest, decision-feedback-reconcile.`);
   }
 
   async subscribe(sessionId: string, options: EventSubscriptionOptions): Promise<void> {
