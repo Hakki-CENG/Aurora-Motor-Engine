@@ -1,0 +1,71 @@
+{
+  "id": "traj-recovery-001-1789666874077-925xcj",
+  "taskId": "recovery-001",
+  "tenantId": "eval",
+  "sessionId": "eval-recovery-001",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:41:14.077Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "recovery-001",
+        "category": "recovery",
+        "instruction": "Try to install a package called 'nonexistent-package-xyz' that doesn't exist. When it fails, gracefully handle the error and suggest alternatives."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:41:14.077Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789666874077",
+        "data": {
+          "taskDescription": "Try to install a package called 'nonexistent-package-xyz' that doesn't exist. When it fails, gracefully handle the error and suggest alternatives.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:41:14.079Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789666874077",
+        "data": {
+          "traceId": "run-1789666874077-yye17w",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 0,
+          "phaseResults": 0
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:41:14.079Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": []
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:41:14.077Z",
+  "completedAt": "2026-09-17T17:41:14.079Z",
+  "durationMs": 2,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task recovery-001: success"
+}

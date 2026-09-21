@@ -1,0 +1,87 @@
+{
+  "id": "traj-coding-025-1789667944054-wj8ggf",
+  "taskId": "coding-025",
+  "tenantId": "eval",
+  "sessionId": "eval-coding-025",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:59:04.054Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "coding-025",
+        "category": "coding",
+        "instruction": "Implement a finite state machine that: 1) Defines states and transitions, 2) Supports guards on transitions, 3) Has entry/exit actions, 4) Provides history tracking, 5) Supports nested states."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:59:04.054Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944054",
+        "data": {
+          "taskDescription": "Implement a finite state machine that: 1) Defines states and transitions, 2) Supports guards on transitions, 3) Has entry/exit actions, 4) Provides history tracking, 5) Supports nested states.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T17:59:04.054Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Implement a finite state machine that: 1) Defines states and transitions, 2) Supports guards on transitions, 3) Has entry/exit actions, 4) Provides history tracking, 5) Supports nested states.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:59:04.056Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944054",
+        "data": {
+          "traceId": "run-1789667944054-fj7wr6",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:59:04.056Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:59:04.054Z",
+  "completedAt": "2026-09-17T17:59:04.056Z",
+  "durationMs": 2,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task coding-025: success"
+}

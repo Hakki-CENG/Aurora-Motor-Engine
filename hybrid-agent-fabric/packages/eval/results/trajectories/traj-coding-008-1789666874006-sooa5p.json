@@ -1,0 +1,94 @@
+{
+  "id": "traj-coding-008-1789666874006-sooa5p",
+  "taskId": "coding-008",
+  "tenantId": "eval",
+  "sessionId": "eval-coding-008",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:41:14.006Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "coding-008",
+        "category": "coding",
+        "instruction": "The file src/slow.ts has a slow implementation of finding duplicates. Optimize it to O(n) time complexity.\n\n```typescript\nfunction findDuplicates(arr: number[]): number[] {\n  const duplicates: number["
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:41:14.006Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789666874006",
+        "data": {
+          "taskDescription": "The file src/slow.ts has a slow implementation of finding duplicates. Optimize it to O(n) time complexity.\n\n```typescript\nfunction findDuplicates(arr: number[]): number[] {\n  const duplicates: number[",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T17:41:14.006Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "The file src/slow.ts has a slow implementation of finding duplicates. Optimize it to O(n) time complexity.\n\n```typescript\nfunction findDuplicates(arr: number[]): number[] {\n  const duplicates: number[] = [];\n  for (let i = 0; i < arr.length; i++) {\n    for (let j = i + 1; j < arr.length; j++) {\n      if (arr[i] === arr[j] && !duplicates.includes(arr[i])) {\n        duplicates.push(arr[i]);\n      }\n    }\n  }\n  return duplicates;\n}\n```",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:41:14.008Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789666874006",
+        "data": {
+          "traceId": "run-1789666874006-xw5du5",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 8,
+          "phaseResults": 4
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:41:14.008Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory",
+          "world-model",
+          "uncertainty-engine",
+          "causal-graph",
+          "planner",
+          "simulation",
+          "internal-critic",
+          "verification"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:41:14.006Z",
+  "completedAt": "2026-09-17T17:41:14.008Z",
+  "durationMs": 2,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task coding-008: success"
+}

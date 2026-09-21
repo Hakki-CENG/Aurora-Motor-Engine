@@ -1,0 +1,87 @@
+{
+  "id": "traj-capability-002-1789665181966-a6kxcr",
+  "taskId": "capability-002",
+  "tenantId": "eval",
+  "sessionId": "eval-capability-002",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:13:01.966Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "capability-002",
+        "category": "capability_acquisition",
+        "instruction": "Combine existing capabilities to create a new one. For example, combine web search + code generation + testing to create an auto-fix capability."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:13:01.966Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665181966",
+        "data": {
+          "taskDescription": "Combine existing capabilities to create a new one. For example, combine web search + code generation + testing to create an auto-fix capability.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T17:13:01.966Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Combine existing capabilities to create a new one. For example, combine web search + code generation + testing to create an auto-fix capability.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:13:01.967Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665181966",
+        "data": {
+          "traceId": "run-1789665181966-dq3go1",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:13:01.967Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:13:01.966Z",
+  "completedAt": "2026-09-17T17:13:01.967Z",
+  "durationMs": 1,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task capability-002: success"
+}

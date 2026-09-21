@@ -322,21 +322,23 @@ export class ComputerUseService {
   // ─── Private Helpers ───
 
   private async executeStep(target: AutomationTarget, step: AutomationStep): Promise<unknown> {
-    // In production, dispatch to appropriate automation backend
-    switch (step.type) {
-      case "click": return { clicked: step.selector ?? step.coordinates };
-      case "type": return { typed: step.value };
-      case "scroll": return { scrolled: step.value };
-      case "wait": return { waited: step.value ?? 1000 };
-      case "screenshot": return { screenshot: "base64..." };
-      case "navigate": return { navigated: step.value };
-      case "keypress": return { pressed: step.value };
-      case "hover": return { hovered: step.selector };
-      case "drag": return { dragged: step.coordinates };
-      case "assert": return { asserted: true };
-      case "extract": return { extracted: step.value };
-      default: return {};
+    // No automation backend is wired up. Each branch below used to report the
+    // action as performed — `{ clicked: ... }`, `{ typed: ... }`, and even a
+    // literal `"base64..."` string standing in for a screenshot — so a caller
+    // received a full, plausible trace of a session that never happened.
+    //
+    // `wait` is the one step that is genuinely honoured, because waiting
+    // requires no backend.
+    if (step.type === "wait") {
+      const ms = typeof step.value === "number" ? step.value : 1000;
+      await new Promise((resolve) => setTimeout(resolve, ms));
+      return { waited: ms };
     }
+
+    throw new Error(
+      `Computer-use step '${step.type}' is not implemented. ` +
+        `It requires an automation backend (Playwright, CDP, or an OS-level driver).`,
+    );
   }
 
   private createRollbackStep(step: AutomationStep): AutomationStep {

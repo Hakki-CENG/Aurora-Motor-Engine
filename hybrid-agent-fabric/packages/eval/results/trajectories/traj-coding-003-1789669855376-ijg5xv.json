@@ -1,0 +1,94 @@
+{
+  "id": "traj-coding-003-1789669855376-ijg5xv",
+  "taskId": "coding-003",
+  "tenantId": "eval",
+  "sessionId": "eval-coding-003",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T18:30:55.376Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "coding-003",
+        "category": "coding",
+        "instruction": "Refactor the file src/dispatch.ts to use a strategy pattern instead of a switch statement.\n\n```typescript\ntype ActionType = 'create' | 'update' | 'delete';\n\nfunction handleAction(action: ActionType, d"
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T18:30:55.376Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789669855376",
+        "data": {
+          "taskDescription": "Refactor the file src/dispatch.ts to use a strategy pattern instead of a switch statement.\n\n```typescript\ntype ActionType = 'create' | 'update' | 'delete';\n\nfunction handleAction(action: ActionType, d",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T18:30:55.376Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Refactor the file src/dispatch.ts to use a strategy pattern instead of a switch statement.\n\n```typescript\ntype ActionType = 'create' | 'update' | 'delete';\n\nfunction handleAction(action: ActionType, data: any): string {\n  switch (action) {\n    case 'create': return `Created: ${JSON.stringify(data)}`;\n    case 'update': return `Updated: ${JSON.stringify(data)}`;\n    case 'delete': return `Deleted: ${data.id}`;\n    default: throw new Error(`Unknown action: ${action}`);\n  }\n}\n```",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T18:30:55.378Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789669855376",
+        "data": {
+          "traceId": "run-1789669855376-knncgd",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 8,
+          "phaseResults": 4
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T18:30:55.378Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory",
+          "world-model",
+          "uncertainty-engine",
+          "causal-graph",
+          "planner",
+          "simulation",
+          "internal-critic",
+          "verification"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T18:30:55.376Z",
+  "completedAt": "2026-09-17T18:30:55.378Z",
+  "durationMs": 2,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task coding-003: success"
+}

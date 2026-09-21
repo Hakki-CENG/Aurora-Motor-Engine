@@ -1,0 +1,121 @@
+{
+  "timestamp": "2026-09-17T18:31:02.149Z",
+  "model": "mock",
+  "overall": {
+    "totalTokens": 0,
+    "totalCostUsd": 0,
+    "avgTokensPerTask": 0,
+    "avgCostPerTask": 0,
+    "medianTokensPerTask": 0,
+    "p95Tokens": 0,
+    "p99Tokens": 0
+  },
+  "byCategory": [
+    {
+      "category": "coding",
+      "taskCount": 26,
+      "totalTokens": 0,
+      "totalCostUsd": 0,
+      "avgTokensPerTask": 0,
+      "avgCostPerTask": 0
+    },
+    {
+      "category": "memory",
+      "taskCount": 6,
+      "totalTokens": 0,
+      "totalCostUsd": 0,
+      "avgTokensPerTask": 0,
+      "avgCostPerTask": 0
+    },
+    {
+      "category": "planning",
+      "taskCount": 6,
+      "totalTokens": 0,
+      "totalCostUsd": 0,
+      "avgTokensPerTask": 0,
+      "avgCostPerTask": 0
+    },
+    {
+      "category": "reasoning",
+      "taskCount": 6,
+      "totalTokens": 0,
+      "totalCostUsd": 0,
+      "avgTokensPerTask": 0,
+      "avgCostPerTask": 0
+    },
+    {
+      "category": "recovery",
+      "taskCount": 6,
+      "totalTokens": 0,
+      "totalCostUsd": 0,
+      "avgTokensPerTask": 0,
+      "avgCostPerTask": 0
+    },
+    {
+      "category": "security",
+      "taskCount": 6,
+      "totalTokens": 0,
+      "totalCostUsd": 0,
+      "avgTokensPerTask": 0,
+      "avgCostPerTask": 0
+    },
+    {
+      "category": "capability_acquisition",
+      "taskCount": 2,
+      "totalTokens": 0,
+      "totalCostUsd": 0,
+      "avgTokensPerTask": 0,
+      "avgCostPerTask": 0
+    },
+    {
+      "category": "long_horizon",
+      "taskCount": 2,
+      "totalTokens": 0,
+      "totalCostUsd": 0,
+      "avgTokensPerTask": 0,
+      "avgCostPerTask": 0
+    },
+    {
+      "category": "multimodal",
+      "taskCount": 2,
+      "totalTokens": 0,
+      "totalCostUsd": 0,
+      "avgTokensPerTask": 0,
+      "avgCostPerTask": 0
+    },
+    {
+      "category": "research",
+      "taskCount": 3,
+      "totalTokens": 0,
+      "totalCostUsd": 0,
+      "avgTokensPerTask": 0,
+      "avgCostPerTask": 0
+    },
+    {
+      "category": "tool_use",
+      "taskCount": 10,
+      "totalTokens": 0,
+      "totalCostUsd": 0,
+      "avgTokensPerTask": 0,
+      "avgCostPerTask": 0
+    }
+  ],
+  "byDifficulty": [
+    {
+      "difficulty": 3,
+      "label": "Medium",
+      "taskCount": 75,
+      "totalTokens": 0,
+      "totalCostUsd": 0,
+      "avgTokensPerTask": 0,
+      "avgCostPerTask": 0
+    }
+  ],
+  "budgetAlerts": [],
+  "recommendations": [],
+  "efficiency": {
+    "tokensPerSuccessfulStep": 0,
+    "costPerSuccessfulTask": 0,
+    "wastePercentage": 0
+  }
+}

@@ -4,19 +4,48 @@ import { describe, it, expect } from "vitest";
 
 function renderMarkdown(text: string): string {
   let h = text;
+  // Escape HTML outside of code blocks first
+  // Extract code blocks, replace with placeholders, escape HTML, restore code blocks
+  const codeBlocks: string[] = [];
   h = h.replace(/```(\w+)?\n([\s\S]*?)```/g, (_: string, lang: string, code: string) => {
+    const placeholder = `__CODE_BLOCK_${codeBlocks.length}__`;
     const esc = code.trim().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-    return `<div class="code-block"><div class="code-header">${lang ? `<span class="code-lang">${lang}</span>` : ""}<button class="copy-btn">Copy</button></div><pre><code>${esc}</code></pre></div>`;
+    codeBlocks.push(`<div class="code-block"><div class="code-header">${lang ? `<span class="code-lang">${lang}</span>` : ""}<button class="copy-btn">Copy</button></div><pre><code>${esc}</code></pre></div>`);
+    return placeholder;
   });
-  h = h.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+
+  // Extract inline code, replace with placeholders
+  const inlineCodes: string[] = [];
+  h = h.replace(/`([^`]+)`/g, (_: string, code: string) => {
+    const placeholder = `__INLINE_CODE_${inlineCodes.length}__`;
+    inlineCodes.push(`<code class="inline-code">${code.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</code>`);
+    return placeholder;
+  });
+
+  // Now escape HTML in remaining text
+  h = h.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  // Restore inline codes
+  h = h.replace(/__INLINE_CODE_(\d+)__/g, (_: string, idx: string) => inlineCodes[parseInt(idx)]!);
+
+  // Restore code blocks
+  h = h.replace(/__CODE_BLOCK_(\d+)__/g, (_: string, idx: string) => codeBlocks[parseInt(idx)]!);
+
   h = h.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   h = h.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, "<em>$1</em>");
   h = h.replace(/^### (.+)$/gm, "<h4>$1</h4>");
   h = h.replace(/^## (.+)$/gm, "<h3>$1</h3>");
   h = h.replace(/^# (.+)$/gm, "<h2>$1</h2>");
-  h = h.replace(/^> (.+)$/gm, "<blockquote>$1</blockquote>");
+  h = h.replace(/^&gt; (.+)$/gm, "<blockquote>$1</blockquote>");
   h = h.replace(/^[*-] (.+)$/gm, "<li>$1</li>");
-  h = h.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  // Sanitize links - block javascript: URLs
+  h = h.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_: string, text: string, url: string) => {
+    const safeUrl = url.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+    if (/^javascript:/i.test(url)) {
+      return `<a href="#" title="Blocked unsafe link">${text}</a>`;
+    }
+    return `<a href="${safeUrl}" target="_blank" rel="noopener">${text}</a>`;
+  });
   h = h.replace(/^---$/gm, "<hr>");
   h = h.replace(/\n/g, "<br>");
   return h;

@@ -1,0 +1,255 @@
+{
+  "timestamp": "2026-09-17T17:59:08.684Z",
+  "overall": {
+    "totalTasks": 75,
+    "totalDurationMs": 2028,
+    "avgDurationMs": 27.04,
+    "medianDurationMs": 1,
+    "p95DurationMs": 4,
+    "p99DurationMs": 25,
+    "minDurationMs": 0,
+    "maxDurationMs": 25,
+    "stdDevMs": 25.346642118171548,
+    "throughput": 36.98224852071006
+  },
+  "byCategory": [
+    {
+      "category": "coding",
+      "stats": {
+        "totalTasks": 26,
+        "totalDurationMs": 70,
+        "avgDurationMs": 2.6923076923076925,
+        "medianDurationMs": 2,
+        "p95DurationMs": 4,
+        "p99DurationMs": 25,
+        "minDurationMs": 1,
+        "maxDurationMs": 25,
+        "stdDevMs": 4.512966198114654,
+        "throughput": 371.42857142857144
+      },
+      "taskCount": 26,
+      "avgQuality": 1
+    },
+    {
+      "category": "memory",
+      "stats": {
+        "totalTasks": 6,
+        "totalDurationMs": 15,
+        "avgDurationMs": 2.5,
+        "medianDurationMs": 1,
+        "p95DurationMs": 10,
+        "p99DurationMs": 10,
+        "minDurationMs": 0,
+        "maxDurationMs": 10,
+        "stdDevMs": 3.4034296427770228,
+        "throughput": 400
+      },
+      "taskCount": 6,
+      "avgQuality": 1
+    },
+    {
+      "category": "planning",
+      "stats": {
+        "totalTasks": 6,
+        "totalDurationMs": 11,
+        "avgDurationMs": 1.8333333333333333,
+        "medianDurationMs": 1,
+        "p95DurationMs": 5,
+        "p99DurationMs": 5,
+        "minDurationMs": 1,
+        "maxDurationMs": 5,
+        "stdDevMs": 1.462494064565354,
+        "throughput": 545.4545454545454
+      },
+      "taskCount": 6,
+      "avgQuality": 1
+    },
+    {
+      "category": "reasoning",
+      "stats": {
+        "totalTasks": 6,
+        "totalDurationMs": 6,
+        "avgDurationMs": 1,
+        "medianDurationMs": 1,
+        "p95DurationMs": 1,
+        "p99DurationMs": 1,
+        "minDurationMs": 1,
+        "maxDurationMs": 1,
+        "stdDevMs": 0,
+        "throughput": 1000
+      },
+      "taskCount": 6,
+      "avgQuality": 1
+    },
+    {
+      "category": "recovery",
+      "stats": {
+        "totalTasks": 6,
+        "totalDurationMs": 6,
+        "avgDurationMs": 1,
+        "medianDurationMs": 1,
+        "p95DurationMs": 1,
+        "p99DurationMs": 1,
+        "minDurationMs": 1,
+        "maxDurationMs": 1,
+        "stdDevMs": 0,
+        "throughput": 1000
+      },
+      "taskCount": 6,
+      "avgQuality": 1
+    },
+    {
+      "category": "security",
+      "stats": {
+        "totalTasks": 6,
+        "totalDurationMs": 9,
+        "avgDurationMs": 1.5,
+        "medianDurationMs": 1,
+        "p95DurationMs": 3,
+        "p99DurationMs": 3,
+        "minDurationMs": 1,
+        "maxDurationMs": 3,
+        "stdDevMs": 0.7637626158259734,
+        "throughput": 666.6666666666666
+      },
+      "taskCount": 6,
+      "avgQuality": 1
+    },
+    {
+      "category": "capability_acquisition",
+      "stats": {
+        "totalTasks": 2,
+        "totalDurationMs": 2,
+        "avgDurationMs": 1,
+        "medianDurationMs": 1,
+        "p95DurationMs": 1,
+        "p99DurationMs": 1,
+        "minDurationMs": 1,
+        "maxDurationMs": 1,
+        "stdDevMs": 0,
+        "throughput": 1000
+      },
+      "taskCount": 2,
+      "avgQuality": 1
+    },
+    {
+      "category": "long_horizon",
+      "stats": {
+        "totalTasks": 2,
+        "totalDurationMs": 3,
+        "avgDurationMs": 1.5,
+        "medianDurationMs": 2,
+        "p95DurationMs": 2,
+        "p99DurationMs": 2,
+        "minDurationMs": 1,
+        "maxDurationMs": 2,
+        "stdDevMs": 0.5,
+        "throughput": 666.6666666666666
+      },
+      "taskCount": 2,
+      "avgQuality": 1
+    },
+    {
+      "category": "multimodal",
+      "stats": {
+        "totalTasks": 2,
+        "totalDurationMs": 2,
+        "avgDurationMs": 1,
+        "medianDurationMs": 1,
+        "p95DurationMs": 1,
+        "p99DurationMs": 1,
+        "minDurationMs": 1,
+        "maxDurationMs": 1,
+        "stdDevMs": 0,
+        "throughput": 1000
+      },
+      "taskCount": 2,
+      "avgQuality": 1
+    },
+    {
+      "category": "research",
+      "stats": {
+        "totalTasks": 3,
+        "totalDurationMs": 3,
+        "avgDurationMs": 1,
+        "medianDurationMs": 1,
+        "p95DurationMs": 1,
+        "p99DurationMs": 1,
+        "minDurationMs": 1,
+        "maxDurationMs": 1,
+        "stdDevMs": 0,
+        "throughput": 1000
+      },
+      "taskCount": 3,
+      "avgQuality": 1
+    },
+    {
+      "category": "tool_use",
+      "stats": {
+        "totalTasks": 10,
+        "totalDurationMs": 13,
+        "avgDurationMs": 1.3,
+        "medianDurationMs": 1,
+        "p95DurationMs": 2,
+        "p99DurationMs": 2,
+        "minDurationMs": 1,
+        "maxDurationMs": 2,
+        "stdDevMs": 0.45825756949558405,
+        "throughput": 769.2307692307693
+      },
+      "taskCount": 10,
+      "avgQuality": 1
+    }
+  ],
+  "byDifficulty": [
+    {
+      "difficulty": 3,
+      "label": "Medium",
+      "stats": {
+        "totalTasks": 75,
+        "totalDurationMs": 140,
+        "avgDurationMs": 1.8666666666666667,
+        "medianDurationMs": 1,
+        "p95DurationMs": 4,
+        "p99DurationMs": 25,
+        "minDurationMs": 0,
+        "maxDurationMs": 25,
+        "stdDevMs": 2.9589788028229527,
+        "throughput": 535.7142857142857
+      },
+      "taskCount": 75,
+      "avgQuality": 1
+    }
+  ],
+  "bottlenecks": [
+    {
+      "taskId": "coding-008",
+      "category": "coding",
+      "difficulty": 3,
+      "durationMs": 25,
+      "avgForCategory": 2.6923076923076925,
+      "avgForDifficulty": 1.8666666666666667,
+      "slowdownFactor": 9.285714285714285,
+      "severity": "high",
+      "recommendation": "Task coding-008 is 9.3x slower than average. Consider optimizing or increasing timeout."
+    },
+    {
+      "taskId": "memory-004",
+      "category": "memory",
+      "difficulty": 3,
+      "durationMs": 10,
+      "avgForCategory": 2.5,
+      "avgForDifficulty": 1.8666666666666667,
+      "slowdownFactor": 4,
+      "severity": "medium",
+      "recommendation": "Task memory-004 is 4.0x slower than average. Consider optimizing or increasing timeout."
+    }
+  ],
+  "recommendations": [
+    "2 bottleneck tasks detected. Top: coding-008 (9.3x slower)."
+  ],
+  "trend": {
+    "direction": "declining",
+    "details": "Execution time regressed by 29%"
+  }
+}

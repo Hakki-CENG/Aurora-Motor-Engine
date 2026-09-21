@@ -95,6 +95,18 @@ export interface CognitiveStateSnapshot {
   /** Son hata bağlamı */
   lastFailure: FailureContext | null;
 
+  /** Tüm hata geçmişi */
+  failureHistory: FailureContext[];
+
+  /** Belirsizlik seviyesi (0-1) */
+  uncertainty: number;
+
+  /** Son doğrulama sonucu */
+  lastVerificationResult: "pass" | "fail" | "partial" | null;
+
+  /** Aktif şüphe sayısı */
+  activeSuspicionCount: number;
+
   /** Başarı oranı (son 20 görev) */
   recentSuccessRate: number;
 
@@ -112,10 +124,33 @@ export interface CognitiveStateSnapshot {
 
   /** Timestamp */
   lastUpdated: number;
+
+  /** Number of tasks currently tracked in their own slots (running + recent). */
+  taskCount: number;
 }
 
+/**
+ * One task's own cognitive record.
+ *
+ * Exists because the flat fields on CognitiveStateSnapshot are single-valued:
+ * with two tasks in flight, "the active goal" is not a well-formed question.
+ */
+export interface TaskCognitiveSlot {
+  readonly taskId: string;
+  readonly tenantId: string;
+  readonly startedAt: number;
+  endedAt: number | null;
+  goal: ActiveGoal | null;
+  plan: ActivePlan | null;
+  verificationResult: "pass" | "fail" | "partial" | null;
+  failures: FailureContext[];
+}
+
+/** Keeps the finished-task map from growing without bound. */
+const MAX_TRACKED_TASKS = 100;
+
 const DEFAULT_STATE: CognitiveStateSnapshot = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   mode: "idle",
   activeGoal: null,
   activePlan: null,
@@ -131,12 +166,17 @@ const DEFAULT_STATE: CognitiveStateSnapshot = {
   },
   attentionFocus: null,
   lastFailure: null,
+  failureHistory: [],
+  uncertainty: 0,
+  lastVerificationResult: null,
+  activeSuspicionCount: 0,
   recentSuccessRate: 1.0,
   activeAgentCount: 0,
   activeToolCount: 0,
   totalTasksProcessed: 0,
   lastModeChangeReason: "initial",
   lastUpdated: Date.now(),
+  taskCount: 0,
 };
 
 /**
@@ -145,14 +185,114 @@ const DEFAULT_STATE: CognitiveStateSnapshot = {
  * DurableJsonState kullanmaz çünkü bu state sürekli değişir
  * ve persistence gerektirmez (rekonstrüksiyon yapılabilir).
  *
- * Thread-safe: Tek event loop'ta çalıştığı için race condition yok.
+ * Concurrency: a single event loop prevents torn writes, but it does NOT
+ * prevent interleaving. `PlanningEngine.plan()` awaits between its writes, so
+ * two concurrent plans overwrite each other's `activeGoal`/`activePlan` and a
+ * reader gets whichever finished last. The flat fields below are therefore
+ * "most recent task wins" — fine for a dashboard, wrong as a per-task record.
+ *
+ * `beginTask()` / `snapshotForTask()` give each task its own slot. Callers
+ * that care which task a goal or verdict belongs to must use those; the flat
+ * fields are kept so existing dashboard readers keep working.
  */
 export class CognitiveState {
   private state: CognitiveStateSnapshot;
   private history: Array<{ timestamp: number; mode: CognitiveMode; reason: string }> = [];
+  /** Per-task slots, insertion-ordered so the oldest finished task is evicted first. */
+  private tasks = new Map<string, TaskCognitiveSlot>();
 
   constructor() {
     this.state = { ...DEFAULT_STATE };
+  }
+
+  // ═══ Per-task slots (P0-2) ═══
+
+  /** Start tracking a task. Re-registering an existing id is a no-op. */
+  beginTask(taskId: string, tenantId: string): void {
+    if (this.tasks.has(taskId)) return;
+    this.tasks.set(taskId, {
+      taskId,
+      tenantId,
+      startedAt: Date.now(),
+      endedAt: null,
+      goal: null,
+      plan: null,
+      verificationResult: null,
+      failures: [],
+    });
+    this.evictFinishedTasks();
+    this.state.taskCount = this.tasks.size;
+    this.state.lastUpdated = Date.now();
+  }
+
+  /** Mark a task finished. Its slot stays readable until evicted. */
+  endTask(taskId: string): void {
+    const slot = this.tasks.get(taskId);
+    if (!slot) return;
+    slot.endedAt = Date.now();
+    this.evictFinishedTasks();
+    this.state.taskCount = this.tasks.size;
+    this.state.lastUpdated = Date.now();
+  }
+
+  /** Read one task's record. Null when the task was never begun. */
+  snapshotForTask(taskId: string): TaskCognitiveSlot | null {
+    const slot = this.tasks.get(taskId);
+    return slot ? { ...slot, failures: [...slot.failures] } : null;
+  }
+
+  /** Tasks that have not ended yet. */
+  runningTasks(): TaskCognitiveSlot[] {
+    return [...this.tasks.values()]
+      .filter((t) => t.endedAt === null)
+      .map((t) => ({ ...t, failures: [...t.failures] }));
+  }
+
+  /**
+   * Set a task's goal.
+   *
+   * Also mirrors into the flat field so existing dashboard readers keep
+   * working. The mirror is lossy by nature — that is exactly why the
+   * per-task slot exists.
+   */
+  setActiveGoalFor(taskId: string, goal: ActiveGoal | null): void {
+    const slot = this.tasks.get(taskId);
+    if (!slot) return;
+    slot.goal = goal;
+    this.setActiveGoal(goal);
+  }
+
+  /** Set a task's plan. Mirrors into the flat field, same caveat as above. */
+  setActivePlanFor(taskId: string, plan: ActivePlan | null): void {
+    const slot = this.tasks.get(taskId);
+    if (!slot) return;
+    slot.plan = plan;
+    this.setActivePlan(plan);
+  }
+
+  /** Record which task a verdict belongs to. */
+  setVerificationResultFor(taskId: string, result: "pass" | "fail" | "partial" | null): void {
+    const slot = this.tasks.get(taskId);
+    if (!slot) return;
+    slot.verificationResult = result;
+    this.setVerificationResult(result);
+  }
+
+  /** Attribute a failure to the task that produced it. */
+  recordFailureFor(taskId: string, failure: FailureContext): void {
+    const slot = this.tasks.get(taskId);
+    if (!slot) return;
+    slot.failures.push(failure);
+    this.recordFailure(failure);
+  }
+
+  /** Drop the oldest finished tasks once the map exceeds its bound. */
+  private evictFinishedTasks(): void {
+    if (this.tasks.size <= MAX_TRACKED_TASKS) return;
+    for (const [id, slot] of this.tasks) {
+      if (this.tasks.size <= MAX_TRACKED_TASKS) break;
+      if (slot.endedAt !== null) this.tasks.delete(id);
+    }
   }
 
   /** Tüm state'i oku (snapshot) */
@@ -226,6 +366,11 @@ export class CognitiveState {
   /** Hata bağlamını kaydet */
   recordFailure(failure: FailureContext): void {
     this.state.lastFailure = failure;
+    this.state.failureHistory.push(failure);
+    // Keep last 100 failures
+    if (this.state.failureHistory.length > 100) {
+      this.state.failureHistory = this.state.failureHistory.slice(-100);
+    }
     this.state.lastUpdated = Date.now();
   }
 
@@ -253,8 +398,27 @@ export class CognitiveState {
 
   /** State'i sıfırla (yeni session) */
   reset(): void {
-    this.state = { ...DEFAULT_STATE };
+    this.state = { ...DEFAULT_STATE, taskCount: 0 };
     this.history = [];
+    this.tasks.clear();
+  }
+
+  /** Belirsizlik seviyesini güncelle */
+  setUncertainty(level: number): void {
+    this.state.uncertainty = Math.max(0, Math.min(1, level));
+    this.state.lastUpdated = Date.now();
+  }
+
+  /** Son doğrulama sonucunu kaydet */
+  setVerificationResult(result: "pass" | "fail" | "partial" | null): void {
+    this.state.lastVerificationResult = result;
+    this.state.lastUpdated = Date.now();
+  }
+
+  /** Aktif şüphe sayısını güncelle */
+  setActiveSuspicionCount(count: number): void {
+    this.state.activeSuspicionCount = count;
+    this.state.lastUpdated = Date.now();
   }
 
   getStats() {

@@ -1,0 +1,141 @@
+{
+  "timestamp": "2026-09-17T18:31:20.070Z",
+  "status": {
+    "active": true,
+    "lastRun": "2026-09-17T18:30:55.508Z",
+    "nextRun": "2026-09-17T19:30:55.508Z",
+    "health": "healthy",
+    "healthDetails": "All systems operational",
+    "recentAlerts": [],
+    "runHistory": [
+      {
+        "timestamp": "2026-09-17T18:30:55.508Z",
+        "score": 1,
+        "passed": 75,
+        "total": 75
+      },
+      {
+        "timestamp": "2026-09-17T18:24:35.098Z",
+        "score": 1,
+        "passed": 10,
+        "total": 10
+      },
+      {
+        "timestamp": "2026-09-17T18:19:25.378Z",
+        "score": 1,
+        "passed": 10,
+        "total": 10
+      },
+      {
+        "timestamp": "2026-09-17T18:15:09.441Z",
+        "score": 1,
+        "passed": 10,
+        "total": 10
+      },
+      {
+        "timestamp": "2026-09-17T18:08:46.546Z",
+        "score": 1,
+        "passed": 10,
+        "total": 10
+      },
+      {
+        "timestamp": "2026-09-17T18:04:18.989Z",
+        "score": 1,
+        "passed": 10,
+        "total": 10
+      },
+      {
+        "timestamp": "2026-09-17T17:59:04.137Z",
+        "score": 1,
+        "passed": 75,
+        "total": 75
+      },
+      {
+        "timestamp": "2026-09-17T17:51:20.656Z",
+        "score": 1,
+        "passed": 10,
+        "total": 10
+      },
+      {
+        "timestamp": "2026-09-17T17:41:14.160Z",
+        "score": 1,
+        "passed": 75,
+        "total": 75
+      },
+      {
+        "timestamp": "2026-09-17T17:35:15.276Z",
+        "score": 1,
+        "passed": 10,
+        "total": 10
+      },
+      {
+        "timestamp": "2026-09-17T17:26:36.098Z",
+        "score": 1,
+        "passed": 75,
+        "total": 75
+      },
+      {
+        "timestamp": "2026-09-17T17:26:14.898Z",
+        "score": 1,
+        "passed": 10,
+        "total": 10
+      },
+      {
+        "timestamp": "2026-09-17T17:13:02.007Z",
+        "score": 1,
+        "passed": 75,
+        "total": 75
+      },
+      {
+        "timestamp": "2026-09-17T17:12:46.319Z",
+        "score": 1,
+        "passed": 3,
+        "total": 3
+      },
+      {
+        "timestamp": "2026-09-17T16:46:30.059Z",
+        "score": 1,
+        "passed": 75,
+        "total": 75
+      },
+      {
+        "timestamp": "2026-09-17T16:46:20.126Z",
+        "score": 1,
+        "passed": 10,
+        "total": 10
+      },
+      {
+        "timestamp": "2026-09-17T16:46:07.617Z",
+        "score": 1,
+        "passed": 3,
+        "total": 3
+      },
+      {
+        "timestamp": "2026-09-17T16:43:12.163Z",
+        "score": 0,
+        "passed": 0,
+        "total": 2
+      },
+      {
+        "timestamp": "2026-09-17T16:42:38.745Z",
+        "score": 0,
+        "passed": 0,
+        "total": 3
+      }
+    ]
+  },
+  "config": {
+    "intervalMinutes": 60,
+    "enabled": true,
+    "alertThresholds": {
+      "scoreDrop": 0.05,
+      "regressionCount": 0,
+      "budgetExceeded": 50,
+      "durationSpike": 200
+    },
+    "alertChannels": {
+      "log": true
+    }
+  },
+  "recommendations": []
+}

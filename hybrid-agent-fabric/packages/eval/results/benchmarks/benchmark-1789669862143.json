@@ -1,0 +1,244 @@
+{
+  "timestamp": "2026-09-17T18:31:02.143Z",
+  "overall": {
+    "totalTasks": 75,
+    "totalDurationMs": 1900,
+    "avgDurationMs": 25.333333333333332,
+    "medianDurationMs": 2,
+    "p95DurationMs": 9,
+    "p99DurationMs": 16,
+    "minDurationMs": 2,
+    "maxDurationMs": 16,
+    "stdDevMs": 22.368032745167582,
+    "throughput": 39.473684210526315
+  },
+  "byCategory": [
+    {
+      "category": "coding",
+      "stats": {
+        "totalTasks": 26,
+        "totalDurationMs": 116,
+        "avgDurationMs": 4.461538461538462,
+        "medianDurationMs": 3,
+        "p95DurationMs": 12,
+        "p99DurationMs": 16,
+        "minDurationMs": 2,
+        "maxDurationMs": 16,
+        "stdDevMs": 3.6080121229410995,
+        "throughput": 224.13793103448276
+      },
+      "taskCount": 26,
+      "avgQuality": 1
+    },
+    {
+      "category": "memory",
+      "stats": {
+        "totalTasks": 6,
+        "totalDurationMs": 15,
+        "avgDurationMs": 2.5,
+        "medianDurationMs": 2,
+        "p95DurationMs": 4,
+        "p99DurationMs": 4,
+        "minDurationMs": 2,
+        "maxDurationMs": 4,
+        "stdDevMs": 0.7637626158259734,
+        "throughput": 400
+      },
+      "taskCount": 6,
+      "avgQuality": 1
+    },
+    {
+      "category": "planning",
+      "stats": {
+        "totalTasks": 6,
+        "totalDurationMs": 14,
+        "avgDurationMs": 2.3333333333333335,
+        "medianDurationMs": 2,
+        "p95DurationMs": 3,
+        "p99DurationMs": 3,
+        "minDurationMs": 2,
+        "maxDurationMs": 3,
+        "stdDevMs": 0.4714045207910317,
+        "throughput": 428.57142857142856
+      },
+      "taskCount": 6,
+      "avgQuality": 1
+    },
+    {
+      "category": "reasoning",
+      "stats": {
+        "totalTasks": 6,
+        "totalDurationMs": 14,
+        "avgDurationMs": 2.3333333333333335,
+        "medianDurationMs": 2,
+        "p95DurationMs": 3,
+        "p99DurationMs": 3,
+        "minDurationMs": 2,
+        "maxDurationMs": 3,
+        "stdDevMs": 0.4714045207910317,
+        "throughput": 428.57142857142856
+      },
+      "taskCount": 6,
+      "avgQuality": 1
+    },
+    {
+      "category": "recovery",
+      "stats": {
+        "totalTasks": 6,
+        "totalDurationMs": 15,
+        "avgDurationMs": 2.5,
+        "medianDurationMs": 2,
+        "p95DurationMs": 4,
+        "p99DurationMs": 4,
+        "minDurationMs": 2,
+        "maxDurationMs": 4,
+        "stdDevMs": 0.7637626158259734,
+        "throughput": 400
+      },
+      "taskCount": 6,
+      "avgQuality": 1
+    },
+    {
+      "category": "security",
+      "stats": {
+        "totalTasks": 6,
+        "totalDurationMs": 13,
+        "avgDurationMs": 2.1666666666666665,
+        "medianDurationMs": 2,
+        "p95DurationMs": 3,
+        "p99DurationMs": 3,
+        "minDurationMs": 2,
+        "maxDurationMs": 3,
+        "stdDevMs": 0.3726779962499649,
+        "throughput": 461.53846153846155
+      },
+      "taskCount": 6,
+      "avgQuality": 1
+    },
+    {
+      "category": "capability_acquisition",
+      "stats": {
+        "totalTasks": 2,
+        "totalDurationMs": 5,
+        "avgDurationMs": 2.5,
+        "medianDurationMs": 3,
+        "p95DurationMs": 3,
+        "p99DurationMs": 3,
+        "minDurationMs": 2,
+        "maxDurationMs": 3,
+        "stdDevMs": 0.5,
+        "throughput": 400
+      },
+      "taskCount": 2,
+      "avgQuality": 1
+    },
+    {
+      "category": "long_horizon",
+      "stats": {
+        "totalTasks": 2,
+        "totalDurationMs": 4,
+        "avgDurationMs": 2,
+        "medianDurationMs": 2,
+        "p95DurationMs": 2,
+        "p99DurationMs": 2,
+        "minDurationMs": 2,
+        "maxDurationMs": 2,
+        "stdDevMs": 0,
+        "throughput": 500
+      },
+      "taskCount": 2,
+      "avgQuality": 1
+    },
+    {
+      "category": "multimodal",
+      "stats": {
+        "totalTasks": 2,
+        "totalDurationMs": 5,
+        "avgDurationMs": 2.5,
+        "medianDurationMs": 3,
+        "p95DurationMs": 3,
+        "p99DurationMs": 3,
+        "minDurationMs": 2,
+        "maxDurationMs": 3,
+        "stdDevMs": 0.5,
+        "throughput": 400
+      },
+      "taskCount": 2,
+      "avgQuality": 1
+    },
+    {
+      "category": "research",
+      "stats": {
+        "totalTasks": 3,
+        "totalDurationMs": 6,
+        "avgDurationMs": 2,
+        "medianDurationMs": 2,
+        "p95DurationMs": 2,
+        "p99DurationMs": 2,
+        "minDurationMs": 2,
+        "maxDurationMs": 2,
+        "stdDevMs": 0,
+        "throughput": 500
+      },
+      "taskCount": 3,
+      "avgQuality": 1
+    },
+    {
+      "category": "tool_use",
+      "stats": {
+        "totalTasks": 10,
+        "totalDurationMs": 25,
+        "avgDurationMs": 2.5,
+        "medianDurationMs": 3,
+        "p95DurationMs": 3,
+        "p99DurationMs": 3,
+        "minDurationMs": 2,
+        "maxDurationMs": 3,
+        "stdDevMs": 0.5,
+        "throughput": 400
+      },
+      "taskCount": 10,
+      "avgQuality": 1
+    }
+  ],
+  "byDifficulty": [
+    {
+      "difficulty": 3,
+      "label": "Medium",
+      "stats": {
+        "totalTasks": 75,
+        "totalDurationMs": 232,
+        "avgDurationMs": 3.0933333333333333,
+        "medianDurationMs": 2,
+        "p95DurationMs": 9,
+        "p99DurationMs": 16,
+        "minDurationMs": 2,
+        "maxDurationMs": 16,
+        "stdDevMs": 2.3898303054587138,
+        "throughput": 323.2758620689655
+      },
+      "taskCount": 75,
+      "avgQuality": 1
+    }
+  ],
+  "bottlenecks": [
+    {
+      "taskId": "coding-016",
+      "category": "coding",
+      "difficulty": 3,
+      "durationMs": 16,
+      "avgForCategory": 4.461538461538462,
+      "avgForDifficulty": 3.0933333333333333,
+      "slowdownFactor": 3.586206896551724,
+      "severity": "medium",
+      "recommendation": "Task coding-016 is 3.6x slower than average. Consider optimizing or increasing timeout."
+    }
+  ],
+  "recommendations": [
+    "1 bottleneck tasks detected. Top: coding-016 (3.6x slower)."
+  ],
+  "trend": {
+    "direction": "declining",
+    "details": "Execution time regressed by 15%"
+  }
+}

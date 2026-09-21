@@ -1,126 +1,214 @@
 #!/usr/bin/env node
-// Minimal LSP server over stdio used by code-intelligence tests. It exercises
-// the framing, initialize, notifications, pull requests, push diagnostics and
-// shutdown paths without requiring a real language server installation.
-import { readFileSync } from "node:fs";
+/**
+ * Fake language server — test fixture.
+ *
+ * Speaks LSP over Content-Length framed JSON-RPC on stdio. It reacts to marker
+ * comments in the opened document so the engine's diagnostics/symbol/definition
+ * /references plumbing can be tested without installing a real
+ * typescript-language-server.
+ *
+ * Markers understood in document text:
+ *   TYPE_ERROR_MARKER — publishes a TS9999 error diagnostic on that line.
+ *   WARNING_MARKER    — publishes a W1000 warning diagnostic on that line.
+ *
+ * The error message is deliberately long and multi-line so the host's
+ * sanitizer (single line, <= 300 chars) is exercised.
+ */
 
-let buffer = "";
+import { Buffer } from "node:buffer";
+
+/** uri -> { version, text } */
+const documents = new Map();
+
 const send = (message) => {
-  const body = JSON.stringify(message);
-  process.stdout.write(`Content-Length: ${Buffer.byteLength(body, "utf8")}\r\n\r\n${body}`);
+  const body = JSON.stringify({ jsonrpc: "2.0", ...message });
+  const payload = Buffer.from(body, "utf8");
+  process.stdout.write(`Content-Length: ${payload.byteLength}\r\n\r\n`);
+  process.stdout.write(payload);
 };
-const reply = (id, result) => send({ jsonrpc: "2.0", id, result });
-const errorReply = (id, code, message) => send({ jsonrpc: "2.0", id, error: { code, message } });
 
-const pathOf = (uri) => decodeURIComponent(uri.slice("file://".length));
+const reply = (id, result) => send({ id, result });
+const notify = (method, params) => send({ method, params });
+
+const NOISY_ERROR_MESSAGE =
+  "Type 'string' is not assignable to type 'number'.\n" +
+  "  The expected type comes from property 'value'.\n" +
+  `  ${"Additional diagnostic context that pads this message well beyond the three hundred character limit so the host sanitizer has to truncate it. ".repeat(4)}`;
+
+function computeDiagnostics(text) {
+  const diagnostics = [];
+  const lines = text.split("\n");
+
+  lines.forEach((line, index) => {
+    if (line.includes("TYPE_ERROR_MARKER")) {
+      diagnostics.push({
+        range: {
+          start: { line: index, character: 2 },
+          end: { line: index, character: Math.max(3, line.length) },
+        },
+        severity: 1, // Error
+        code: "TS9999",
+        source: "ts",
+        message: NOISY_ERROR_MESSAGE,
+      });
+    }
+    if (line.includes("WARNING_MARKER")) {
+      diagnostics.push({
+        range: {
+          start: { line: index, character: 0 },
+          end: { line: index, character: Math.max(1, line.length) },
+        },
+        severity: 2, // Warning
+        code: "W1000",
+        source: "ts",
+        message: "Unused marker comment.",
+      });
+    }
+  });
+
+  return diagnostics;
+}
+
+function publish(uri) {
+  const doc = documents.get(uri);
+  if (!doc) return;
+  notify("textDocument/publishDiagnostics", {
+    uri,
+    version: doc.version,
+    diagnostics: computeDiagnostics(doc.text),
+  });
+}
 
 function handle(message) {
   const { id, method, params } = message;
-  if (id !== undefined && method === "initialize") {
-    return void reply(id, {
-      capabilities: {
-        textDocument: {
-          publishDiagnostics: { versionSupport: true },
-          definition: { linkSupport: true },
-          references: {},
-          documentSymbol: { hierarchicalDocumentSymbolSupport: true },
+
+  switch (method) {
+    case "initialize":
+      reply(id, {
+        capabilities: {
+          textDocumentSync: { openClose: true, change: 1 },
+          documentSymbolProvider: true,
+          definitionProvider: true,
+          referencesProvider: true,
+          diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false },
         },
-      },
-    });
-  }
-  if (method === "initialized") return;
-  if (method === "textDocument/didOpen") {
-    const doc = params.textDocument;
-    let content = "";
-    try {
-      content = readFileSync(pathOf(doc.uri), "utf8");
-    } catch {
-      // File vanished; publish nothing.
-    }
-    // One publishDiagnostics per document replaces the full set (LSP semantics).
-    const diagnostics = [];
-    if (content.includes("TYPE_ERROR_MARKER")) {
-      diagnostics.push({
-        range: { start: { line: 1, character: 0 }, end: { line: 1, character: 10 } },
-        severity: 1,
-        code: "TS9999",
-        source: "fake-server",
-        message: `Marker found\ninjected note ${"x".repeat(400)}`,
+        serverInfo: { name: "fake-lsp-server", version: "1.0.0" },
       });
+      return;
+
+    case "initialized":
+      return;
+
+    case "textDocument/didOpen": {
+      const doc = params?.textDocument;
+      if (!doc?.uri) return;
+      documents.set(doc.uri, { version: doc.version ?? 1, text: doc.text ?? "" });
+      publish(doc.uri);
+      return;
     }
-    if (content.includes("WARNING_MARKER")) {
-      diagnostics.push({
-        range: { start: { line: 2, character: 0 }, end: { line: 2, character: 4 } },
-        severity: 2,
-        code: "W1000",
-        source: "fake-server",
-        message: "A warning marker was found",
+
+    case "textDocument/didChange": {
+      const uri = params?.textDocument?.uri;
+      if (!uri) return;
+      const existing = documents.get(uri) ?? { version: 0, text: "" };
+      const change = params?.contentChanges?.[0];
+      documents.set(uri, {
+        version: params?.textDocument?.version ?? existing.version + 1,
+        text: change?.text ?? existing.text,
       });
+      publish(uri);
+      return;
     }
-    if (diagnostics.length > 0) {
-      send({
-        jsonrpc: "2.0",
-        method: "textDocument/publishDiagnostics",
-        params: { uri: doc.uri, version: doc.version, diagnostics },
-      });
+
+    case "textDocument/didClose": {
+      const uri = params?.textDocument?.uri;
+      if (uri) documents.delete(uri);
+      return;
     }
-    return;
+
+    case "textDocument/documentSymbol": {
+      // The test asserts: name "say", kind function, line 1 (1-based),
+      // detail "Greets callers".
+      reply(id, [
+        {
+          name: "say",
+          detail: "Greets callers",
+          kind: 12, // SymbolKind.Function
+          range: { start: { line: 0, character: 0 }, end: { line: 3, character: 1 } },
+          selectionRange: { start: { line: 0, character: 16 }, end: { line: 0, character: 19 } },
+        },
+      ]);
+      return;
+    }
+
+    case "textDocument/definition": {
+      // The test asks at line 3, column 3 (1-based) and expects a candidate at
+      // line 3, column 6 (1-based) => zero-based line 2, character 5.
+      const uri = params?.textDocument?.uri;
+      reply(id, [
+        {
+          uri,
+          range: { start: { line: 2, character: 5 }, end: { line: 2, character: 11 } },
+        },
+      ]);
+      return;
+    }
+
+    case "textDocument/references": {
+      // The test expects exactly two occurrences.
+      const uri = params?.textDocument?.uri;
+      reply(id, [
+        { uri, range: { start: { line: 0, character: 16 }, end: { line: 0, character: 19 } } },
+        { uri, range: { start: { line: 2, character: 5 }, end: { line: 2, character: 11 } } },
+      ]);
+      return;
+    }
+
+    case "shutdown":
+      reply(id, null);
+      return;
+
+    case "exit":
+      process.exit(0);
+      return;
+
+    default:
+      // Unknown requests must still be answered so the client never hangs.
+      if (id !== undefined && id !== null) {
+        send({ id, error: { code: -32601, message: `Method not found: ${method}` } });
+      }
   }
-  if (method === "textDocument/definition") {
-    const doc = params.textDocument;
-    return void reply(id, {
-      uri: doc.uri,
-      range: { start: { line: 2, character: 5 }, end: { line: 2, character: 9 } },
-    });
-  }
-  if (method === "textDocument/references") {
-    const doc = params.textDocument;
-    return void reply(id, [
-      { uri: doc.uri, range: { start: { line: 0, character: 3 }, end: { line: 0, character: 6 } } },
-      { uri: doc.uri, range: { start: { line: 2, character: 5 }, end: { line: 2, character: 8 } } },
-    ]);
-  }
-  if (method === "textDocument/documentSymbol") {
-    const doc = params.textDocument;
-    return void reply(id, [
-      {
-        name: "say",
-        kind: 12,
-        range: { start: { line: 0, character: 0 }, end: { line: 0, character: 20 } },
-        selectionRange: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } },
-        detail: "Greets callers",
-        children: [],
-      },
-    ]);
-  }
-  if (method === "workspace/symbol") {
-    return void reply(id, [{ name: "say", kind: 12, location: { uri: "file:///nowhere.ts", range: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } } } }]);
-  }
-  if (method === "shutdown") return void reply(id, null);
-  if (method === "exit") process.exit(0);
-  if (id !== undefined) return void errorReply(id, -32601, `method not found: ${method}`);
 }
 
+let buffer = Buffer.alloc(0);
+
 process.stdin.on("data", (chunk) => {
-  buffer += chunk.toString("utf8");
+  buffer = Buffer.concat([buffer, chunk]);
+
   for (;;) {
-    const headerEnd = buffer.indexOf("\r\n\r\n");
-    if (headerEnd < 0) break;
-    const headers = buffer.slice(0, headerEnd);
-    const match = /Content-Length:\s*(\d+)/i.exec(headers);
+    const separator = buffer.indexOf("\r\n\r\n");
+    if (separator === -1) return;
+
+    const header = buffer.subarray(0, separator).toString("ascii");
+    const match = /Content-Length:\s*(\d+)/i.exec(header);
     if (!match) {
-      buffer = buffer.slice(headerEnd + 4);
+      buffer = buffer.subarray(separator + 4);
       continue;
     }
+
     const length = Number(match[1]);
-    const start = headerEnd + 4;
-    if (buffer.length < start + length) break;
-    const body = buffer.slice(start, start + length);
-    buffer = buffer.slice(start + length);
+    const start = separator + 4;
+    if (buffer.byteLength < start + length) return;
+
+    const body = buffer.subarray(start, start + length).toString("utf8");
+    buffer = buffer.subarray(start + length);
+
     try {
       handle(JSON.parse(body));
     } catch {
-      // Tests must not hang on a malformed client frame.
+      // Ignore malformed frames; a real server would log and continue.
     }
   }
 });
+
+process.stdin.on("close", () => process.exit(0));

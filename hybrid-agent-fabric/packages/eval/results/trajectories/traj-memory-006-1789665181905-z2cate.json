@@ -1,0 +1,71 @@
+{
+  "id": "traj-memory-006-1789665181905-z2cate",
+  "taskId": "memory-006",
+  "tenantId": "eval",
+  "sessionId": "eval-memory-006",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:13:01.905Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "memory-006",
+        "category": "memory",
+        "instruction": "Consolidate short-term memories into long-term: 1) Store multiple pieces of information, 2) Identify important vs trivial, 3) Consolidate important memories, 4) Verify consolidated memories are access"
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:13:01.905Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665181905",
+        "data": {
+          "taskDescription": "Consolidate short-term memories into long-term: 1) Store multiple pieces of information, 2) Identify important vs trivial, 3) Consolidate important memories, 4) Verify consolidated memories are access",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:13:01.905Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665181905",
+        "data": {
+          "traceId": "run-1789665181905-yus4r0",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 0,
+          "phaseResults": 0
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:13:01.905Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": []
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:13:01.905Z",
+  "completedAt": "2026-09-17T17:13:01.905Z",
+  "durationMs": 0,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task memory-006: success"
+}

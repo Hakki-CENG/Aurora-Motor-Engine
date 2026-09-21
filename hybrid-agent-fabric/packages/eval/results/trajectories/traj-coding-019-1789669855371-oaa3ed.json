@@ -1,0 +1,87 @@
+{
+  "id": "traj-coding-019-1789669855371-oaa3ed",
+  "taskId": "coding-019",
+  "tenantId": "eval",
+  "sessionId": "eval-coding-019",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T18:30:55.371Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "coding-019",
+        "category": "coding",
+        "instruction": "Implement a priority queue that: 1) Supports enqueue with priority, 2) Dequeues highest priority first, 3) Supports peek, size, isEmpty, 4) Uses a binary heap for O(log n) operations."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T18:30:55.371Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789669855371",
+        "data": {
+          "taskDescription": "Implement a priority queue that: 1) Supports enqueue with priority, 2) Dequeues highest priority first, 3) Supports peek, size, isEmpty, 4) Uses a binary heap for O(log n) operations.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T18:30:55.371Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Implement a priority queue that: 1) Supports enqueue with priority, 2) Dequeues highest priority first, 3) Supports peek, size, isEmpty, 4) Uses a binary heap for O(log n) operations.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T18:30:55.373Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789669855371",
+        "data": {
+          "traceId": "run-1789669855371-110v4p",
+          "outcome": "success",
+          "totalDurationMs": 1,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T18:30:55.373Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T18:30:55.371Z",
+  "completedAt": "2026-09-17T18:30:55.373Z",
+  "durationMs": 2,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task coding-019: success"
+}

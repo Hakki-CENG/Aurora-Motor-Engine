@@ -1,0 +1,75 @@
+{
+  "timestamp": "2026-09-17T17:41:00.884Z",
+  "overall": {
+    "totalTasks": 10,
+    "totalDurationMs": 1748,
+    "avgDurationMs": 174.8,
+    "medianDurationMs": 4,
+    "p95DurationMs": 22,
+    "p99DurationMs": 22,
+    "minDurationMs": 3,
+    "maxDurationMs": 22,
+    "stdDevMs": 169.29229161423746,
+    "throughput": 5.720823798627002
+  },
+  "byCategory": [
+    {
+      "category": "coding",
+      "stats": {
+        "totalTasks": 10,
+        "totalDurationMs": 56,
+        "avgDurationMs": 5.6,
+        "medianDurationMs": 4,
+        "p95DurationMs": 22,
+        "p99DurationMs": 22,
+        "minDurationMs": 3,
+        "maxDurationMs": 22,
+        "stdDevMs": 5.589275444992848,
+        "throughput": 178.57142857142858
+      },
+      "taskCount": 10,
+      "avgQuality": 1
+    }
+  ],
+  "byDifficulty": [
+    {
+      "difficulty": 3,
+      "label": "Medium",
+      "stats": {
+        "totalTasks": 10,
+        "totalDurationMs": 56,
+        "avgDurationMs": 5.6,
+        "medianDurationMs": 4,
+        "p95DurationMs": 22,
+        "p99DurationMs": 22,
+        "minDurationMs": 3,
+        "maxDurationMs": 22,
+        "stdDevMs": 5.589275444992848,
+        "throughput": 178.57142857142858
+      },
+      "taskCount": 10,
+      "avgQuality": 1
+    }
+  ],
+  "bottlenecks": [
+    {
+      "taskId": "coding-010",
+      "category": "coding",
+      "difficulty": 3,
+      "durationMs": 22,
+      "avgForCategory": 5.6,
+      "avgForDifficulty": 5.6,
+      "slowdownFactor": 3.928571428571429,
+      "severity": "medium",
+      "recommendation": "Task coding-010 is 3.9x slower than average. Consider optimizing or increasing timeout."
+    }
+  ],
+  "recommendations": [
+    "1 bottleneck tasks detected. Top: coding-010 (3.9x slower).",
+    "Low throughput (5.7 tasks/sec). Consider parallel execution or caching."
+  ],
+  "trend": {
+    "direction": "improving",
+    "details": "Execution time improved by 22%"
+  }
+}

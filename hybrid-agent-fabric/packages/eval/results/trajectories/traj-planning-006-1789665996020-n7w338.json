@@ -1,0 +1,71 @@
+{
+  "id": "traj-planning-006-1789665996020-n7w338",
+  "taskId": "planning-006",
+  "tenantId": "eval",
+  "sessionId": "eval-planning-006",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:26:36.020Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "planning-006",
+        "category": "planning",
+        "instruction": "Plan a task while being aware of resource constraints: 1) Token budget, 2) Time limit, 3) API rate limits. Adjust plan to stay within constraints."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:26:36.020Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665996020",
+        "data": {
+          "taskDescription": "Plan a task while being aware of resource constraints: 1) Token budget, 2) Time limit, 3) API rate limits. Adjust plan to stay within constraints.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:26:36.022Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665996020",
+        "data": {
+          "traceId": "run-1789665996020-qiffme",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 0,
+          "phaseResults": 0
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:26:36.022Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": []
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:26:36.020Z",
+  "completedAt": "2026-09-17T17:26:36.022Z",
+  "durationMs": 2,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task planning-006: success"
+}

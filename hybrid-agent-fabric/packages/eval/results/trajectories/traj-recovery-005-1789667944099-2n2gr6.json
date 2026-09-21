@@ -1,0 +1,71 @@
+{
+  "id": "traj-recovery-005-1789667944099-2n2gr6",
+  "taskId": "recovery-005",
+  "tenantId": "eval",
+  "sessionId": "eval-recovery-005",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:59:04.099Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "recovery-005",
+        "category": "recovery",
+        "instruction": "Execute a multi-step task where some steps succeed and some fail. Track what completed successfully, retry failed steps, and ensure overall task completion."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:59:04.099Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944099",
+        "data": {
+          "taskDescription": "Execute a multi-step task where some steps succeed and some fail. Track what completed successfully, retry failed steps, and ensure overall task completion.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:59:04.099Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944099",
+        "data": {
+          "traceId": "run-1789667944099-r9u93i",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 0,
+          "phaseResults": 0
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:59:04.099Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": []
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:59:04.099Z",
+  "completedAt": "2026-09-17T17:59:04.099Z",
+  "durationMs": 0,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task recovery-005: success"
+}

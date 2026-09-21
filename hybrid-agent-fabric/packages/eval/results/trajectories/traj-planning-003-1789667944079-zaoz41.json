@@ -1,0 +1,87 @@
+{
+  "id": "traj-planning-003-1789667944079-zaoz41",
+  "taskId": "planning-003",
+  "tenantId": "eval",
+  "sessionId": "eval-planning-003",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:59:04.079Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "planning-003",
+        "category": "planning",
+        "instruction": "Build a project with multiple modules that have dependencies. Ensure modules are built in the correct order based on their dependencies."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:59:04.080Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944079",
+        "data": {
+          "taskDescription": "Build a project with multiple modules that have dependencies. Ensure modules are built in the correct order based on their dependencies.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T17:59:04.080Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Build a project with multiple modules that have dependencies. Ensure modules are built in the correct order based on their dependencies.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:59:04.084Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944079",
+        "data": {
+          "traceId": "run-1789667944080-y70ud6",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:59:04.084Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:59:04.079Z",
+  "completedAt": "2026-09-17T17:59:04.084Z",
+  "durationMs": 5,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task planning-003: success"
+}

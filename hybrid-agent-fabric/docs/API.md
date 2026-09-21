@@ -1,6 +1,6 @@
 # Aurora Motor Engine - API Dokümantasyonu
 
-**Versiyon:**1.64.0  
+**Versiyon:**1.65.0  
 **Temel URL:** `http://localhost:8787`
 
 ---

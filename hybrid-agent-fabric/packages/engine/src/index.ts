@@ -160,3 +160,58 @@ export * from "./learning/refinement-service.js";
 export * from "./learning/refinement-planner.js";
 export * from "./context/intent-preserving-projection.js";
 export * from "./context/rolling-micro-compactor.js";
+
+// ═══ Aurora Motor Engine: 50-Phase Plan Exports ═══
+
+// FAZ 17-19: Capability Synthesis
+export * from "./capabilities/capability-synthesis.js";
+
+// FAZ 20-21: Skill Synthesis
+export * from "./skills/skill-synthesis.js";
+
+// FAZ 23: Skill Composition
+export * from "./skills/skill-composition.js";
+
+// FAZ 22: Skill Promotion Gate
+export * from "./skills/skill-promotion.js";
+
+// FAZ 24-26: World Model + Exploration + Prediction
+export * from "./world/world-model-exploration.js";
+
+// FAZ 27: Goal Discovery
+export * from "./aurora/goal-discovery.js";
+
+// FAZ 28-29: Self-Improvement (Prompt + Code)
+export * from "./aurora/self-improvement.js";
+
+// FAZ 30: Integration + Verification Loop
+export * from "./aurora/integration-verification.js";
+
+// FAZ 31: Reward Hacking Defense
+export * from "./security/reward-hacking-defense.js";
+export * from "./security/reward-hacking-detectors.js";
+
+// FAZ 32-33: Model Routing + Qwen Benchmark
+export * from "./routing/model-routing.js";
+
+// FAZ 34-35: Agent Society + Swarm Measurement
+export * from "./society/agent-society.js";
+
+// FAZ 36-38: Production Persistence + Event Store + Replay
+export * from "./persistence/production-persistence.js";
+
+// FAZ 39-41: Security (Injection + Approval + Kill Switch)
+export * from "./security/security-system.js";
+
+// FAZ 42-45: Jarvis Surface (Voice + Multimodal + Computer Use + Integrations)
+export * from "./surface/jarvis-surface.js";
+export * from "./aurora/cognitive-runtime.js";
+export * from "./experimental/maturity.js";
+export * from "./execution/execution-status.js";
+export * from "./execution/task-context.js";
+export * from "./execution/verification-factory.js";
+export * from "./execution/consensus-verifier.js";
+export * from "./execution/failure-taxonomy.js";
+export * from "./execution/gap-detection.js";
+export * from "./execution/capability-acquisition.js";
+export * from "./execution/unified-execution-loop.js";

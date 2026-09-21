@@ -6,9 +6,11 @@ import { resolveWorkspaceImage } from "./multimodal.js";
 export interface OpenAICompatibleOptions {
   id?: string;
   baseUrl: string;
-  apiKey?: string;
+  apiKey?: string | undefined;
   model: string;
-  headers?: Record<string, string>;
+  headers?: Record<string, string> | undefined;
+  /** Enable streaming (default: true) */
+  enableStreaming?: boolean;
 }
 
 function toContent(message: AgentMessage): string {
@@ -74,6 +76,7 @@ export class OpenAICompatibleProvider implements ModelProvider {
       }
     }
 
+    const enableStreaming = this.options.enableStreaming !== false;
     const response = await fetch(`${this.options.baseUrl.replace(/\/$/, "")}/chat/completions`, {
       method: "POST",
       headers: {
@@ -84,7 +87,7 @@ export class OpenAICompatibleProvider implements ModelProvider {
       body: JSON.stringify({
         model: request.model?.includes(":") ? request.model.slice(request.model.indexOf(":") + 1) : this.options.model,
         messages,
-        stream: false,
+        stream: enableStreaming,
         tools: request.tools.map((tool) => ({
           type: "function",
           function: { name: tool.id.replaceAll(".", "__"), description: `${tool.description} [capability-id: ${tool.id}]`, parameters: tool.inputSchema },
@@ -93,6 +96,143 @@ export class OpenAICompatibleProvider implements ModelProvider {
       ...(request.signal ? { signal: request.signal } : {}),
     });
     if (!response.ok) throw await modelHttpError(this.id, response);
+
+    if (enableStreaming) {
+      yield* this.parseSSEStream(response);
+    } else {
+      yield* this.parseNonStreamingResponse(response);
+    }
+  }
+
+  /**
+   * SSE stream parser — real streaming implementation.
+   */
+  private async *parseSSEStream(response: Response): AsyncIterable<ModelStreamEvent> {
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error("Response body is not readable");
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let cacheReadTokens = 0;
+    const toolCalls: Map<number, { id: string; name: string; arguments: string }> = new Map();
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const data = line.slice(6).trim();
+            if (data === "[DONE]") {
+              // Yield tool calls if any
+              for (const [, tc] of toolCalls) {
+                let args = {};
+                try {
+                  args = JSON.parse(tc.arguments);
+                } catch {
+                  args = { raw: tc.arguments };
+                }
+                yield {
+                  type: "tool_call",
+                  call: {
+                    type: "tool_call",
+                    id: tc.id,
+                    name: tc.name.replaceAll("__", "."),
+                    arguments: args,
+                  },
+                };
+              }
+              yield {
+                type: "usage",
+                usage: { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens: 0 },
+              };
+              yield { type: "done", stopReason: toolCalls.size > 0 ? "tool_use" : "end_turn" };
+              return;
+            }
+
+            try {
+              const parsed = JSON.parse(data);
+              const delta = parsed.choices?.[0]?.delta;
+              const finishReason = parsed.choices?.[0]?.finish_reason;
+
+              // Text content
+              if (delta?.content) {
+                yield { type: "text_delta", delta: delta.content };
+                outputTokens++;
+              }
+
+              // Tool calls
+              if (delta?.tool_calls) {
+                for (const tc of delta.tool_calls) {
+                  const index = tc.index ?? 0;
+                  if (!toolCalls.has(index)) {
+                    toolCalls.set(index, { id: tc.id ?? randomUUID(), name: "", arguments: "" });
+                  }
+                  const existing = toolCalls.get(index)!;
+                  if (tc.id) existing.id = tc.id;
+                  if (tc.function?.name) existing.name = tc.function.name;
+                  if (tc.function?.arguments) existing.arguments += tc.function.arguments;
+                }
+              }
+
+              // Usage (some providers include it in the stream)
+              if (parsed.usage) {
+                inputTokens = parsed.usage.prompt_tokens ?? inputTokens;
+                outputTokens = parsed.usage.completion_tokens ?? outputTokens;
+                cacheReadTokens = parsed.usage.prompt_tokens_details?.cached_tokens ?? cacheReadTokens;
+              }
+
+              // Finish reason
+              if (finishReason === "length") {
+                yield { type: "done", stopReason: "max_tokens" };
+                return;
+              }
+            } catch {
+              // Skip malformed JSON
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    // If we get here without [DONE], yield what we have
+    for (const [, tc] of toolCalls) {
+      let args = {};
+      try {
+        args = JSON.parse(tc.arguments);
+      } catch {
+        args = { raw: tc.arguments };
+      }
+      yield {
+        type: "tool_call",
+        call: {
+          type: "tool_call",
+          id: tc.id,
+          name: tc.name.replaceAll("__", "."),
+          arguments: args,
+        },
+      };
+    }
+    yield {
+      type: "usage",
+      usage: { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens: 0 },
+    };
+    yield { type: "done", stopReason: toolCalls.size > 0 ? "tool_use" : "end_turn" };
+  }
+
+  /**
+   * Non-streaming response parser (fallback).
+   */
+  private async *parseNonStreamingResponse(response: Response): AsyncIterable<ModelStreamEvent> {
     const body: any = await response.json();
     const choice = body.choices?.[0];
     const message = choice?.message ?? {};

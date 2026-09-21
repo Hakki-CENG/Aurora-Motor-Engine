@@ -269,24 +269,33 @@ export class FederatedService {
     return s.dataPolicies.filter(p => p.tenantId === tenantId);
   }
 
-  async checkDataPolicy(tenantId: string, operation: string, target: string): Promise<{ allowed: boolean; violations: string[] }> {
+  async checkDataPolicy(tenantId: string, operation: string, target: string): Promise<{ allowed: boolean; violations: string[]; unenforceable: string[] }> {
     const policies = await this.getDataPolicies(tenantId);
     const violations: string[] = [];
 
+    // Rule types this method can actually decide. Anything outside this set is
+    // reported as unenforceable rather than being silently skipped — an
+    // enforced rule that no code evaluates must not read as "compliant".
+    const evaluatable = new Set(["no_cloud", "data_residency"]);
+    const unenforceable: string[] = [];
+
     for (const policy of policies.filter(p => p.active)) {
       for (const rule of policy.rules) {
-        if (rule.enforced) {
-          if (rule.type === "no_cloud" && target.includes("cloud")) {
-            violations.push(`Policy "${policy.name}": Cloud access blocked`);
-          }
-          if (rule.type === "data_residency" && !this.checkResidency(target, rule.parameters)) {
-            violations.push(`Policy "${policy.name}": Data residency violation`);
-          }
+        if (!rule.enforced) continue;
+
+        if (rule.type === "no_cloud" && target.includes("cloud")) {
+          violations.push(`Policy "${policy.name}": Cloud access blocked`);
+        }
+        if (rule.type === "data_residency" && !this.checkResidency(target, rule.parameters)) {
+          violations.push(`Policy "${policy.name}": Data residency violation`);
+        }
+        if (!evaluatable.has(rule.type)) {
+          unenforceable.push(`Policy "${policy.name}": rule '${rule.type}' is enforced but not evaluated by checkDataPolicy`);
         }
       }
     }
 
-    return { allowed: violations.length === 0, violations };
+    return { allowed: violations.length === 0, violations, unenforceable };
   }
 
   // ─── Air Gap ───
@@ -336,13 +345,63 @@ export class FederatedService {
     return nodes.find(n => n.status === "online" && n.models.includes(modelId)) ?? nodes.find(n => n.status === "online");
   }
 
-  private async runInference(modelId: string, nodeId: string | undefined, input: unknown, parameters?: Record<string, unknown>): Promise<unknown> {
-    // In production, run local inference
-    return { text: `[Local inference placeholder for model ${modelId}]` };
+  /**
+   * Local inference is NOT implemented.
+   *
+   * This returned `{ text: "[Local inference placeholder for model X]" }`,
+   * which callers stored and displayed as though it were model output.
+   */
+  private async runInference(modelId: string, _nodeId: string | undefined, _input: unknown, _parameters?: Record<string, unknown>): Promise<unknown> {
+    throw new Error(
+      `Local inference for model '${modelId}' is not implemented. ` +
+        `It requires a local runtime (llama.cpp, vLLM, or an equivalent) bound to the federated node.`,
+    );
   }
 
+  /**
+   * Data residency check.
+   *
+   * This used to `return true` unconditionally, which meant the
+   * `data_residency` branch in `checkDataPolicy` could never fire: the rule
+   * was configurable, enforceable, and completely inert. A policy engine whose
+   * rules cannot fail provides compliance theatre, not compliance.
+   *
+   * Supported parameters (all optional, combined with AND):
+   *   - `allowedRegions: string[]` — the target must match one of these
+   *   - `blockedRegions: string[]` — the target must match none of these
+   *   - `region: string`           — shorthand for a single allowed region
+   *
+   * When a rule carries no usable parameters we treat it as UNSATISFIED rather
+   * than satisfied: an operator who enables an empty residency rule has
+   * misconfigured it, and silently passing would hide that.
+   */
   private checkResidency(target: string, params: Record<string, unknown>): boolean {
-    // In production, check data residency requirements
+    const asRegionList = (value: unknown): string[] => {
+      if (typeof value === "string") return [value.toLowerCase()];
+      if (Array.isArray(value)) {
+        return value.filter((item): item is string => typeof item === "string").map((item) => item.toLowerCase());
+      }
+      return [];
+    };
+
+    const haystack = target.toLowerCase();
+    const allowed = [...asRegionList(params["allowedRegions"]), ...asRegionList(params["region"])];
+    const blocked = asRegionList(params["blockedRegions"]);
+
+    if (allowed.length === 0 && blocked.length === 0) {
+      // Misconfigured rule — surface it as a violation instead of a pass.
+      return false;
+    }
+
+    const matches = (region: string): boolean => {
+      // Match on token boundaries so "eu" does not match "eu-central" only by
+      // accident, while still matching "eu-west-1" and "region:eu".
+      if (haystack === region) return true;
+      return new RegExp(`(^|[^a-z0-9])${region.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`).test(haystack);
+    };
+
+    if (blocked.some(matches)) return false;
+    if (allowed.length > 0) return allowed.some(matches);
     return true;
   }
 }

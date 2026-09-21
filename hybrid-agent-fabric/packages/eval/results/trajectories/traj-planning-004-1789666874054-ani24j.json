@@ -1,0 +1,71 @@
+{
+  "id": "traj-planning-004-1789666874054-ani24j",
+  "taskId": "planning-004",
+  "tenantId": "eval",
+  "sessionId": "eval-planning-004",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:41:14.054Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "planning-004",
+        "category": "planning",
+        "instruction": "Given a set of independent tasks, identify which can be executed in parallel and execute them concurrently to save time."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:41:14.054Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789666874054",
+        "data": {
+          "taskDescription": "Given a set of independent tasks, identify which can be executed in parallel and execute them concurrently to save time.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:41:14.056Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789666874054",
+        "data": {
+          "traceId": "run-1789666874054-nl1x2n",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 0,
+          "phaseResults": 0
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:41:14.056Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": []
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:41:14.054Z",
+  "completedAt": "2026-09-17T17:41:14.056Z",
+  "durationMs": 2,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task planning-004: success"
+}

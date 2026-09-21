@@ -18,6 +18,22 @@ export function registerCognitiveRoutes(app: FastifyInstance, engine: HybridAgen
   app.get("/v1/cognitive-state/history", async () => { return { history: engine.cognitiveState.getModeHistory() }; });
   app.post("/v1/cognitive-state/reset", async () => { engine.cognitiveState.reset(); return { ok: true }; });
 
+  // Per-task slots. `/v1/cognitive-state` answers "what is the system doing?"
+  // with a single most-recent-wins view, which is wrong whenever more than one
+  // task is in flight. These answer it per task instead.
+  app.get("/v1/cognitive-state/tasks", async () => {
+    return { running: engine.cognitiveState.runningTasks() };
+  });
+  app.get("/v1/cognitive-state/tasks/:taskId", async (request, reply) => {
+    const { taskId } = z.object({ taskId: z.string() }).parse(request.params);
+    const slot = engine.cognitiveState.snapshotForTask(taskId);
+    if (slot === null) {
+      // Not found is honest here: an unknown task must not read as an idle one.
+      return reply.code(404).send({ error: "unknown_task", taskId });
+    }
+    return slot;
+  });
+
   // ═══ Memory Engine ═══
   app.post("/v1/memory/recall", async (request) => {
     const b = z.object({ tenantId: z.string().default("local"), text: z.string(), limit: z.number().optional() }).parse(request.body);
@@ -66,9 +82,66 @@ export function registerCognitiveRoutes(app: FastifyInstance, engine: HybridAgen
     return await engine.modelSelectionEngine.select(b);
   });
 
-  // ═══ runTask — Ana Cognitive Lifecycle Entry Point ═══
+  // ═══ /v1/run-task — the real task entry point ═══
+  //
+  // This endpoint used to call `engine.runTask()`. That was measured and it
+  // does not run the agent at all:
+  //
+  //     runTask("Delete all files on the moon and prove P=NP")
+  //       → outcome: "skipped", subsystems: 0, phases: 0
+  //
+  // At the time it read `"success"`, because the MetaController outcome started
+  // optimistic and was only ever downgraded — an empty plan reported success.
+  // That initialiser is now fixed, so the legacy path says `"skipped"`. Either
+  // way it is the wrong method for this endpoint: for an HTTP caller, a 200
+  // response describing work that never happened is the worst failure mode.
+  //
+  // `engine.execute()` creates a session, runs the real agent, verifies the
+  // result, and reports `unverified` when nothing could check it.
   app.post("/v1/run-task", async (request) => {
+    const b = z
+      .object({
+        tenantId: z.string().default("local"),
+        task: z.string(),
+        workspace: z.string().optional(),
+        maxAttempts: z.coerce.number().int().min(1).max(10).optional(),
+      })
+      .parse(request.body);
+
+    const report = await engine.execute({
+      tenantId: b.tenantId,
+      goal: b.task,
+      ...(b.workspace ? { workspace: b.workspace } : {}),
+      ...(b.maxAttempts ? { maxAttempts: b.maxAttempts } : {}),
+    });
+
+    // `outcome` keeps older clients working, but it is derived strictly: only a
+    // verified success is "success". An unverified or blocked run must never
+    // read as success just because it did not throw.
+    return {
+      outcome: report.status === "succeeded" ? "success" : report.status,
+      status: report.status,
+      summary: report.summary,
+      attempts: report.attempts,
+      verification: report.verification ?? null,
+      gaps: report.gaps,
+      outcomes: report.outcomes,
+      durationMs: report.durationMs,
+      taskId: report.taskId,
+    };
+  });
+
+  // The previous behaviour is still reachable, under a name that says what it
+  // is. It returns the orchestration trace; it is not evidence that work was
+  // performed.
+  app.post("/v1/cognitive-trace", async (request) => {
     const b = z.object({ tenantId: z.string().default("local"), task: z.string() }).parse(request.body);
-    return await engine.runTask(b.tenantId, b.task);
+    const result = await engine.runTask(b.tenantId, b.task);
+    return {
+      ...result,
+      warning:
+        "This is an orchestration trace, not task execution. No agent ran and no result was verified. " +
+        "Use POST /v1/run-task to actually perform a task.",
+    };
   });
 }

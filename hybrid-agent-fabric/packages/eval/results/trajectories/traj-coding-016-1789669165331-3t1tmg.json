@@ -1,0 +1,87 @@
+{
+  "id": "traj-coding-016-1789669165331-3t1tmg",
+  "taskId": "coding-016",
+  "tenantId": "eval",
+  "sessionId": "eval-coding-016",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T18:19:25.331Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "coding-016",
+        "category": "coding",
+        "instruction": "Create a configuration validator that: 1) Defines a schema for app config, 2) Validates environment variables, 3) Provides defaults, 4) Reports missing/invalid values, 5) Supports nested configs."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T18:19:25.331Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789669165331",
+        "data": {
+          "taskDescription": "Create a configuration validator that: 1) Defines a schema for app config, 2) Validates environment variables, 3) Provides defaults, 4) Reports missing/invalid values, 5) Supports nested configs.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T18:19:25.332Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Create a configuration validator that: 1) Defines a schema for app config, 2) Validates environment variables, 3) Provides defaults, 4) Reports missing/invalid values, 5) Supports nested configs.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T18:19:25.333Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789669165331",
+        "data": {
+          "traceId": "run-1789669165331-d1kw34",
+          "outcome": "success",
+          "totalDurationMs": 1,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T18:19:25.333Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T18:19:25.331Z",
+  "completedAt": "2026-09-17T18:19:25.333Z",
+  "durationMs": 2,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task coding-016: success"
+}

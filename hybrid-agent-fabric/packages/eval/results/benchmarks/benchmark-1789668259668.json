@@ -1,0 +1,62 @@
+{
+  "timestamp": "2026-09-17T18:04:19.668Z",
+  "overall": {
+    "totalTasks": 10,
+    "totalDurationMs": 1664,
+    "avgDurationMs": 166.4,
+    "medianDurationMs": 2,
+    "p95DurationMs": 6,
+    "p99DurationMs": 6,
+    "minDurationMs": 2,
+    "maxDurationMs": 6,
+    "stdDevMs": 163.40734377622078,
+    "throughput": 6.009615384615385
+  },
+  "byCategory": [
+    {
+      "category": "coding",
+      "stats": {
+        "totalTasks": 10,
+        "totalDurationMs": 30,
+        "avgDurationMs": 3,
+        "medianDurationMs": 2,
+        "p95DurationMs": 6,
+        "p99DurationMs": 6,
+        "minDurationMs": 2,
+        "maxDurationMs": 6,
+        "stdDevMs": 1.5491933384829668,
+        "throughput": 333.3333333333333
+      },
+      "taskCount": 10,
+      "avgQuality": 1
+    }
+  ],
+  "byDifficulty": [
+    {
+      "difficulty": 3,
+      "label": "Medium",
+      "stats": {
+        "totalTasks": 10,
+        "totalDurationMs": 30,
+        "avgDurationMs": 3,
+        "medianDurationMs": 2,
+        "p95DurationMs": 6,
+        "p99DurationMs": 6,
+        "minDurationMs": 2,
+        "maxDurationMs": 6,
+        "stdDevMs": 1.5491933384829668,
+        "throughput": 333.3333333333333
+      },
+      "taskCount": 10,
+      "avgQuality": 1
+    }
+  ],
+  "bottlenecks": [],
+  "recommendations": [
+    "Low throughput (6.0 tasks/sec). Consider parallel execution or caching."
+  ],
+  "trend": {
+    "direction": "declining",
+    "details": "Execution time regressed by 63%"
+  }
+}

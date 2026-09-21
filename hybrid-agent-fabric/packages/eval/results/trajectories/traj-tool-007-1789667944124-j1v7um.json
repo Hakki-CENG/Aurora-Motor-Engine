@@ -1,0 +1,87 @@
+{
+  "id": "traj-tool-007-1789667944124-j1v7um",
+  "taskId": "tool-007",
+  "tenantId": "eval",
+  "sessionId": "eval-tool-007",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:59:04.124Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "tool-007",
+        "category": "tool_use",
+        "instruction": "Create Docker configuration for a Node.js app: 1) Dockerfile with multi-stage build, 2) docker-compose.yml with app and database services, 3) .dockerignore file, 4) Health check configuration."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:59:04.124Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944124",
+        "data": {
+          "taskDescription": "Create Docker configuration for a Node.js app: 1) Dockerfile with multi-stage build, 2) docker-compose.yml with app and database services, 3) .dockerignore file, 4) Health check configuration.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T17:59:04.124Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Create Docker configuration for a Node.js app: 1) Dockerfile with multi-stage build, 2) docker-compose.yml with app and database services, 3) .dockerignore file, 4) Health check configuration.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:59:04.125Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944124",
+        "data": {
+          "traceId": "run-1789667944124-cysjo6",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:59:04.125Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:59:04.124Z",
+  "completedAt": "2026-09-17T17:59:04.125Z",
+  "durationMs": 1,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task tool-007: success"
+}

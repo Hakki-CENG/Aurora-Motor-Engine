@@ -1,0 +1,89 @@
+{
+  "id": "traj-research-003-1789665181991-uq6rla",
+  "taskId": "research-003",
+  "tenantId": "eval",
+  "sessionId": "eval-research-003",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:13:01.991Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "research-003",
+        "category": "research",
+        "instruction": "Research best practices for API security. Synthesize findings from multiple sources into a comprehensive checklist. Prioritize by importance."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:13:01.991Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665181991",
+        "data": {
+          "taskDescription": "Research best practices for API security. Synthesize findings from multiple sources into a comprehensive checklist. Prioritize by importance.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T17:13:01.992Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Research best practices for API security. Synthesize findings from multiple sources into a comprehensive checklist. Prioritize by importance.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:13:01.992Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665181991",
+        "data": {
+          "traceId": "run-1789665181991-0max4x",
+          "outcome": "success",
+          "totalDurationMs": 1,
+          "subsystemsUsed": 3,
+          "phaseResults": 3
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:13:01.992Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory",
+          "world-model",
+          "planner"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:13:01.991Z",
+  "completedAt": "2026-09-17T17:13:01.992Z",
+  "durationMs": 1,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task research-003: success"
+}

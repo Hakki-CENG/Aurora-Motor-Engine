@@ -1,0 +1,87 @@
+{
+  "id": "traj-coding-004-1789667944011-t2lpm1",
+  "taskId": "coding-004",
+  "tenantId": "eval",
+  "sessionId": "eval-coding-004",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:59:04.011Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "coding-004",
+        "category": "coding",
+        "instruction": "Create unit tests for the math.ts file in src/utils/math.ts. Use Vitest framework. Test all functions including edge cases like division by zero."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:59:04.011Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944011",
+        "data": {
+          "taskDescription": "Create unit tests for the math.ts file in src/utils/math.ts. Use Vitest framework. Test all functions including edge cases like division by zero.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T17:59:04.011Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Create unit tests for the math.ts file in src/utils/math.ts. Use Vitest framework. Test all functions including edge cases like division by zero.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:59:04.011Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944011",
+        "data": {
+          "traceId": "run-1789667944011-7j95uo",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:59:04.011Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:59:04.011Z",
+  "completedAt": "2026-09-17T17:59:04.011Z",
+  "durationMs": 0,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task coding-004: success"
+}

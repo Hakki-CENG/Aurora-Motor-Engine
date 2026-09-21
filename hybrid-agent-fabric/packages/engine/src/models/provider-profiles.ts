@@ -146,6 +146,26 @@ const BUILTIN_PROFILES: ProviderProfile[] = [
     defaultModel: "qwen3",
     dataPolicy: "local",
   },
+  {
+    id: "qwen",
+    displayName: "Qwen (Alibaba Cloud)",
+    apiMode: "openai-chat-completions",
+    defaultBaseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    apiKeyEnvironmentVariable: "QWEN_API_KEY",
+    defaultModel: "qwen3.8-27b",
+    aliases: ["qwen3", "qwen3.8", "qwen-27b"],
+    dataPolicy: "provider",
+  },
+  {
+    id: "qwen-local",
+    displayName: "Qwen Local (Ollama)",
+    apiMode: "openai-chat-completions",
+    defaultBaseUrl: "http://127.0.0.1:11434/v1",
+    apiKeyEnvironmentVariable: "OLLAMA_API_KEY",
+    defaultModel: "qwen3.8-27b",
+    aliases: ["qwen-local", "local-qwen"],
+    dataPolicy: "local",
+  },
 ];
 
 export class ProviderProfileRegistry {

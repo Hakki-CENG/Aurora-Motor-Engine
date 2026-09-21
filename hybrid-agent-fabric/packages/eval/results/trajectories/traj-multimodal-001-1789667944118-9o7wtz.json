@@ -1,0 +1,71 @@
+{
+  "id": "traj-multimodal-001-1789667944118-9o7wtz",
+  "taskId": "multimodal-001",
+  "tenantId": "eval",
+  "sessionId": "eval-multimodal-001",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:59:04.118Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "multimodal-001",
+        "category": "multimodal",
+        "instruction": "Analyze an image of a code diagram. Describe what it shows, identify components, and explain the relationships between them."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:59:04.118Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944118",
+        "data": {
+          "taskDescription": "Analyze an image of a code diagram. Describe what it shows, identify components, and explain the relationships between them.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:59:04.119Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944118",
+        "data": {
+          "traceId": "run-1789667944118-7hkhcf",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 0,
+          "phaseResults": 0
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:59:04.119Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": []
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:59:04.118Z",
+  "completedAt": "2026-09-17T17:59:04.119Z",
+  "durationMs": 1,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task multimodal-001: success"
+}

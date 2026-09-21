@@ -2,6 +2,9 @@ name: CI
 on:
   push:
   pull_request:
+  schedule:
+    # Nightly, for the recall gate that needs a real embedding endpoint.
+    - cron: '0 3 * * *'
 permissions:
   contents: read
 jobs:
@@ -27,6 +30,15 @@ jobs:
         run: npm run test:adversarial
       - name: Worker and persistence chaos suite
         run: npm run test:chaos
+      # Acceptance gates. Unit tests prove the code runs; these prove the
+      # measured criteria still hold. Without them a gate can regress to zero
+      # and CI stays green — which is what happened before they were added.
+      #
+      # eval:recall is deliberately absent: its criterion needs a real
+      # embedding model, so eval:gates runs the hash-encoder regression lock
+      # instead. See recall-nightly below for the real criterion.
+      - name: Acceptance gates (eval)
+        run: npm run eval:gates
       - run: npm run build
       - name: Kernel protocol smoke
         if: runner.os == 'Linux'
@@ -36,6 +48,37 @@ jobs:
           {"type":"shutdown","id":"2"}
           EOF2
           grep -q '"result": "42"' /tmp/kernel.jsonl
+
+  # The FAZ 11 acceptance criterion in full: Recall@8 must beat the lexical
+  # baseline by >= 0.05 using a real semantic encoder. The per-push job cannot
+  # run this (no embedding model), so it runs the regression lock and this job
+  # carries the criterion itself.
+  #
+  # Skipped rather than failed when EMBEDDINGS_URL is not configured: a red X
+  # for a missing secret trains people to ignore red X's. The step below states
+  # plainly when the criterion was not measured.
+  recall-nightly:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w @haf/engine
+      - name: Recall gate (real encoder)
+        env:
+          EMBEDDINGS_URL: ${{ secrets.EMBEDDINGS_URL }}
+        run: |
+          if [ -z "${EMBEDDINGS_URL}" ]; then
+            echo "::warning title=Recall gate not measured::EMBEDDINGS_URL secret is not set."
+            echo "The FAZ 11 acceptance criterion was NOT verified in this run."
+            exit 0
+          fi
+          npm run eval:recall -w @haf/eval
 
   canvas-e2e:
     runs-on: ubuntu-24.04

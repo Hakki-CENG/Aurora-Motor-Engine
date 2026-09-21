@@ -1,0 +1,87 @@
+{
+  "id": "traj-coding-014-1789666873972-gheqe2",
+  "taskId": "coding-014",
+  "tenantId": "eval",
+  "sessionId": "eval-coding-014",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:41:13.972Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "coding-014",
+        "category": "coding",
+        "instruction": "Implement an LRU (Least Recently Used) cache with: 1) Configurable capacity, 2) get() and put() operations, 3) O(1) time complexity for both, 4) Optional TTL (time-to-live) support."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:41:13.972Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789666873972",
+        "data": {
+          "taskDescription": "Implement an LRU (Least Recently Used) cache with: 1) Configurable capacity, 2) get() and put() operations, 3) O(1) time complexity for both, 4) Optional TTL (time-to-live) support.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T17:41:13.972Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Implement an LRU (Least Recently Used) cache with: 1) Configurable capacity, 2) get() and put() operations, 3) O(1) time complexity for both, 4) Optional TTL (time-to-live) support.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:41:13.973Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789666873972",
+        "data": {
+          "traceId": "run-1789666873972-1wp59f",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:41:13.973Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:41:13.972Z",
+  "completedAt": "2026-09-17T17:41:13.973Z",
+  "durationMs": 1,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task coding-014: success"
+}

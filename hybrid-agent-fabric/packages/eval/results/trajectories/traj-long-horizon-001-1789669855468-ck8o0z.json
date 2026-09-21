@@ -1,0 +1,71 @@
+{
+  "id": "traj-long-horizon-001-1789669855468-ck8o0z",
+  "taskId": "long-horizon-001",
+  "tenantId": "eval",
+  "sessionId": "eval-long-horizon-001",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T18:30:55.468Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "long-horizon-001",
+        "category": "long_horizon",
+        "instruction": "Conduct a multi-step research project: 1) Define research questions, 2) Gather sources, 3) Analyze findings, 4) Write report. This spans multiple interactions."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T18:30:55.468Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789669855468",
+        "data": {
+          "taskDescription": "Conduct a multi-step research project: 1) Define research questions, 2) Gather sources, 3) Analyze findings, 4) Write report. This spans multiple interactions.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T18:30:55.470Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789669855468",
+        "data": {
+          "traceId": "run-1789669855468-2xda0v",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 0,
+          "phaseResults": 0
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T18:30:55.470Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": []
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T18:30:55.468Z",
+  "completedAt": "2026-09-17T18:30:55.470Z",
+  "durationMs": 2,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task long-horizon-001: success"
+}

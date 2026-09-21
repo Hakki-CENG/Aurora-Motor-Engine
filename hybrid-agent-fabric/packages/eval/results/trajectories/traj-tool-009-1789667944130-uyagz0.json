@@ -1,0 +1,71 @@
+{
+  "id": "traj-tool-009-1789667944130-uyagz0",
+  "taskId": "tool-009",
+  "tenantId": "eval",
+  "sessionId": "eval-tool-009",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:59:04.130Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "tool-009",
+        "category": "tool_use",
+        "instruction": "Use MCP (Model Context Protocol) tools to: 1) List available tools, 2) Call a tool to get weather information, 3) Call a tool to search the web, 4) Handle tool errors gracefully."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:59:04.130Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944130",
+        "data": {
+          "taskDescription": "Use MCP (Model Context Protocol) tools to: 1) List available tools, 2) Call a tool to get weather information, 3) Call a tool to search the web, 4) Handle tool errors gracefully.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:59:04.131Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944130",
+        "data": {
+          "traceId": "run-1789667944130-jrido3",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 0,
+          "phaseResults": 0
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:59:04.131Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": []
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:59:04.130Z",
+  "completedAt": "2026-09-17T17:59:04.131Z",
+  "durationMs": 1,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task tool-009: success"
+}

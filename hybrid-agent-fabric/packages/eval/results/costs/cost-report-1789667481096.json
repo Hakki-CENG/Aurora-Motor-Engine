@@ -1,0 +1,41 @@
+{
+  "timestamp": "2026-09-17T17:51:21.096Z",
+  "model": "mock",
+  "overall": {
+    "totalTokens": 0,
+    "totalCostUsd": 0,
+    "avgTokensPerTask": 0,
+    "avgCostPerTask": 0,
+    "medianTokensPerTask": 0,
+    "p95Tokens": 0,
+    "p99Tokens": 0
+  },
+  "byCategory": [
+    {
+      "category": "coding",
+      "taskCount": 10,
+      "totalTokens": 0,
+      "totalCostUsd": 0,
+      "avgTokensPerTask": 0,
+      "avgCostPerTask": 0
+    }
+  ],
+  "byDifficulty": [
+    {
+      "difficulty": 3,
+      "label": "Medium",
+      "taskCount": 10,
+      "totalTokens": 0,
+      "totalCostUsd": 0,
+      "avgTokensPerTask": 0,
+      "avgCostPerTask": 0
+    }
+  ],
+  "budgetAlerts": [],
+  "recommendations": [],
+  "efficiency": {
+    "tokensPerSuccessfulStep": 0,
+    "costPerSuccessfulTask": 0,
+    "wastePercentage": 0
+  }
+}

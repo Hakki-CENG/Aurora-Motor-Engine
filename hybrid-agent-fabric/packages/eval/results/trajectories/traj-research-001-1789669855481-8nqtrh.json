@@ -1,0 +1,71 @@
+{
+  "id": "traj-research-001-1789669855481-8nqtrh",
+  "taskId": "research-001",
+  "tenantId": "eval",
+  "sessionId": "eval-research-001",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T18:30:55.481Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "research-001",
+        "category": "research",
+        "instruction": "Research the latest version of Node.js LTS. Verify the information from multiple sources. Report the version, release date, and key features."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T18:30:55.481Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789669855481",
+        "data": {
+          "taskDescription": "Research the latest version of Node.js LTS. Verify the information from multiple sources. Report the version, release date, and key features.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T18:30:55.483Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789669855481",
+        "data": {
+          "traceId": "run-1789669855481-5qib99",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 0,
+          "phaseResults": 0
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T18:30:55.483Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": []
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T18:30:55.481Z",
+  "completedAt": "2026-09-17T18:30:55.483Z",
+  "durationMs": 2,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task research-001: success"
+}

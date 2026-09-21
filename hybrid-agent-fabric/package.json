@@ -1,6 +1,6 @@
 {
   "name": "hybrid-agent-fabric",
-  "version": "1.64.0",
+  "version": "1.65.0",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -12,10 +12,11 @@
   },
   "scripts": {
     "dev": "npm run dev -w @haf/control-api",
-    "build": "npm run build -w @haf/engine && npm run build -w @haf/canvas-web && npm run build -w @haf/control-api && npm run build -w @haf/acp-server && npm run build -w @haf/headless-client && npm run build -w @haf/release-tool && npm run build -w @haf/session-worker && npm run build -w @haf/wasi-runner && npm run build -w @haf/desktop",
-    "test": "npm run test -w @haf/engine && npm run test -w @haf/control-api && npm run test -w @haf/headless-client && npm run test -w @haf/release-tool && npm run test -w @haf/canvas-web && npm run test -w @haf/desktop",
-    "typecheck": "npm run typecheck -w @haf/engine && npm run typecheck -w @haf/canvas-web && npm run typecheck -w @haf/control-api && npm run typecheck -w @haf/acp-server && npm run typecheck -w @haf/headless-client && npm run typecheck -w @haf/release-tool && npm run typecheck -w @haf/session-worker && npm run typecheck -w @haf/wasi-runner && npm run typecheck -w @haf/desktop",
+    "build": "npm run build -w @haf/engine && npm run build -w @haf/canvas-web && npm run build -w @haf/control-api && npm run build -w @haf/acp-server && npm run build -w @haf/headless-client && npm run build -w @haf/release-tool && npm run build -w @haf/session-worker && npm run build -w @haf/wasi-runner && npm run build -w @haf/desktop && npm run build -w @haf/eval",
+    "test": "npm run test -w @haf/engine && npm run test -w @haf/control-api && npm run test -w @haf/headless-client && npm run test -w @haf/release-tool && npm run test -w @haf/canvas-web && npm run test -w @haf/desktop && npm run test -w @haf/eval",
+    "typecheck": "npm run typecheck -w @haf/engine && npm run typecheck -w @haf/canvas-web && npm run typecheck -w @haf/control-api && npm run typecheck -w @haf/acp-server && npm run typecheck -w @haf/headless-client && npm run typecheck -w @haf/release-tool && npm run typecheck -w @haf/session-worker && npm run typecheck -w @haf/wasi-runner && npm run typecheck -w @haf/desktop && npm run typecheck -w @haf/eval",
     "check": "npm run typecheck && npm test",
+    "eval:gates": "npm run eval:validate -w @haf/eval && npm run eval:baseline -w @haf/eval && npm run eval:learning -w @haf/eval && npm run eval:recall:lock -w @haf/eval",
     "acp": "npm run dev -w @haf/acp-server",
     "client": "npm run build -w @haf/headless-client && node apps/headless-client/dist/main.js",
     "release:prepare": "npm run build -w @haf/release-tool && node apps/release-tool/dist/main.js prepare",

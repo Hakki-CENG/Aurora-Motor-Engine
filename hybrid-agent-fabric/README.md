@@ -8,6 +8,27 @@ A single, durable agent engine combining the strongest architectural ideas from:
 
 This repository is a new implementation, not a claim that three multi-million-line products can be safely concatenated. The engine is built around explicit control-plane, runtime-plane and execution-plane contracts so integrations can be ported without recreating a monolith.
 
+## Project status
+
+Three documents describe what this system actually does. They are **generated
+from the code** by `npm run docs:state -w @haf/eval`, and a test fails if they
+drift, because the repo previously accumulated 27 hand-written
+"PHASE NN COMPLETED ✅" files that were false within days of being written.
+
+| Document | Answers |
+|---|---|
+| [`CURRENT_STATE.md`](CURRENT_STATE.md) | What works right now, measured |
+| [`MATURITY_MATRIX.md`](MATURITY_MATRIX.md) | Per module: implemented → integrated → exercised → verified → production |
+| [`KNOWN_GAPS.md`](KNOWN_GAPS.md) | What is missing, confirmed by command rather than impression |
+
+A feature is only `completed` when five things hold: code exists, it is on a
+real execution path, tests cover it, an eval measures it, and its failure
+behaviour is defined. Missing any one of those, it is `implemented` — not
+`completed`. Feature counts are not progress; wired-up depth is.
+
+Claims in this README are scoped accordingly: read the maturity matrix before
+treating any subsystem name as a promise about its mechanism.
+
 ## Current milestone — 1.65.0
 
 Phase6: **Real-World Capabilities**. Nine new services adding multimodal understanding, real-world
@@ -32,17 +53,42 @@ diagnostics and durable content-addressed evidence. Governance: `code.catalog`, 
 
 The current code is a **working integrated runtime and control-center foundation**, not yet full current-upstream feature parity with all three products. The exact re-audit against their 2026-08-18 default branches is recorded in [`docs/upstream-gap-audit-2026-08-18.md`](docs/upstream-gap-audit-2026-08-18.md).
 
-Implemented and tested:
+### Maturity legend
+
+Names in this repository are held to what the code actually does. The
+authoritative, machine-checked record is
+[`packages/engine/src/experimental/maturity.ts`](packages/engine/src/experimental/maturity.ts)
+(29 modules: 7 stable, 16 beta, 6 experimental), enforced by
+`maturity-registry.test.ts`.
+
+| Label | Meaning |
+|---|---|
+| **Implemented** | Real behaviour, wired into the engine, covered by tests |
+| **Beta** | Works and is wired, but the name promises more than it delivers; the shortfall is written in `gapToStable` |
+| **Experimental** | Structure and persistence are real; the *doing* part raises a named `…NotImplemented` / `…Unavailable` error rather than faking a result |
+
+Experimental subsystems do not pretend. For example, extension execution throws
+`ExtensionSandboxUnavailableError` instead of returning `{ success: true }` —
+it previously did the latter, which made never-executed extensions report a
+100% success rate.
+
+**Experimental — scaffolding real, execution not wired:**
+
+- **code pipeline**: the SDLC chain is modelled and persisted; six of eight stages raise `CodePipelineStageNotImplementedError` until real backends exist
+- **real-world connectors**: registration, credential refs and policy are real; connector *actions* (e.g. `listEmails`) throw pending a configured provider
+- **computer use**: step planning and rollback bookkeeping are real; individual steps throw pending a driver
+- **digital twin**: context modelling is real; there is no simulation/prediction loop yet
+- **domain experts**: routing and disclosure controls are real; there are no specialised expert backends
+- **federated/edge**: node and policy management are real; there is no parameter aggregation across nodes
+- **agent SDK**: registry, publish lifecycle, instances and permissions are real; execution throws until an isolate is wired
+
+**Implemented and tested:**
 
 - multimodal service: OCR, document analysis, image/video/audio understanding, CAD/3D parsing, map/spatial analysis, time series analysis
-- real-world connectors: email, calendar, CRM, ERP, accounting, customer support, sales, social media, warehouse, IoT
-- computer use service: browser/desktop automation, visual grounding, safe form filling, long-running task rollback
-- code pipeline: full SDLC chain (issue → plan → branch → implement → test → security review → PR → CI → deploy) with rollback
 - research engine: multi-source search, source trust scoring, citation verification, contradiction analysis, report generation
-- digital twin: user project/tool/workflow/constraint/preference context with learning history and sync
-- domain experts: law, finance, health, tax, compliance with source-showing, controlled modes, risk assessment
-- federated/edge: local model management (GGUF/ONNX/SafeTensors), edge node management, data policies, air-gap mode
-- agent SDK: third-party extension framework with sandbox execution, signature verification, review system
+- unified execution loop: one real path from goal to verified outcome, with `succeeded` / `unverified` / `unavailable` / `skipped` kept distinct
+- gap detection and capability acquisition: a missing tool is named, synthesised, verified in a Worker isolate against known-good cases **and known-bad decoys**, then retried on the original task
+- verification factory: V1 formal, V2 empirical and workspace-acceptance verifiers; absent evidence reports `uncertain`, never `pass`
 - durable session actor and supervisor
 - process-safe stale-lock-aware session leases
 - append-only event store with generation/sequence metadata
@@ -559,6 +605,7 @@ npm run build
 npm run typecheck
 npm test
 npm run check      # typecheck + tests
+npm run eval:gates # acceptance gates: criteria, baseline, learning, recall lock
 ```
 
 ## Repository layout
@@ -1986,6 +2033,26 @@ The adversarial gate covers SSRF, path/symlink escape, webhook least privilege,
 malicious skill archives, plugin signatures, OPA fail-closed and credential
 scope. Chaos covers worker death/adoption, child rehydration, binary replay,
 PostgreSQL journals/leases and NATS request/reply.
+
+### Acceptance gates
+
+`npm run eval:gates` runs on every push and fails the build when a measured
+criterion regresses:
+
+| gate | asserts |
+|---|---|
+| `eval:validate` | every acceptance criterion rejects an unsolved workspace (60/60 discriminative) |
+| `eval:baseline` | a non-acting model scores 0/61 — a pass here would prove the tasks are vacuous |
+| `eval:learning` | a repeated task family completes in fewer steps (4/4 families, 42.9% mean reduction) |
+| `eval:recall:lock` | hybrid retrieval's fusion and ranking behaviour is unchanged |
+
+`eval:recall:lock` is a **regression lock, not a quality claim**. The FAZ 11
+acceptance criterion — Recall@8 beating a BM25 baseline by ≥0.05 — requires a
+real semantic encoder, which per-push CI does not have. That criterion runs in
+the nightly `recall-nightly` job against `EMBEDDINGS_URL`; with a real encoder
+the pipeline measures 0.317 → 0.400 (+0.083, 8W/1L/6T). Running the lock with
+the deterministic hash encoder only proves the retrieval logic did not change,
+and its output says so explicitly.
 
 ## SBOM, provenance and release verification
 

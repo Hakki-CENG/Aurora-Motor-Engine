@@ -1,0 +1,87 @@
+{
+  "id": "traj-tool-008-1789667944123-mbzpcw",
+  "taskId": "tool-008",
+  "tenantId": "eval",
+  "sessionId": "eval-tool-008",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:59:04.123Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "tool-008",
+        "category": "tool_use",
+        "instruction": "Test a REST API using curl: 1) Send GET request to get users, 2) Send POST request to create user, 3) Send PUT request to update user, 4) Send DELETE request to delete user, 5) Handle authentication h"
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:59:04.123Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944123",
+        "data": {
+          "taskDescription": "Test a REST API using curl: 1) Send GET request to get users, 2) Send POST request to create user, 3) Send PUT request to update user, 4) Send DELETE request to delete user, 5) Handle authentication h",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T17:59:04.123Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Test a REST API using curl: 1) Send GET request to get users, 2) Send POST request to create user, 3) Send PUT request to update user, 4) Send DELETE request to delete user, 5) Handle authentication headers.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:59:04.123Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944123",
+        "data": {
+          "traceId": "run-1789667944123-eibsqc",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:59:04.123Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:59:04.123Z",
+  "completedAt": "2026-09-17T17:59:04.123Z",
+  "durationMs": 0,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task tool-008: success"
+}

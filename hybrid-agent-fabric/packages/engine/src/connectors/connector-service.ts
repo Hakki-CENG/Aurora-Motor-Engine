@@ -199,13 +199,23 @@ export class ConnectorService {
     return this.executeAction(connectorId, "email.send", { to, subject, body, html });
   }
 
-  async listEmails(connectorId: string, folder?: string, limit?: number): Promise<EmailMessage[]> {
-    // Placeholder: In production, call email API
-    return [];
+  /**
+   * Email listing/search is NOT implemented.
+   *
+   * These returned `[]`, which is indistinguishable from "the mailbox is
+   * empty" — a caller could reasonably conclude there were no messages when in
+   * fact nothing was ever queried.
+   */
+  async listEmails(_connectorId: string, _folder?: string, _limit?: number): Promise<EmailMessage[]> {
+    throw new Error(
+      "listEmails is not implemented. It requires a configured mail provider (IMAP/Graph/Gmail API) on the connector.",
+    );
   }
 
-  async searchEmails(connectorId: string, query: string): Promise<EmailMessage[]> {
-    return [];
+  async searchEmails(_connectorId: string, _query: string): Promise<EmailMessage[]> {
+    throw new Error(
+      "searchEmails is not implemented. It requires a configured mail provider (IMAP/Graph/Gmail API) on the connector.",
+    );
   }
 
   // ─── Calendar Operations ───
@@ -314,9 +324,14 @@ export class ConnectorService {
   }
 
   private async dispatchAction(connector: ConnectorConfig, action: string, params: Record<string, unknown>): Promise<unknown> {
-    // In production, route to appropriate connector implementation
-    // For now, return placeholder
-    return { success: true, action, connector: connector.name };
+    // No connector backend is implemented. Returning `{ success: true }` here
+    // caused `executeAction` to record the action as "completed" with a
+    // successful result, so every integration appeared to work while nothing
+    // left the process.
+    throw new Error(
+      `Connector action '${action}' is not implemented for connector '${connector.name}'. ` +
+        `It requires a provider implementation (the action is recorded as failed, not completed).`,
+    );
   }
 
   // ─── Sync ───

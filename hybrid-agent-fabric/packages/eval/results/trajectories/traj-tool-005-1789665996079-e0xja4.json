@@ -1,0 +1,87 @@
+{
+  "id": "traj-tool-005-1789665996079-e0xja4",
+  "taskId": "tool-005",
+  "tenantId": "eval",
+  "sessionId": "eval-tool-005",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:26:36.079Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "tool-005",
+        "category": "tool_use",
+        "instruction": "Manage environment variables: 1) Create a .env file with database config, 2) Create a .env.example with placeholder values, 3) Add .env to .gitignore, 4) Create a function that reads and validates env"
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:26:36.079Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665996079",
+        "data": {
+          "taskDescription": "Manage environment variables: 1) Create a .env file with database config, 2) Create a .env.example with placeholder values, 3) Add .env to .gitignore, 4) Create a function that reads and validates env",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T17:26:36.079Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Manage environment variables: 1) Create a .env file with database config, 2) Create a .env.example with placeholder values, 3) Add .env to .gitignore, 4) Create a function that reads and validates env vars.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:26:36.081Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665996079",
+        "data": {
+          "traceId": "run-1789665996079-lgwf4n",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:26:36.081Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:26:36.079Z",
+  "completedAt": "2026-09-17T17:26:36.081Z",
+  "durationMs": 2,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task tool-005: success"
+}

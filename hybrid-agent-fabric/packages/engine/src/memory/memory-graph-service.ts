@@ -45,6 +45,7 @@ export interface MemoryObjectRecord {
   usageCount: number;
   reinforcementCount: number;
   lastAccessedAt?: string;
+  lastVerifiedAt?: string;
   evidenceRefs: string[];
   createdAt: string;
   updatedAt: string;
@@ -788,6 +789,32 @@ export class MemoryGraphService {
     return state.anchors
       .filter((item) => item.tenantId === tenantId && item.status === "active" && Date.parse(item.nextReviewAt) <= timestamp)
       .sort((a, b) => b.importance - a.importance)
+      .map((item) => structuredClone(item));
+  }
+
+  /** Verify a memory — updates lastVerifiedAt and confidence. */
+  async verifyMemory(tenantId: string, memoryId: string, confirmed: boolean): Promise<MemoryObjectRecord> {
+    return await this.store.mutate(state => {
+      const memory = this.mutableMemory(state, tenantId, memoryId);
+      const nowIso = new Date(this.now()).toISOString();
+      memory.lastVerifiedAt = nowIso;
+      if (confirmed) {
+        memory.confidence = auroraRound(Math.min(1, memory.confidence + 0.1));
+      } else {
+        memory.confidence = auroraRound(Math.max(0, memory.confidence - 0.2));
+      }
+      memory.updatedAt = nowIso;
+      return structuredClone(memory);
+    });
+  }
+
+  /** Get unverified memories for a tenant. */
+  async getUnverified(tenantId: string, limit = 20): Promise<MemoryObjectRecord[]> {
+    const state = await this.store.read();
+    return state.memories
+      .filter((item) => item.tenantId === tenantId && item.state === "active" && !item.lastVerifiedAt)
+      .sort((a, b) => b.importance - a.importance)
+      .slice(0, limit)
       .map((item) => structuredClone(item));
   }
 

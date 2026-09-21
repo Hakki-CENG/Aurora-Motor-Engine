@@ -469,7 +469,7 @@ export class ConstitutionService {
 
   // ═══ P2: Explainability ═══
 
-  
+
   // ═══ P3: Stats ═══
 
   async getStats(tenantId: string) {

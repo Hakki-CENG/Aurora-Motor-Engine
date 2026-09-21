@@ -72,6 +72,20 @@ Response format: `{ data: [...], pagination: { page, pageSize, total, totalPages
 | `GET` | `/v1/cognitive/reflection` | Reflection |
 | `POST` | `/v1/cognitive/cycle` | Cycle |
 
+## Cognitive State
+
+`/v1/cognitive-state` returns a single most-recent-wins view, which is
+ambiguous whenever more than one task is in flight. The per-task endpoints
+answer the same question per task.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/v1/cognitive-state` | Flat snapshot (last writer wins) |
+| `GET` | `/v1/cognitive-state/history` | Mode change history |
+| `POST` | `/v1/cognitive-state/reset` | Clear state and all task slots |
+| `GET` | `/v1/cognitive-state/tasks` | Tasks currently running, each with its own goal/plan |
+| `GET` | `/v1/cognitive-state/tasks/:taskId` | One task's record; `404` if the id is unknown |
+
 ## Cognitive Telemetry
 
 | Method | Path | Description |

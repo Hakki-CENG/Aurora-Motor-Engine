@@ -1,0 +1,87 @@
+{
+  "id": "traj-recovery-003-1789665181922-bekmb6",
+  "taskId": "recovery-003",
+  "tenantId": "eval",
+  "sessionId": "eval-recovery-003",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:13:01.922Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "recovery-003",
+        "category": "recovery",
+        "instruction": "Execute a plan that fails midway. Detect the failure, analyze why, create an alternative plan, and successfully complete the task."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:13:01.922Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665181922",
+        "data": {
+          "taskDescription": "Execute a plan that fails midway. Detect the failure, analyze why, create an alternative plan, and successfully complete the task.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T17:13:01.922Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Execute a plan that fails midway. Detect the failure, analyze why, create an alternative plan, and successfully complete the task.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:13:01.923Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665181922",
+        "data": {
+          "traceId": "run-1789665181922-55er3e",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:13:01.923Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:13:01.922Z",
+  "completedAt": "2026-09-17T17:13:01.923Z",
+  "durationMs": 1,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task recovery-003: success"
+}

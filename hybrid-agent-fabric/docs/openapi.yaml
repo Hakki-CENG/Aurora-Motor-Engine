@@ -16,7 +16,7 @@ info:
     - MCP server yönetimi
     - Öğrenme ve iyileştirme
     - Otomasyon ve zamanlama
-  version: 1.64.0
+  version: 1.65.0
   contact:
     name: Aurora Motor Engine
   license:
@@ -53,7 +53,7 @@ paths:
                     example: hybrid-agent-fabric
                   version:
                     type: string
-                    example: 1.64.0
+                    example: 1.65.0
                   provider:
                     type: array
                     items:

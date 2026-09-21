@@ -212,14 +212,14 @@ export class AuroraContextComposer {
     recommendations: string[];
   }> {
     const recommendations: string[] = [];
-    
+
     if (request.touchedPaths && request.touchedPaths.length > 20) {
       recommendations.push("Reduce touched paths — top 20 by relevance should suffice");
     }
     if (request.query && request.query.length > 5000) {
       recommendations.push("Query is very long — consider summarizing");
     }
-    
+
     return { optimized: true, tokenSavings: recommendations.length * 500, recommendations };
   }
 
@@ -232,5 +232,3 @@ export class AuroraContextComposer {
     return { entity: entityId, summary: "N/A", rationale: ["Service does not support entity lookup"], details: {} };
   }
 }
-
-

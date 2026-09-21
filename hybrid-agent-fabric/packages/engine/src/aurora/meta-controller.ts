@@ -15,7 +15,7 @@ interface TaskProfile { id: string; tenantId: string; taskDescription: string; c
 interface ExecutionPhase { id: string; name: string; subsystems: string[]; parallel: boolean; optional: boolean; timeoutMs: number; earlyExitIf: string; dependsOn: string[]; }
 interface ExecutionPlan { id: string; profileId: string; phases: ExecutionPhase[]; totalEstimatedMs: number; totalEstimatedTokens: number; parallelGroups: string[][]; earlyExitConditions: string[]; fallbackPlan: string; createdAt: string; }
 interface SubsystemHealth { name: string; status: SystemHealth; avgLatencyMs: number; avgTokenCost: number; successRate: number; usageCount: number; errorCount: number; lastError: string; lastUsedAt: string; consecutiveFailures: number; }
-interface MetaDecision { id: string; tenantId: string; taskId: string; profile: TaskProfile; plan: ExecutionPlan; actualDurationMs: number; actualTokensUsed: number; actualSubsystemsUsed: string[]; outcome: string; efficiency: number; lessonsForMeta: string[]; createdAt: string; completedAt: string; }
+interface MetaDecision { id: string; tenantId: string; taskId: string; profile: TaskProfile; plan: ExecutionPlan; actualDurationMs: number; actualTokensUsed: number; actualSubsystemsUsed: string[]; outcome: "success" | "failure" | "partial" | "skipped" | "timed_out" | "cancelled" | "blocked"; efficiency: number; lessonsForMeta: string[]; createdAt: string; completedAt: string; }
 interface SystemAlert { id: string; subsystem: string; level: "info" | "warning" | "critical"; message: string; timestamp: string; acknowledged: boolean; }
 interface MetaInsight { id: string; category: "optimization" | "risk" | "pattern" | "anomaly" | "recommendation"; insight: string; confidence: number; impact: "low" | "medium" | "high"; subsystems: string[]; timestamp: string; }
 interface MetaConfig { mode: MetaMode; maxConcurrentSubsystems: number; healthCheckIntervalMs: number; autoRecovery: boolean; learningRate: number; explorationRate: number; }
@@ -135,34 +135,70 @@ export class MetaControllerService {
     };
   }
 
-  // ═══ Execution Plan Oluşturma ═══
+  // ═══ Execution Plan Oluşturma (15 Phase) ═══
   createPlan(profile: TaskProfile): ExecutionPlan {
     const phases: ExecutionPhase[] = [];
     let pn = 0;
 
-    // Phase1: Observe & Recall
+    // Phase1: Context Engineering
     const subs1 = ["memory", "neural-memory-fusion", "long-horizon-memory"].filter(s => profile.requiredSubsystems.includes(s));
-    if (subs1.length) phases.push({ id: `p${++pn}`, name: "Observe & Recall", subsystems: subs1, parallel: true, optional: false, timeoutMs: 5000, earlyExitIf: "", dependsOn: [] });
+    if (subs1.length) phases.push({ id: `p${++pn}`, name: "Context Engineering", subsystems: subs1, parallel: true, optional: false, timeoutMs: 5000, earlyExitIf: "", dependsOn: [] });
 
-    // Phase2: Analyze & Assess
-    const subs2 = ["world-model", "uncertainty-engine", "self-model", "learned-world-model", "causal-graph"].filter(s => profile.requiredSubsystems.includes(s));
-    if (subs2.length) phases.push({ id: `p${++pn}`, name: "Analyze & Assess", subsystems: subs2, parallel: true, optional: false, timeoutMs: 10000, earlyExitIf: "", dependsOn: phases.length ? [phases[phases.length - 1]!.id] : [] });
+    // Phase2: Self-Awareness
+    const subs2 = ["self-model", "uncertainty-engine", "failure-taxonomy", "cognitive-telemetry"].filter(s => profile.requiredSubsystems.includes(s));
+    if (subs2.length) phases.push({ id: `p${++pn}`, name: "Self-Awareness", subsystems: subs2, parallel: true, optional: false, timeoutMs: 3000, earlyExitIf: "", dependsOn: phases.length ? [phases[phases.length - 1]!.id] : [] });
 
-    // Phase3: Plan & Simulate
-    const subs3 = ["planner", "simulation", "multi-hypothesis", "counterfactual-simulator", "experiment-engine"].filter(s => profile.requiredSubsystems.includes(s));
-    if (subs3.length) phases.push({ id: `p${++pn}`, name: "Plan & Simulate", subsystems: subs3, parallel: true, optional: false, timeoutMs: 15000, earlyExitIf: "", dependsOn: phases.length ? [phases[phases.length - 1]!.id] : [] });
+    // Phase3: World Understanding
+    const subs3 = ["world-model", "learned-world-model", "causal-graph"].filter(s => profile.requiredSubsystems.includes(s));
+    if (subs3.length) phases.push({ id: `p${++pn}`, name: "World Understanding", subsystems: subs3, parallel: true, optional: false, timeoutMs: 8000, earlyExitIf: "", dependsOn: phases.length ? [phases[phases.length - 1]!.id] : [] });
 
-    // Phase4: Verify & Critique
-    const subs4 = ["internal-critic", "verification", "cognitive-telemetry"].filter(s => profile.requiredSubsystems.includes(s));
-    if (subs4.length) phases.push({ id: `p${++pn}`, name: "Verify & Critique", subsystems: subs4, parallel: true, optional: true, timeoutMs: 10000, earlyExitIf: "", dependsOn: [] });
+    // Phase4: Resource Assessment
+    const subs4 = ["resource-intelligence", "benchmark-lab"].filter(s => profile.requiredSubsystems.includes(s));
+    if (subs4.length) phases.push({ id: `p${++pn}`, name: "Resource Assessment", subsystems: subs4, parallel: true, optional: true, timeoutMs: 3000, earlyExitIf: "", dependsOn: [] });
 
-    // Phase5: Execute & Monitor
-    const subs5 = ["attention-v2", "adaptive-router"].filter(s => profile.requiredSubsystems.includes(s));
-    if (subs5.length) phases.push({ id: `p${++pn}`, name: "Execute & Monitor", subsystems: subs5, parallel: true, optional: false, timeoutMs: 8000, earlyExitIf: "", dependsOn: [] });
+    // Phase5: Risk Analysis
+    const subs5 = ["internal-critic", "verification"].filter(s => profile.requiredSubsystems.includes(s));
+    if (subs5.length) phases.push({ id: `p${++pn}`, name: "Risk Analysis", subsystems: subs5, parallel: true, optional: false, timeoutMs: 5000, earlyExitIf: "", dependsOn: phases.length ? [phases[phases.length - 1]!.id] : [] });
 
-    // Phase6: Learn & Record
-    const subs6 = ["experience-compiler", "failure-taxonomy", "shared-learning", "self-debugging"].filter(s => profile.requiredSubsystems.includes(s));
-    if (subs6.length) phases.push({ id: `p${++pn}`, name: "Learn & Record", subsystems: subs6, parallel: true, optional: true, timeoutMs: 5000, earlyExitIf: "", dependsOn: [] });
+    // Phase6: Hypothesis Generation
+    const subs6 = ["multi-hypothesis", "counterfactual-simulator", "experiment-engine"].filter(s => profile.requiredSubsystems.includes(s));
+    if (subs6.length) phases.push({ id: `p${++pn}`, name: "Hypothesis Generation", subsystems: subs6, parallel: true, optional: false, timeoutMs: 10000, earlyExitIf: "", dependsOn: phases.length ? [phases[phases.length - 1]!.id] : [] });
+
+    // Phase7: Planning
+    const subs7 = ["planner", "planner-v2", "goal-stack"].filter(s => profile.requiredSubsystems.includes(s));
+    if (subs7.length) phases.push({ id: `p${++pn}`, name: "Planning", subsystems: subs7, parallel: true, optional: false, timeoutMs: 8000, earlyExitIf: "", dependsOn: phases.length ? [phases[phases.length - 1]!.id] : [] });
+
+    // Phase8: Simulation
+    const subs8 = ["simulation", "counterfactual-simulator"].filter(s => profile.requiredSubsystems.includes(s));
+    if (subs8.length) phases.push({ id: `p${++pn}`, name: "Simulation", subsystems: subs8, parallel: true, optional: true, timeoutMs: 10000, earlyExitIf: "", dependsOn: phases.length ? [phases[phases.length - 1]!.id] : [] });
+
+    // Phase9: Confidence Calibration
+    const subs9 = ["uncertainty-engine", "internal-critic"].filter(s => profile.requiredSubsystems.includes(s));
+    if (subs9.length) phases.push({ id: `p${++pn}`, name: "Confidence Calibration", subsystems: subs9, parallel: true, optional: false, timeoutMs: 3000, earlyExitIf: "", dependsOn: [] });
+
+    // Phase10: Attention Focus
+    const subs10 = ["attention-v2", "adaptive-router"].filter(s => profile.requiredSubsystems.includes(s));
+    if (subs10.length) phases.push({ id: `p${++pn}`, name: "Attention Focus", subsystems: subs10, parallel: true, optional: false, timeoutMs: 3000, earlyExitIf: "", dependsOn: [] });
+
+    // Phase11: Execution
+    const subs11 = ["planner", "simulation"].filter(s => profile.requiredSubsystems.includes(s));
+    if (subs11.length) phases.push({ id: `p${++pn}`, name: "Execution", subsystems: subs11, parallel: false, optional: false, timeoutMs: 15000, earlyExitIf: "", dependsOn: phases.length ? [phases[phases.length - 1]!.id] : [] });
+
+    // Phase12: Monitoring
+    const subs12 = ["cognitive-telemetry", "failure-taxonomy"].filter(s => profile.requiredSubsystems.includes(s));
+    if (subs12.length) phases.push({ id: `p${++pn}`, name: "Monitoring", subsystems: subs12, parallel: true, optional: false, timeoutMs: 5000, earlyExitIf: "", dependsOn: [] });
+
+    // Phase13: Verification
+    const subs13 = ["verification", "critic", "internal-critic"].filter(s => profile.requiredSubsystems.includes(s));
+    if (subs13.length) phases.push({ id: `p${++pn}`, name: "Verification", subsystems: subs13, parallel: true, optional: false, timeoutMs: 8000, earlyExitIf: "", dependsOn: phases.length ? [phases[phases.length - 1]!.id] : [] });
+
+    // Phase14: Meta Learning
+    const subs14 = ["experience-compiler", "shared-learning", "self-debugging"].filter(s => profile.requiredSubsystems.includes(s));
+    if (subs14.length) phases.push({ id: `p${++pn}`, name: "Meta Learning", subsystems: subs14, parallel: true, optional: true, timeoutMs: 5000, earlyExitIf: "", dependsOn: [] });
+
+    // Phase15: Consolidation
+    const subs15 = ["sleep-cycle", "neural-memory-fusion"].filter(s => profile.requiredSubsystems.includes(s));
+    if (subs15.length) phases.push({ id: `p${++pn}`, name: "Consolidation", subsystems: subs15, parallel: true, optional: true, timeoutMs: 10000, earlyExitIf: "", dependsOn: [] });
 
     return {
       id: randomUUID(), profileId: profile.id, phases,
@@ -176,7 +212,7 @@ export class MetaControllerService {
   }
 
   // ═══ Karar Kaydetme ═══
-  async recordDecision(tenantId: string, taskId: string, profile: TaskProfile, plan: ExecutionPlan, actual: { durationMs: number; tokensUsed: number; subsystemsUsed: string[]; outcome: string }): Promise<MetaDecision> {
+  async recordDecision(tenantId: string, taskId: string, profile: TaskProfile, plan: ExecutionPlan, actual: { durationMs: number; tokensUsed: number; subsystemsUsed: string[]; outcome: "success" | "failure" | "partial" | "skipped" | "timed_out" | "cancelled" | "blocked" }): Promise<MetaDecision> {
     const efficiency = auroraRound(plan.totalEstimatedMs > 0 ? Math.min(2, actual.durationMs / plan.totalEstimatedMs) : 1);
     const lessons: string[] = [];
     if (efficiency > 1.5) lessons.push(`Task took ${auroraRound(efficiency)}x longer than estimated`);
@@ -208,6 +244,12 @@ export class MetaControllerService {
           health.successRate = Math.min(1, health.successRate + 0.05);
           health.consecutiveFailures = 0;
           health.status = "healthy";
+        } else if (actual.outcome === "skipped" || actual.outcome === "cancelled") {
+          // Skipped/cancelled don't count as failures
+          health.consecutiveFailures = 0;
+        } else if (actual.outcome === "blocked") {
+          // Blocked is a dependency issue, not a failure
+          health.consecutiveFailures = 0;
         } else {
           health.successRate = Math.max(0, health.successRate - 0.1);
           health.errorCount++;
@@ -218,9 +260,12 @@ export class MetaControllerService {
         health.lastUsedAt = new Date().toISOString();
       }
 
-      // Update global success rate
+      // Update global success rate (exclude skipped/cancelled/blocked from denominator)
       const allDecisions = s.decisions;
-      s.globalSuccessRate = allDecisions.filter(d => d.outcome === "success").length / allDecisions.length;
+      const relevantDecisions = allDecisions.filter(d => !["skipped", "cancelled", "blocked"].includes(d.outcome));
+      s.globalSuccessRate = relevantDecisions.length > 0
+        ? relevantDecisions.filter(d => d.outcome === "success").length / relevantDecisions.length
+        : 1.0;
 
       // Auto mode switching
       if (s.config.autoRecovery) {
@@ -242,6 +287,41 @@ export class MetaControllerService {
   async getSubsystemHealth(): Promise<SubsystemHealth[]> {
     const s = await this.store.read();
     return s.subsystemHealth;
+  }
+
+  // ═══ Performance-Based Routing ═══
+  async selectBestSubsystem(subsystemNames: string[]): Promise<string | null> {
+    const s = await this.store.read();
+    const candidates = subsystemNames
+      .map(name => s.subsystemHealth.find(h => h.name === name))
+      .filter((h): h is SubsystemHealth => h !== undefined);
+
+    if (candidates.length === 0) return null;
+
+    // Skor hesapla: successRate * 0.6 + (1 - avgLatencyMs/10000) * 0.4
+    const scored = candidates.map(h => ({
+      name: h.name,
+      score: h.successRate * 0.6 + Math.max(0, 1 - h.avgLatencyMs / 10000) * 0.4,
+      status: h.status,
+    }));
+
+    // Önce healthy olanları tercih et
+    const healthy = scored.filter(s => s.status === "healthy");
+    if (healthy.length > 0) {
+      healthy.sort((a, b) => b.score - a.score);
+      return healthy[0]!.name;
+    }
+
+    // Sonra degraded olanları
+    const degraded = scored.filter(s => s.status === "degraded");
+    if (degraded.length > 0) {
+      degraded.sort((a, b) => b.score - a.score);
+      return degraded[0]!.name;
+    }
+
+    // Critical olanları son çare olarak kullan
+    scored.sort((a, b) => b.score - a.score);
+    return scored[0]!.name;
   }
 
   // ═══ Uyarılar ═══
@@ -303,6 +383,50 @@ export class MetaControllerService {
       if (partial.learningRate !== undefined) s.config.learningRate = partial.learningRate;
       if (partial.explorationRate !== undefined) s.config.explorationRate = partial.explorationRate;
     });
+  }
+
+  // ═══ Execution State Tracking ═══
+  async getExecutionState(tenantId: string, taskId: string): Promise<{
+    state: "planned" | "executing" | "succeeded" | "failed" | "skipped" | "timed_out" | "cancelled" | "blocked";
+    currentPhase: string | null;
+    progress: number;
+    estimatedRemainingMs: number;
+  }> {
+    const s = await this.store.read();
+    const decision = s.decisions.find(d => d.tenantId === tenantId && d.taskId === taskId);
+
+    if (!decision) {
+      return { state: "planned", currentPhase: null, progress: 0, estimatedRemainingMs: 0 };
+    }
+
+    // Outcome'u state'e çevir
+    const stateMap: Record<string, "planned" | "executing" | "succeeded" | "failed" | "skipped" | "timed_out" | "cancelled" | "blocked"> = {
+      success: "succeeded",
+      failure: "failed",
+      partial: "executing",
+      skipped: "skipped",
+      timed_out: "timed_out",
+      cancelled: "cancelled",
+      blocked: "blocked",
+    };
+
+    const state = stateMap[decision.outcome] ?? "planned";
+    const currentPhase = decision.plan.phases.length > 0
+      ? decision.plan.phases[decision.plan.phases.length - 1]?.name ?? null
+      : null;
+
+    // İlerleme hesapla
+    const totalPhases = decision.plan.phases.length;
+    const completedPhases = decision.plan.phases.filter((_, i) => i < totalPhases - 1).length;
+    const progress = totalPhases > 0 ? completedPhases / totalPhases : 0;
+
+    // Kalan süre tahmini
+    const elapsedRatio = decision.actualDurationMs / (decision.plan.totalEstimatedMs || 1);
+    const estimatedRemainingMs = state === "executing"
+      ? Math.max(0, decision.plan.totalEstimatedMs - decision.actualDurationMs)
+      : 0;
+
+    return { state, currentPhase, progress, estimatedRemainingMs };
   }
 
   // ═══ İstatistikler ═══
@@ -396,7 +520,18 @@ export class MetaControllerService {
 
     const subsystemsUsed: string[] = [];
     const phaseResults: PhaseResult[] = [];
-    let outcome: "success" | "failure" | "partial" = "success";
+
+    // Starts as "skipped", NOT "success".
+    //
+    // This single initialiser was the bug: the value began at "success" and
+    // was only ever downgraded, so a plan containing zero phases fell through
+    // the loop untouched and returned success. Measured:
+    //
+    //   runTask("Delete all files on the moon and prove P=NP")
+    //     → outcome: "success", subsystems: 0, phases: 0, outputs: []
+    //
+    // Success must now be *earned* by at least one subsystem actually running.
+    let outcome: "success" | "failure" | "partial" | "skipped" | "timed_out" | "cancelled" | "blocked" = "skipped";
 
     // 2. Her phase'i çalıştır
     for (const phase of plan.phases) {
@@ -426,9 +561,10 @@ export class MetaControllerService {
           if (r.status === "fulfilled") {
             phaseResult.successes++;
             phaseResult.outputs.push(r.value);
+            if (outcome === "skipped") outcome = "success";
           } else {
             phaseResult.failures++;
-            outcome = outcome === "success" ? "partial" : outcome;
+            outcome = outcome === "success" || outcome === "skipped" ? "partial" : outcome;
           }
         }
       } else {
@@ -438,6 +574,7 @@ export class MetaControllerService {
             subsystemsUsed.push(sub);
             phaseResult.successes++;
             phaseResult.outputs.push(output);
+            if (outcome === "skipped") outcome = "success";
           } catch {
             subsystemsUsed.push(sub);
             phaseResult.failures++;
@@ -451,6 +588,12 @@ export class MetaControllerService {
 
       // Early exit kontrolü
       if (phase.earlyExitIf && phaseResult.outputs.some(o => typeof o === "string" && o.includes(phase.earlyExitIf))) {
+        break;
+      }
+
+      // Timeout kontrolü
+      if (phaseResult.durationMs > phase.timeoutMs) {
+        outcome = "timed_out";
         break;
       }
     }
@@ -504,6 +647,22 @@ export class MetaControllerService {
    * Phase adını CognitiveMode'a çevir.
    */
   private phaseToCognitiveMode(phaseName: string): string {
+    if (phaseName.includes("Context")) return "observing";
+    if (phaseName.includes("Self-Awareness")) return "observing";
+    if (phaseName.includes("World")) return "reasoning";
+    if (phaseName.includes("Resource")) return "observing";
+    if (phaseName.includes("Risk")) return "reasoning";
+    if (phaseName.includes("Hypothesis")) return "reasoning";
+    if (phaseName.includes("Planning")) return "planning";
+    if (phaseName.includes("Simulation")) return "reasoning";
+    if (phaseName.includes("Confidence")) return "verifying";
+    if (phaseName.includes("Attention")) return "observing";
+    if (phaseName.includes("Execution")) return "executing";
+    if (phaseName.includes("Monitoring")) return "observing";
+    if (phaseName.includes("Verification")) return "verifying";
+    if (phaseName.includes("Meta Learning")) return "learning";
+    if (phaseName.includes("Consolidation")) return "consolidating";
+    // Eski phase'ler için geriye dönük uyumluluk
     if (phaseName.includes("Observe")) return "observing";
     if (phaseName.includes("Analyze")) return "reasoning";
     if (phaseName.includes("Plan")) return "planning";
@@ -511,6 +670,42 @@ export class MetaControllerService {
     if (phaseName.includes("Execute")) return "executing";
     if (phaseName.includes("Learn")) return "learning";
     return "idle";
+  }
+
+  /** Görevi iptal et — outcome: "cancelled" olarak kaydeder */
+  async cancelTask(tenantId: string, taskId: string, reason: string): Promise<void> {
+    await this.store.mutate(s => {
+      const decision = s.decisions.find(d => d.tenantId === tenantId && d.taskId === taskId);
+      if (decision) {
+        decision.outcome = "cancelled";
+        decision.lessonsForMeta.push(`Cancelled: ${reason}`);
+        decision.completedAt = new Date().toISOString();
+      }
+    });
+  }
+
+  /** Görevi engelle — outcome: "blocked" olarak kaydeder */
+  async blockTask(tenantId: string, taskId: string, reason: string): Promise<void> {
+    await this.store.mutate(s => {
+      const decision = s.decisions.find(d => d.tenantId === tenantId && d.taskId === taskId);
+      if (decision) {
+        decision.outcome = "blocked";
+        decision.lessonsForMeta.push(`Blocked: ${reason}`);
+        decision.completedAt = new Date().toISOString();
+      }
+    });
+  }
+
+  /** Görevi atla — outcome: "skipped" olarak kaydeder */
+  async skipTask(tenantId: string, taskId: string, reason: string): Promise<void> {
+    await this.store.mutate(s => {
+      const decision = s.decisions.find(d => d.tenantId === tenantId && d.taskId === taskId);
+      if (decision) {
+        decision.outcome = "skipped";
+        decision.lessonsForMeta.push(`Skipped: ${reason}`);
+        decision.completedAt = new Date().toISOString();
+      }
+    });
   }
 
   // ═══ P2: Explainability ═══
@@ -555,6 +750,6 @@ export interface RunResult {
   phaseResults: PhaseResult[];
   decision: MetaDecision;
   totalDurationMs: number;
-  outcome: "success" | "failure" | "partial";
+  outcome: "success" | "failure" | "partial" | "skipped" | "timed_out" | "cancelled" | "blocked";
   subsystemsUsed: string[];
 }

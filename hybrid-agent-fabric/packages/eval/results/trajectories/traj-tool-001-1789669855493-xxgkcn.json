@@ -1,0 +1,87 @@
+{
+  "id": "traj-tool-001-1789669855493-xxgkcn",
+  "taskId": "tool-001",
+  "tenantId": "eval",
+  "sessionId": "eval-tool-001",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T18:30:55.493Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "tool-001",
+        "category": "tool_use",
+        "instruction": "Perform a complete git workflow: 1) Create a new branch called 'feature/add-config', 2) Create a file src/config.ts with a simple config object, 3) Commit the changes, 4) Switch back to main branch, 5"
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T18:30:55.493Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789669855493",
+        "data": {
+          "taskDescription": "Perform a complete git workflow: 1) Create a new branch called 'feature/add-config', 2) Create a file src/config.ts with a simple config object, 3) Commit the changes, 4) Switch back to main branch, 5",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T18:30:55.493Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Perform a complete git workflow: 1) Create a new branch called 'feature/add-config', 2) Create a file src/config.ts with a simple config object, 3) Commit the changes, 4) Switch back to main branch, 5) Merge the feature branch.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T18:30:55.495Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789669855493",
+        "data": {
+          "traceId": "run-1789669855493-vvhjfg",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T18:30:55.495Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T18:30:55.493Z",
+  "completedAt": "2026-09-17T18:30:55.495Z",
+  "durationMs": 2,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task tool-001: success"
+}

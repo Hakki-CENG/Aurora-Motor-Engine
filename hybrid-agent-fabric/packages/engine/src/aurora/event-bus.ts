@@ -18,6 +18,10 @@ export interface AuroraEvent {
   traceId: string | undefined;
   /** Bu olay hangi cognitive phase'de üretildi */
   phase: string | undefined;
+  /** Bu olaya neden olan olayın ID'si */
+  causationId: string | undefined;
+  /** Bu olay grubunun korelasyon ID'si */
+  correlationId: string | undefined;
 }
 
 export type EventHandler = (event: AuroraEvent) => void | Promise<void>;
@@ -130,7 +134,7 @@ export class EventBus {
     type: string,
     source: string,
     payload: Record<string, unknown>,
-    opts?: { severity?: EventSeverity; traceId?: string; phase?: string }
+    opts?: { severity?: EventSeverity; traceId?: string; phase?: string; causationId?: string; correlationId?: string }
   ): Promise<AuroraEvent> {
     const event: AuroraEvent = {
       id: `evt-${Date.now()}-${++eventCounter}`,
@@ -141,6 +145,8 @@ export class EventBus {
       payload,
       traceId: opts?.traceId,
       phase: opts?.phase,
+      causationId: opts?.causationId,
+      correlationId: opts?.correlationId,
     };
 
     this.eventLog.push(event);
@@ -224,6 +230,93 @@ export class EventBus {
     rationale: string[]; details: Record<string, unknown>;
   }> {
     return { entity: entityId, summary: "N/A", rationale: ["Service does not support entity lookup"], details: {} };
+  }
+
+  // ═══ Transactional Support (Outbox Pattern) ═══
+
+  private pendingEvents: AuroraEvent[] = [];
+  private inTransaction = false;
+
+  /** Transaction başlat — olaylar buffer'a alınır */
+  beginTransaction(): void {
+    if (this.inTransaction) throw new Error("Transaction already in progress");
+    this.inTransaction = true;
+    this.pendingEvents = [];
+  }
+
+  /** Transaction'ı commit et — buffer'daki olaylar publish edilir */
+  async commit(): Promise<AuroraEvent[]> {
+    if (!this.inTransaction) throw new Error("No transaction in progress");
+    const events = [...this.pendingEvents];
+    this.pendingEvents = [];
+    this.inTransaction = false;
+
+    // Publish all pending events
+    const published: AuroraEvent[] = [];
+    for (const event of events) {
+      this.eventLog.push(event);
+      const relevant = this.subscriptions
+        .filter(s => s.eventType === "*" || s.eventType === event.type)
+        .sort((a, b) => b.priority - a.priority);
+      for (const sub of relevant) {
+        try {
+          await sub.handler(event);
+        } catch {
+          // Handler error doesn't stop the bus
+        }
+      }
+      published.push(event);
+    }
+
+    // Trim log if needed
+    if (this.eventLog.length > this.maxLogSize) {
+      this.eventLog = this.eventLog.slice(-Math.floor(this.maxLogSize * 0.8));
+    }
+
+    return published;
+  }
+
+  /** Transaction'ı iptal et — buffer'daki olaylar atılır */
+  rollback(): AuroraEvent[] {
+    if (!this.inTransaction) throw new Error("No transaction in progress");
+    const discarded = [...this.pendingEvents];
+    this.pendingEvents = [];
+    this.inTransaction = false;
+    return discarded;
+  }
+
+  /** Transaction içinde olay emit et (buffer'a alınır) */
+  emitInTransaction(
+    type: string,
+    source: string,
+    payload: Record<string, unknown>,
+    opts?: { severity?: EventSeverity; traceId?: string; phase?: string; causationId?: string; correlationId?: string }
+  ): AuroraEvent {
+    if (!this.inTransaction) throw new Error("Not in transaction — use emit() instead");
+    const event: AuroraEvent = {
+      id: `evt-${Date.now()}-${++eventCounter}`,
+      type,
+      source,
+      timestamp: Date.now(),
+      severity: opts?.severity ?? "info",
+      payload,
+      traceId: opts?.traceId,
+      phase: opts?.phase,
+      causationId: opts?.causationId,
+      correlationId: opts?.correlationId,
+    };
+    this.pendingEvents.push(event);
+    return event;
+  }
+
+  /** Transaction durumunu kontrol et */
+  isInTransaction(): boolean {
+    return this.inTransaction;
+  }
+
+  /** Buffer'daki bekleyen olayları getir */
+  getPendingEvents(): AuroraEvent[] {
+    return [...this.pendingEvents];
   }
 }
 

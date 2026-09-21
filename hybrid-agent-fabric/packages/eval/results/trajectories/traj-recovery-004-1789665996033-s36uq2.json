@@ -1,0 +1,71 @@
+{
+  "id": "traj-recovery-004-1789665996033-s36uq2",
+  "taskId": "recovery-004",
+  "tenantId": "eval",
+  "sessionId": "eval-recovery-004",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:26:36.033Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "recovery-004",
+        "category": "recovery",
+        "instruction": "Simulate context loss (e.g., session restart). Recover by: 1) Checking what was saved, 2) Reconstructing context, 3) Continuing from where left off."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:26:36.033Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665996033",
+        "data": {
+          "taskDescription": "Simulate context loss (e.g., session restart). Recover by: 1) Checking what was saved, 2) Reconstructing context, 3) Continuing from where left off.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:26:36.034Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665996033",
+        "data": {
+          "traceId": "run-1789665996033-n1wz18",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 0,
+          "phaseResults": 0
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:26:36.034Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": []
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:26:36.033Z",
+  "completedAt": "2026-09-17T17:26:36.034Z",
+  "durationMs": 1,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task recovery-004: success"
+}

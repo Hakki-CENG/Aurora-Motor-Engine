@@ -1,0 +1,87 @@
+{
+  "id": "traj-coding-005-1789667943999-ep5tkl",
+  "taskId": "coding-005",
+  "tenantId": "eval",
+  "sessionId": "eval-coding-005",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:59:03.999Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "coding-005",
+        "category": "coding",
+        "instruction": "Refactor the monolithic server.ts file by extracting the user-related logic into a separate UserService class with proper dependency injection."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:59:03.999Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667943999",
+        "data": {
+          "taskDescription": "Refactor the monolithic server.ts file by extracting the user-related logic into a separate UserService class with proper dependency injection.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T17:59:03.999Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Refactor the monolithic server.ts file by extracting the user-related logic into a separate UserService class with proper dependency injection.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:59:03.999Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667943999",
+        "data": {
+          "traceId": "run-1789667943999-vl2uqp",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:59:03.999Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:59:03.999Z",
+  "completedAt": "2026-09-17T17:59:03.999Z",
+  "durationMs": 0,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task coding-005: success"
+}

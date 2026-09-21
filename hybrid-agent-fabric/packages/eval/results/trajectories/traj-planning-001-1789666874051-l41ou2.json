@@ -1,0 +1,87 @@
+{
+  "id": "traj-planning-001-1789666874051-l41ou2",
+  "taskId": "planning-001",
+  "tenantId": "eval",
+  "sessionId": "eval-planning-001",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:41:14.051Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "planning-001",
+        "category": "planning",
+        "instruction": "Set up a new Node.js project with: 1) package.json with name 'my-app', 2) TypeScript configuration, 3) ESLint configuration, 4) A src/index.ts entry point that logs 'Hello World', 5) A build script th"
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:41:14.051Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789666874051",
+        "data": {
+          "taskDescription": "Set up a new Node.js project with: 1) package.json with name 'my-app', 2) TypeScript configuration, 3) ESLint configuration, 4) A src/index.ts entry point that logs 'Hello World', 5) A build script th",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T17:41:14.052Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Set up a new Node.js project with: 1) package.json with name 'my-app', 2) TypeScript configuration, 3) ESLint configuration, 4) A src/index.ts entry point that logs 'Hello World', 5) A build script that compiles TypeScript.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:41:14.053Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789666874051",
+        "data": {
+          "traceId": "run-1789666874052-40r8gl",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:41:14.053Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:41:14.051Z",
+  "completedAt": "2026-09-17T17:41:14.053Z",
+  "durationMs": 2,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task planning-001: success"
+}

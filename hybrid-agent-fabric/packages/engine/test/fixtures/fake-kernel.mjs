@@ -1,50 +1,138 @@
+#!/usr/bin/env node
+/**
+ * Fake Python kernel — test fixture.
+ *
+ * Speaks the v2 generation-fenced kernel protocol over NDJSON on stdio so the
+ * host-request security rules can be exercised without a real Python runtime.
+ *
+ * Supported `execute` payloads (selected by the `code` string):
+ *   "duplicate" — emits the SAME host_request twice; the client must
+ *                 deduplicate by generation/execution/request id.
+ *   "stale"     — emits a host_request with a bogus token and generation; the
+ *                 client must reject it before reaching the capability handler.
+ *   "hang"      — never replies, so cancellation/kill behaviour can be tested.
+ *   anything else — echoes immediately.
+ */
+
 import { createInterface } from "node:readline";
 
-const lines = createInterface({ input: process.stdin, crlfDelay: Infinity })[Symbol.asyncIterator]();
-const send = (value) => process.stdout.write(`${JSON.stringify(value)}\n`);
-send({ type: "ready", pid: process.pid, protocolVersion: 2 });
+const write = (frame) => {
+  process.stdout.write(`${JSON.stringify(frame)}\n`);
+};
 
-while (true) {
-  const item = await lines.next();
-  if (item.done) break;
-  const frame = JSON.parse(item.value);
-  if (frame.type === "restore" || frame.type === "snapshot") {
-    send({ type: "result", id: frame.id, ok: true, result: {} });
-    continue;
+// Announce protocol v2 readiness.
+write({ type: "ready", pid: process.pid, protocolVersion: 2 });
+
+/** Pending host responses keyed by requestId, per execution. */
+const awaitingHostResponse = new Map();
+
+const rl = createInterface({ input: process.stdin, crlfDelay: Infinity });
+
+rl.on("line", (line) => {
+  if (!line.trim()) return;
+
+  let frame;
+  try {
+    frame = JSON.parse(line);
+  } catch {
+    return;
   }
-  if (frame.type === "shutdown") {
-    send({ type: "result", id: frame.id, ok: true, result: "bye" });
-    break;
+
+  if (frame.type === "host_response") {
+    const pending = awaitingHostResponse.get(frame.requestId);
+    if (pending) {
+      awaitingHostResponse.delete(frame.requestId);
+      pending(frame);
+    }
+    return;
   }
-  if (frame.type !== "execute") continue;
-  if (frame.code === "hang") {
-    await new Promise(() => {});
+
+  if (frame.type !== "execute") return;
+
+  const { id, code, executionId, kernelGeneration, hostToken } = frame;
+
+  if (code === "hang") {
+    // Deliberately never respond: the client must cancel and kill us.
+    return;
   }
-  const requestId = "host-request-1";
-  const hostRequest = {
-    type: "host_request",
-    requestId,
-    executionId: frame.executionId,
-    kernelGeneration: frame.kernelGeneration,
-    hostToken: frame.code === "stale" ? "wrong-token" : frame.hostToken,
-    capability: "test.capability",
-    arguments: { value: 1 },
-  };
-  send(hostRequest);
-  const first = JSON.parse((await lines.next()).value);
-  if (frame.code === "duplicate") {
-    send(hostRequest);
-    const second = JSON.parse((await lines.next()).value);
-    if (JSON.stringify(first) !== JSON.stringify(second)) throw new Error("duplicate response was not replayed");
+
+  if (code === "duplicate") {
+    const requestId = "host-request-1";
+    let responses = 0;
+
+    const onResponse = (response) => {
+      responses += 1;
+      // Reply only after the first (deduplicated) response comes back.
+      write({
+        type: "result",
+        id,
+        executionId,
+        ok: true,
+        stdout: "",
+        stderr: "",
+        result: response.ok ? `accepted:${responses}` : `rejected:${response.error}`,
+        resultType: "str",
+      });
+    };
+
+    awaitingHostResponse.set(requestId, onResponse);
+
+    const hostRequest = {
+      type: "host_request",
+      requestId,
+      executionId,
+      kernelGeneration,
+      hostToken,
+      capability: "test.capability",
+      arguments: { probe: true },
+    };
+
+    // Emit the identical frame twice — the client must only invoke the
+    // capability handler once.
+    write(hostRequest);
+    write(hostRequest);
+    return;
   }
-  send({
+
+  if (code === "stale") {
+    const requestId = "host-request-stale";
+
+    awaitingHostResponse.set(requestId, (response) => {
+      write({
+        type: "result",
+        id,
+        executionId,
+        ok: true,
+        stdout: "",
+        stderr: "",
+        result: response.ok ? "accepted" : String(response.error),
+        resultType: "str",
+      });
+    });
+
+    // Wrong generation AND wrong token: must be refused before the handler.
+    write({
+      type: "host_request",
+      requestId,
+      executionId,
+      kernelGeneration: "00000000-0000-0000-0000-000000000000",
+      hostToken: "not-the-real-token",
+      capability: "test.capability",
+      arguments: {},
+    });
+    return;
+  }
+
+  write({
     type: "result",
-    id: frame.id,
-    executionId: frame.executionId,
+    id,
+    executionId,
     ok: true,
     stdout: "",
     stderr: "",
-    result: JSON.stringify(first),
+    result: String(code ?? ""),
     resultType: "str",
   });
-}
+});
+
+rl.on("close", () => process.exit(0));

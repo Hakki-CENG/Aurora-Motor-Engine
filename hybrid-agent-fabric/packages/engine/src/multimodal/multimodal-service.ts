@@ -107,6 +107,21 @@ interface MultimodalState {
   analyses: MultimodalAnalysis[];
 }
 
+/**
+ * Raised when a multimodal capability has no backend behind it.
+ */
+export class MultimodalCapabilityUnavailableError extends Error {
+  readonly capability: string;
+  readonly requirement: string;
+
+  constructor(capability: string, requirement: string) {
+    super(`Multimodal capability '${capability}' is unavailable. It requires ${requirement}.`);
+    this.name = "MultimodalCapabilityUnavailableError";
+    this.capability = capability;
+    this.requirement = requirement;
+  }
+}
+
 export class MultimodalService {
   private store: DurableJsonState<MultimodalState>;
 
@@ -321,21 +336,36 @@ export class MultimodalService {
     return analysis;
   }
 
-  private async extractText(source: string, language?: string): Promise<string> {
-    // Placeholder: In production, integrate with Tesseract/Cloud Vision
-    return `[OCR placeholder for ${source}]`;
+  /**
+   * OCR, transcription and document parsing are NOT implemented.
+   *
+   * These returned strings like `[OCR placeholder for file.png]`, which flowed
+   * into analyses and stored results as if they were extracted content. A
+   * downstream consumer had no way to tell placeholder text from a real
+   * transcript, so the whole pipeline produced confident nonsense.
+   *
+   * They now throw. A caller that needs these must supply a backend.
+   */
+  private notImplemented(capability: string, requirement: string): never {
+    throw new MultimodalCapabilityUnavailableError(capability, requirement);
   }
 
-  private async extractTextFromImage(source: string): Promise<string> {
-    return `[Image OCR placeholder for ${source}]`;
+  private async extractText(_source: string, _language?: string): Promise<string> {
+    this.notImplemented("extractText", "an OCR backend such as Tesseract or a cloud vision API");
   }
 
-  private async transcribeAudio(source: string, language?: string): Promise<string> {
-    return `[Audio transcription placeholder for ${source}]`;
+  private async extractTextFromImage(_source: string): Promise<string> {
+    this.notImplemented("extractTextFromImage", "an OCR backend such as Tesseract or a cloud vision API");
   }
 
-  private async parseDocumentStructure(source: string, format?: string): Promise<DocumentStructure> {
-    return { pages: 0, sections: [], tables: [], images: 0, metadata: {} };
+  private async transcribeAudio(_source: string, _language?: string): Promise<string> {
+    this.notImplemented("transcribeAudio", "a speech-to-text backend such as Whisper");
+  }
+
+  private async parseDocumentStructure(_source: string, _format?: string): Promise<DocumentStructure> {
+    // An all-zero DocumentStructure reads as "parsed, found nothing", which is
+    // indistinguishable from a blank document.
+    this.notImplemented("parseDocumentStructure", "a document parser for the requested format");
   }
 
   private async extractEntities(source: string): Promise<ExtractedEntity[]> {

@@ -127,6 +127,25 @@ interface SDKState {
   config: SDKConfig;
 }
 
+/**
+ * Raised when an extension is executed but no sandbox backend exists to run it
+ * in. Named so callers can tell "the extension failed" apart from "the platform
+ * cannot run extensions at all".
+ */
+export class ExtensionSandboxUnavailableError extends Error {
+  readonly extension: string;
+
+  constructor(extension: string) {
+    super(
+      `Extension '${extension}' cannot be executed: sandboxed extension execution is not implemented. ` +
+        "It requires a real isolate (SandboxExecutor's Worker isolate or the signed WasiPluginManager) " +
+        "to be wired into AgentSDKService.",
+    );
+    this.name = "ExtensionSandboxUnavailableError";
+    this.extension = extension;
+  }
+}
+
 export class AgentSDKService {
   private store: DurableJsonState<SDKState>;
 
@@ -259,7 +278,9 @@ export class AgentSDKService {
       instanceId,
       tenantId,
       input,
-      status: "success",
+      // Starts as an error: nothing has run yet, so there is nothing to call a
+      // success. Only a completed sandbox run may downgrade this.
+      status: "error",
       durationMs: 0,
       startedAt: new Date().toISOString(),
     };
@@ -386,8 +407,23 @@ export class AgentSDKService {
     }
   }
 
-  private async executeInSandbox(extension: Extension, instance: ExtensionInstance, input: unknown): Promise<unknown> {
-    // In production, execute in isolated sandbox (WASI, VM, etc.)
-    return { success: true, extension: extension.name, input };
+  /**
+   * Extension execution — deliberately NOT implemented.
+   *
+   * This used to return `{ success: true, extension, input }` without running
+   * anything. The consequences compounded: the caller recorded
+   * `status: "success"`, and `stats()` then divided successes by executions, so
+   * an extension that had never executed reported a **100% success rate**. A
+   * fabricated metric is worse than a missing one, because it is trusted.
+   *
+   * Running untrusted extension code needs a real isolate. The engine already
+   * has two — `SandboxExecutor` (Worker isolate, V8 resourceLimits) and
+   * `WasiPluginManager` (signed, out-of-process). Wiring one of them here is
+   * the work; echoing the input is not.
+   *
+   * When that lands, replace this body — do not delete the guard.
+   */
+  private async executeInSandbox(extension: Extension, _instance: ExtensionInstance, _input: unknown): Promise<unknown> {
+    throw new ExtensionSandboxUnavailableError(extension.name);
   }
 }

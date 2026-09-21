@@ -1,0 +1,87 @@
+{
+  "id": "traj-coding-018-1789667944046-i39csi",
+  "taskId": "coding-018",
+  "tenantId": "eval",
+  "sessionId": "eval-coding-018",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:59:04.046Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "coding-018",
+        "category": "coding",
+        "instruction": "Implement a rate limiter using the token bucket algorithm that: 1) Supports configurable rate and burst, 2) Thread-safe, 3) Provides remaining tokens, 4) Supports blocking and non-blocking modes."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:59:04.046Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944046",
+        "data": {
+          "taskDescription": "Implement a rate limiter using the token bucket algorithm that: 1) Supports configurable rate and burst, 2) Thread-safe, 3) Provides remaining tokens, 4) Supports blocking and non-blocking modes.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T17:59:04.046Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Implement a rate limiter using the token bucket algorithm that: 1) Supports configurable rate and burst, 2) Thread-safe, 3) Provides remaining tokens, 4) Supports blocking and non-blocking modes.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:59:04.047Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944046",
+        "data": {
+          "traceId": "run-1789667944046-2jo5qd",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:59:04.047Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:59:04.046Z",
+  "completedAt": "2026-09-17T17:59:04.047Z",
+  "durationMs": 1,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task coding-018: success"
+}

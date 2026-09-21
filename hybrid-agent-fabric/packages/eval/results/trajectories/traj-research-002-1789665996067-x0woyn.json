@@ -1,0 +1,71 @@
+{
+  "id": "traj-research-002-1789665996067-x0woyn",
+  "taskId": "research-002",
+  "tenantId": "eval",
+  "sessionId": "eval-research-002",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:26:36.067Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "research-002",
+        "category": "research",
+        "instruction": "Research and compare three database options (PostgreSQL, MongoDB, Redis) for a specific use case. Provide pros/cons, performance characteristics, and a recommendation."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:26:36.067Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665996067",
+        "data": {
+          "taskDescription": "Research and compare three database options (PostgreSQL, MongoDB, Redis) for a specific use case. Provide pros/cons, performance characteristics, and a recommendation.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:26:36.069Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665996067",
+        "data": {
+          "traceId": "run-1789665996067-burj57",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 0,
+          "phaseResults": 0
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:26:36.069Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": []
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:26:36.067Z",
+  "completedAt": "2026-09-17T17:26:36.069Z",
+  "durationMs": 2,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task research-002: success"
+}

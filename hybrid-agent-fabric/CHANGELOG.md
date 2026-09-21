@@ -1,5 +1,87 @@
 # Changelog
 
+## Unreleased
+
+### Fixed — memory recall ignored its limit
+
+- **`MemoryEngine.recall()` returned far more memories than requested.** The
+  memory graph honoured `query.limit`; long-horizon memory was called without
+  one and returns up to 20 rows of its own, and the two result sets were
+  concatenated raw. Measured: `recall({ limit: 3 })` returned **23** memories.
+  Because `engine.execute()` calls it without a limit and the execution loop
+  writes a memory after every task, the overflow grew with use and inflated
+  every agent prompt. Both stores are now bounded, and the merged set is
+  ranked by importance before truncation — truncating the raw concatenation
+  would have dropped a more important long-horizon memory in favour of the
+  graph's, purely because the graph is queried first.
+
+### Added — the planning phase actually runs
+
+- **`engine.execute()` now supplies the loop's `plan` dependency.**
+  `UnifiedExecutionLoop` has always had the hook and `PlanningEngine` has
+  always existed, but they were never connected, so every run recorded
+  `unavailable: "No planner was supplied"`. Note the honest scope:
+  `decomposeGoal()` produces a fixed Understand → Execute → Verify → Learn
+  skeleton with goal-adapted step descriptions, not goal-specific
+  decomposition.
+- **`TaskReport.plan`** exposes the plan a task ran under. It previously stayed
+  inside `TaskContext`, so callers could only see a step count buried in
+  outcome evidence.
+
+### CI now runs the acceptance gates
+
+- **Eval gates in CI.** `npm run eval:gates` (validate + baseline + learning +
+  recall regression lock, 5.3s) runs on every push. Previously none of the four
+  eval gates ran in CI, so FAZ 11 and FAZ 30 could regress to zero while CI
+  stayed green.
+- **`recall-nightly` job.** The FAZ 11 acceptance criterion needs a real
+  embedding model, so it runs nightly with the `EMBEDDINGS_URL` secret rather
+  than being weakened to fit per-push CI. Without the secret it emits a warning
+  stating the criterion was not measured, instead of a red X people learn to
+  ignore.
+- **`eval:recall:lock`.** New regression-lock mode pinning hash-encoder
+  retrieval behaviour (Recall@8 0.338889, Precision 0.508333, nDCG 0.603330).
+  It proves the fusion/ranking logic did not change; it explicitly does not
+  claim the retriever is good.
+
+### Fixed
+
+- **`adaptive-router.why()`** never reported the path it had selected: it
+  returned `routeName` as a UUID and `target` as the strategy name, and
+  `alternativeRoutes` listed unrelated decision ids. It also treated a decision
+  whose outcome had not been recorded yet as a failure, reporting 0.8
+  confidence alongside a "last use was a failure" warning. Unmeasured and
+  measured-bad are now distinguished.
+- **`cognitive-telemetry.why()`** returned an empty summary for decision
+  traces: it probed for `description`/`statement` fields that `DecisionTrace`
+  does not have. It now explains goal, outcome, confidence movement, span and
+  decision counts, cost and extracted lessons.
+
+### Changed
+
+- **`engine.runTask()` marked `@deprecated`** in favour of `execute()`, with
+  characterisation tests pinning its behaviour. Measurement during this work
+  showed the long-repeated claim that it returns `outcome: "success"` for
+  zero work is **out of date** — it now returns `"skipped"`, because the
+  MetaController initialiser was fixed. Comments in six files that still
+  asserted the old behaviour were corrected. Its docblock also showed
+  `result.outcome`, which is `undefined`; the real path is
+  `result.runResult.outcome`.
+- **Tautological tests replaced with measurements** in
+  `p2-cognitive-telemetry`, `p2-adaptive-router`, `p2-causal-graph` and
+  `live-suite-baseline`. These asserted `typeof x === "number"` or
+  `toBeInstanceOf(Array)`, which any do-nothing implementation satisfies; they
+  now assert real totals, which route each strategy picks, and which nodes a
+  graph traversal returns. Each is verified by sabotage.
+
+### Removed
+
+- **`compareResults()`** from `packages/eval/src/metrics/metrics.ts` — zero
+  callers repo-wide, and it expected fields (`overallScore`,
+  `aggregateMetrics`) the suite JSON does not carry, so it could not have run
+  against real results. The live equivalent is in `dashboard/eval-dashboard.ts`.
+
+
 ## 1.65.0 - 2026-09-16
 
 Phase6: Real-World Capabilities — 15 features added to make Aurora a complete Cognitive Operating System.

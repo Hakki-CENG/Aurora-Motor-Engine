@@ -1,0 +1,107 @@
+{
+  "timestamp": "2026-09-17T18:31:19.523Z",
+  "passed": false,
+  "totalChecks": 12,
+  "passedChecks": 9,
+  "failedChecks": 3,
+  "checks": [
+    {
+      "name": "Overall Score",
+      "passed": true,
+      "actual": 1,
+      "threshold": 0.95,
+      "severity": "critical",
+      "message": "Score 100.0% ≥ 95% threshold"
+    },
+    {
+      "name": "Regressions",
+      "passed": false,
+      "actual": 87,
+      "threshold": 0,
+      "severity": "critical",
+      "message": "87 regressions > 0 allowed"
+    },
+    {
+      "name": "Budget",
+      "passed": true,
+      "actual": 0,
+      "threshold": 50,
+      "severity": "info",
+      "message": "Cost $0.0000 ≤ $50 budget"
+    },
+    {
+      "name": "Avg Duration",
+      "passed": true,
+      "actual": 25.333333333333332,
+      "threshold": 100,
+      "severity": "info",
+      "message": "Avg 25.3ms ≤ 100ms threshold"
+    },
+    {
+      "name": "Throughput",
+      "passed": true,
+      "actual": 39.473684210526315,
+      "threshold": 10,
+      "severity": "info",
+      "message": "39.5 tasks/sec ≥ 10 tasks/sec threshold"
+    },
+    {
+      "name": "Category: coding",
+      "passed": true,
+      "actual": 1,
+      "threshold": 0.9,
+      "severity": "info",
+      "message": "coding 100% ≥ 90% threshold"
+    },
+    {
+      "name": "Category: memory",
+      "passed": true,
+      "actual": 1,
+      "threshold": 0.95,
+      "severity": "info",
+      "message": "memory 100% ≥ 95% threshold"
+    },
+    {
+      "name": "Category: planning",
+      "passed": true,
+      "actual": 1,
+      "threshold": 0.9,
+      "severity": "info",
+      "message": "planning 100% ≥ 90% threshold"
+    },
+    {
+      "name": "Category: reasoning",
+      "passed": true,
+      "actual": 1,
+      "threshold": 0.9,
+      "severity": "info",
+      "message": "reasoning 100% ≥ 90% threshold"
+    },
+    {
+      "name": "Category: security",
+      "passed": true,
+      "actual": 1,
+      "threshold": 1,
+      "severity": "info",
+      "message": "security 100% ≥ 100% threshold"
+    },
+    {
+      "name": "Difficulty: Hard (4)",
+      "passed": false,
+      "actual": 0,
+      "threshold": 0.8,
+      "severity": "warning",
+      "message": "Hard tasks 0% < 80% threshold"
+    },
+    {
+      "name": "Difficulty: Expert (5)",
+      "passed": false,
+      "actual": 0,
+      "threshold": 0.7,
+      "severity": "warning",
+      "message": "Expert tasks 0% < 70% threshold"
+    }
+  ],
+  "summary": "❌ QUALITY GATES FAILED (3/12 checks failed, 1 critical)",
+  "exitCode": 1
+}

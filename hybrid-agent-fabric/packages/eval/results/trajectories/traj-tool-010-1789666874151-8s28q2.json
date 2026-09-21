@@ -1,0 +1,71 @@
+{
+  "id": "traj-tool-010-1789666874151-8s28q2",
+  "taskId": "tool-010",
+  "tenantId": "eval",
+  "sessionId": "eval-tool-010",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:41:14.151Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "tool-010",
+        "category": "tool_use",
+        "instruction": "Manage processes: 1) Start a background process, 2) Monitor its output, 3) Send signals to it, 4) Check if it's running, 5) Gracefully stop it."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:41:14.151Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789666874151",
+        "data": {
+          "taskDescription": "Manage processes: 1) Start a background process, 2) Monitor its output, 3) Send signals to it, 4) Check if it's running, 5) Gracefully stop it.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:41:14.154Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789666874151",
+        "data": {
+          "traceId": "run-1789666874151-6xglg2",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 0,
+          "phaseResults": 0
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:41:14.154Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": []
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:41:14.151Z",
+  "completedAt": "2026-09-17T17:41:14.154Z",
+  "durationMs": 3,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task tool-010: success"
+}

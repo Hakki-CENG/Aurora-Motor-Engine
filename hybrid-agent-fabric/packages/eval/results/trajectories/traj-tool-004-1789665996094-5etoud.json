@@ -1,0 +1,87 @@
+{
+  "id": "traj-tool-004-1789665996094-5etoud",
+  "taskId": "tool-004",
+  "tenantId": "eval",
+  "sessionId": "eval-tool-004",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:26:36.094Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "tool-004",
+        "category": "tool_use",
+        "instruction": "Create a shell script that: 1) Finds all TypeScript files, 2) Counts lines of code, 3) Sorts by size, 4) Outputs a summary report."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:26:36.094Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665996094",
+        "data": {
+          "taskDescription": "Create a shell script that: 1) Finds all TypeScript files, 2) Counts lines of code, 3) Sorts by size, 4) Outputs a summary report.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T17:26:36.094Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Create a shell script that: 1) Finds all TypeScript files, 2) Counts lines of code, 3) Sorts by size, 4) Outputs a summary report.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:26:36.096Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665996094",
+        "data": {
+          "traceId": "run-1789665996094-klom0d",
+          "outcome": "success",
+          "totalDurationMs": 1,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:26:36.096Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:26:36.094Z",
+  "completedAt": "2026-09-17T17:26:36.096Z",
+  "durationMs": 2,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task tool-004: success"
+}

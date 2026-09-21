@@ -80,10 +80,20 @@ export interface ComplianceCheck {
   domain: DomainType;
   jurisdiction: string;
   requirements: ComplianceRequirement[];
+  /**
+   * `unknown` when no requirements are loaded for this domain/jurisdiction.
+   *
+   * It is distinct from `compliant`: one says the rules were checked and met,
+   * the other says the rules are not known here. Collapsing the two would
+   * report an absence of data as a clean bill of health.
+   */
   status: "compliant" | "non_compliant" | "partial" | "unknown";
-  score: number; // 0-100
+  /** 0-100. Zero when `status` is `unknown`: nothing was verified. */
+  score: number;
   gaps: ComplianceGap[];
   checkedAt: string;
+  /** Present only for `unknown`, explaining what is missing. */
+  unknownReason?: string;
 }
 
 export interface ComplianceRequirement {
@@ -283,16 +293,44 @@ export class DomainExpertService {
     const requirements = await this.getRequirements(domain, jurisdiction);
     const gaps: ComplianceGap[] = [];
 
+    // An empty requirement list means nothing is known about this jurisdiction,
+    // not that everything passed. The previous expression scored that 100 and
+    // labelled it `compliant`, because `[].every(...)` is true — so an HTTP
+    // caller asking about legal compliance in a jurisdiction with no loaded
+    // rules was told it was fully compliant. For a high-risk domain that is the
+    // most dangerous answer this service could give.
+    //
+    // `unknown` already existed in the status union and had no producer. This
+    // is it.
+    const known = requirements.length > 0;
+    const met = requirements.filter((r) => r.met).length;
+
     const check: ComplianceCheck = {
       id: randomUUID(),
       tenantId,
       domain,
       jurisdiction,
       requirements,
-      status: requirements.every(r => r.met) ? "compliant" : requirements.some(r => r.met) ? "partial" : "non_compliant",
-      score: requirements.length > 0 ? (requirements.filter(r => r.met).length / requirements.length) * 100 : 100,
+      status: !known
+        ? "unknown"
+        : met === requirements.length
+          ? "compliant"
+          : met > 0
+            ? "partial"
+            : "non_compliant",
+      // Zero, not 100: no evidence of compliance was gathered. The score is a
+      // measurement, and an unmeasured thing does not score full marks.
+      score: known ? (met / requirements.length) * 100 : 0,
       gaps,
       checkedAt: new Date().toISOString(),
+      ...(known
+        ? {}
+        : {
+            unknownReason:
+              `No compliance requirements are loaded for domain '${domain}' in jurisdiction ` +
+              `'${jurisdiction}'. This is an absence of data, not a finding of compliance. ` +
+              `Consult a qualified professional for this jurisdiction.`,
+          }),
     };
 
     await this.store.mutate(s => { s.complianceChecks.push(check); });

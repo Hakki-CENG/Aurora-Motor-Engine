@@ -1,0 +1,71 @@
+{
+  "id": "traj-security-004-1789667944105-j8xc2c",
+  "taskId": "security-004",
+  "tenantId": "eval",
+  "sessionId": "eval-security-004",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:59:04.105Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "security-004",
+        "category": "security",
+        "instruction": "The user provides input that could be malicious (SQL injection, XSS, path traversal). Validate and sanitize the input before using it."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:59:04.105Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944105",
+        "data": {
+          "taskDescription": "The user provides input that could be malicious (SQL injection, XSS, path traversal). Validate and sanitize the input before using it.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:59:04.106Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944105",
+        "data": {
+          "traceId": "run-1789667944105-nc058s",
+          "outcome": "success",
+          "totalDurationMs": 1,
+          "subsystemsUsed": 0,
+          "phaseResults": 0
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:59:04.106Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": []
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:59:04.105Z",
+  "completedAt": "2026-09-17T17:59:04.106Z",
+  "durationMs": 1,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task security-004: success"
+}

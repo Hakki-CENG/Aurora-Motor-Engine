@@ -1,0 +1,87 @@
+{
+  "id": "traj-coding-022-1789665995964-kthnvo",
+  "taskId": "coding-022",
+  "tenantId": "eval",
+  "sessionId": "eval-coding-022",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:26:35.964Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "coding-022",
+        "category": "coding",
+        "instruction": "Create a mini testing framework that: 1) Supports describe/it/beforeEach/afterEach, 2) Provides expect() with matchers, 3) Generates test reports, 4) Supports async tests, 5) Has a test runner CLI."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:26:35.964Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665995964",
+        "data": {
+          "taskDescription": "Create a mini testing framework that: 1) Supports describe/it/beforeEach/afterEach, 2) Provides expect() with matchers, 3) Generates test reports, 4) Supports async tests, 5) Has a test runner CLI.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T17:26:35.964Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Create a mini testing framework that: 1) Supports describe/it/beforeEach/afterEach, 2) Provides expect() with matchers, 3) Generates test reports, 4) Supports async tests, 5) Has a test runner CLI.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:26:35.966Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665995964",
+        "data": {
+          "traceId": "run-1789665995964-yhcv5d",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:26:35.966Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:26:35.964Z",
+  "completedAt": "2026-09-17T17:26:35.966Z",
+  "durationMs": 2,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task coding-022: success"
+}

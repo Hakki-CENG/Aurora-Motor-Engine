@@ -316,15 +316,14 @@ export class DigitalTwinService {
 
   async sync(tenantId: string): Promise<{ synced: boolean; changes: string[] }> {
     const changes: string[] = [];
-    // In production, sync with external systems
-    await this.store.mutate(s => {
-      const twin = s.twins.find(t => t.tenantId === tenantId);
-      if (twin) {
-        twin.lastSyncedAt = new Date().toISOString();
-        changes.push("projects", "tools", "workflows");
-      }
-    });
-    return { synced: true, changes };
+    // There is no external system wired up. This previously stamped
+    // `lastSyncedAt`, reported the strings "projects", "tools", "workflows" as
+    // changed, and returned `synced: true` — a sync that touched nothing but
+    // looked successful, leaving a misleading freshness timestamp behind.
+    throw new Error(
+      "Digital twin sync is not implemented. It requires at least one configured external system; " +
+        "no lastSyncedAt timestamp is written so the twin is not falsely marked fresh.",
+    );
   }
 
   // ─── Stats ───

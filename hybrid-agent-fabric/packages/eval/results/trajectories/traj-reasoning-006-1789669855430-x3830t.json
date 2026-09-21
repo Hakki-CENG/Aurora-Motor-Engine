@@ -1,0 +1,87 @@
+{
+  "id": "traj-reasoning-006-1789669855430-x3830t",
+  "taskId": "reasoning-006",
+  "tenantId": "eval",
+  "sessionId": "eval-reasoning-006",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T18:30:55.430Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "reasoning-006",
+        "category": "reasoning",
+        "instruction": "Compare two approaches for implementing a feature: 1) Simple but slow, 2) Complex but fast. Analyze trade-offs and recommend the best approach for the given context."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T18:30:55.430Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789669855430",
+        "data": {
+          "taskDescription": "Compare two approaches for implementing a feature: 1) Simple but slow, 2) Complex but fast. Analyze trade-offs and recommend the best approach for the given context.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T18:30:55.430Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Compare two approaches for implementing a feature: 1) Simple but slow, 2) Complex but fast. Analyze trade-offs and recommend the best approach for the given context.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T18:30:55.432Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789669855430",
+        "data": {
+          "traceId": "run-1789669855430-6s9h48",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T18:30:55.432Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T18:30:55.430Z",
+  "completedAt": "2026-09-17T18:30:55.432Z",
+  "durationMs": 2,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task reasoning-006: success"
+}

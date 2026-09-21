@@ -1,0 +1,87 @@
+{
+  "id": "traj-coding-001-1789668258970-ya3ga1",
+  "taskId": "coding-001",
+  "tenantId": "eval",
+  "sessionId": "eval-coding-001",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T18:04:18.970Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "coding-001",
+        "category": "coding",
+        "instruction": "Create a TypeScript file at src/utils/math.ts that exports functions: add(a: number, b: number), subtract(a, b), multiply(a, b), divide(a, b). The divide function should throw an error if dividing by "
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T18:04:18.970Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789668258970",
+        "data": {
+          "taskDescription": "Create a TypeScript file at src/utils/math.ts that exports functions: add(a: number, b: number), subtract(a, b), multiply(a, b), divide(a, b). The divide function should throw an error if dividing by ",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T18:04:18.971Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Create a TypeScript file at src/utils/math.ts that exports functions: add(a: number, b: number), subtract(a, b), multiply(a, b), divide(a, b). The divide function should throw an error if dividing by zero.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T18:04:18.972Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789668258970",
+        "data": {
+          "traceId": "run-1789668258971-v12pxs",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T18:04:18.972Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T18:04:18.970Z",
+  "completedAt": "2026-09-17T18:04:18.972Z",
+  "durationMs": 2,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task coding-001: success"
+}

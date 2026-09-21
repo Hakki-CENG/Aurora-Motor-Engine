@@ -335,4 +335,3 @@ export class AuroraAutopilot {
     return { entity: entity.name ?? entity.title ?? entityId, summary: entity.description ?? entity.statement ?? "", rationale, details: entity };
   }
 }
-

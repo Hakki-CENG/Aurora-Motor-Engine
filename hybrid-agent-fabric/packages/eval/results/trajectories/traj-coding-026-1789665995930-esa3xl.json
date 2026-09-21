@@ -1,0 +1,87 @@
+{
+  "id": "traj-coding-026-1789665995930-esa3xl",
+  "taskId": "coding-026",
+  "tenantId": "eval",
+  "sessionId": "eval-coding-026",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:26:35.930Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "coding-026",
+        "category": "coding",
+        "instruction": "Create an in-memory message queue that: 1) Supports publish/subscribe, 2) Has topic-based routing, 3) Provides message acknowledgment, 4) Supports dead letter queues, 5) Has consumer groups."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:26:35.930Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665995930",
+        "data": {
+          "taskDescription": "Create an in-memory message queue that: 1) Supports publish/subscribe, 2) Has topic-based routing, 3) Provides message acknowledgment, 4) Supports dead letter queues, 5) Has consumer groups.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T17:26:35.930Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Create an in-memory message queue that: 1) Supports publish/subscribe, 2) Has topic-based routing, 3) Provides message acknowledgment, 4) Supports dead letter queues, 5) Has consumer groups.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:26:35.931Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665995930",
+        "data": {
+          "traceId": "run-1789665995930-8saqfu",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:26:35.931Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:26:35.930Z",
+  "completedAt": "2026-09-17T17:26:35.931Z",
+  "durationMs": 1,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task coding-026: success"
+}

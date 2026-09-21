@@ -1,5 +1,6 @@
 import { generateKeyPairSync, sign, createHash } from "node:crypto";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import wabtFactory from "wabt";
@@ -50,15 +51,29 @@ async function signedPlugin(root: string, tamperSignature = false) {
   return { source, publicKey: publicKey.export({ format: "pem", type: "spki" }).toString() };
 }
 
+/**
+ * The runner is a build artefact, not source. When it is missing the manager
+ * reports `exit 1; stderr class=present`, which hides the cause and reads like
+ * a plugin-sandbox failure. Name the real problem instead.
+ */
+const RUNNER_PATH = resolve(process.cwd(), "../../apps/wasi-runner/dist/main.js");
+
 describe("signed out-of-process WASI plugins", () => {
   it("verifies, registers, executes and removes a capability", async () => {
+    if (!existsSync(RUNNER_PATH)) {
+      throw new Error(
+        `The WASI runner is not built at ${RUNNER_PATH}. Run \`npm run build -w @haf/wasi-runner\` ` +
+          "(the root `pretest` script does this; a bare `npx vitest run` does not). " +
+          "This is a missing build artefact, not a plugin-sandbox failure.",
+      );
+    }
     const root = await mkdtemp(join(tmpdir(), "haf-wasi-"));
     const plugin = await signedPlugin(root);
     const broker = new CapabilityBroker(new DefaultPolicyEngine(), new ApprovalService(), new EffectJournal(root));
     const hooks = new HookBus();
     const manager = new WasiPluginManager(broker, hooks, {
       rootPath: root,
-      runnerPath: resolve(process.cwd(), "../../apps/wasi-runner/dist/main.js"),
+      runnerPath: RUNNER_PATH,
       trustedPublicKeys: { "test-key": plugin.publicKey },
     });
     const installed = await manager.install(plugin.source);

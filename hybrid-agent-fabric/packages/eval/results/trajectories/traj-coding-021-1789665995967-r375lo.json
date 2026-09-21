@@ -1,0 +1,87 @@
+{
+  "id": "traj-coding-021-1789665995967-r375lo",
+  "taskId": "coding-021",
+  "tenantId": "eval",
+  "sessionId": "eval-coding-021",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:26:35.967Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "coding-021",
+        "category": "coding",
+        "instruction": "Create a validation library similar to Zod that: 1) Defines schemas with type inference, 2) Supports string, number, boolean, array, object, 3) Provides custom validators, 4) Returns detailed error me"
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:26:35.967Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665995967",
+        "data": {
+          "taskDescription": "Create a validation library similar to Zod that: 1) Defines schemas with type inference, 2) Supports string, number, boolean, array, object, 3) Provides custom validators, 4) Returns detailed error me",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T17:26:35.967Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Create a validation library similar to Zod that: 1) Defines schemas with type inference, 2) Supports string, number, boolean, array, object, 3) Provides custom validators, 4) Returns detailed error messages.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:26:35.977Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665995967",
+        "data": {
+          "traceId": "run-1789665995967-x7zp6n",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:26:35.977Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:26:35.967Z",
+  "completedAt": "2026-09-17T17:26:35.977Z",
+  "durationMs": 10,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task coding-021: success"
+}

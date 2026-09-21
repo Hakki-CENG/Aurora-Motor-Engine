@@ -9,7 +9,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { reviewVerdict, searchCapabilities } from "@haf/engine";
+import { reviewVerdict, searchCapabilities, ENGINE_VERSION } from "@haf/engine";
 import { dashboardHtml } from "./dashboard.js";
 import { registerCognitiveRoutes, registerMetaControllerRoutes, registerAuroraServiceRoutes } from "./routes/index.js";
 import { IdentityService, roleAllows, type Identity, type Role } from "./auth/identity-service.js";
@@ -872,7 +872,7 @@ app.get("/", async (_request, reply) => {
 app.get("/health", async () => ({
   status: "ok",
   engine: "hybrid-agent-fabric",
-  version: "1.64.0",
+  version: ENGINE_VERSION,
   provider: engine.models.list(),
   sandbox: engine.config.sandboxBackend,
   persistence: engine.database ? "postgres" : "file",

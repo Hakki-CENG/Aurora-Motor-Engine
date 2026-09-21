@@ -80,6 +80,24 @@ export interface PlanStep {
   status: "pending" | "in_progress" | "completed";
 }
 
+/**
+ * Raised when a pipeline stage has no real implementation behind it.
+ *
+ * Carries the stage name and what would be required to implement it, so a
+ * failed run explains itself instead of surfacing an opaque error.
+ */
+export class CodePipelineStageNotImplementedError extends Error {
+  readonly stage: string;
+  readonly requirement: string;
+
+  constructor(stage: string, requirement: string) {
+    super(`Pipeline stage '${stage}' is not implemented. It requires ${requirement}.`);
+    this.name = "CodePipelineStageNotImplementedError";
+    this.stage = stage;
+    this.requirement = requirement;
+  }
+}
+
 export interface SecurityReviewResult {
   score: number; // 0-100
   vulnerabilities: SecurityVulnerability[];
@@ -315,53 +333,47 @@ export class CodePipelineService {
     return { branch };
   }
 
-  private async implement(run: PipelineRun): Promise<{ filesChanged: number; linesAdded: number; linesRemoved: number }> {
-    // In production, use code generation
-    return { filesChanged: 0, linesAdded: 0, linesRemoved: 0 };
+  /**
+   * Stages below are NOT implemented.
+   *
+   * They previously returned fabricated success: `securityReview` reported
+   * `score: 100, passed: true` without inspecting anything, `runCI` reported
+   * every job green, `deploy` reported a successful deployment, and `createPR`
+   * invented a PR number with `Math.random()`.
+   *
+   * That is the most dangerous shape a stub can take — a caller cannot tell a
+   * passing gate from an absent one, so an unreviewed change looks approved.
+   * Each stage now fails loudly instead. Wiring a real implementation means
+   * replacing the throw, not removing the guard.
+   */
+  private notImplemented(stage: string, requirement: string): never {
+    throw new CodePipelineStageNotImplementedError(stage, requirement);
   }
 
-  private async runTests(run: PipelineRun): Promise<TestResult> {
-    return {
-      total: 0,
-      passed: 0,
-      failed: 0,
-      skipped: 0,
-      durationMs: 0,
-      failures: [],
-    };
+  private async implement(_run: PipelineRun): Promise<{ filesChanged: number; linesAdded: number; linesRemoved: number }> {
+    this.notImplemented("implement", "a code-generation backend that edits the worktree");
   }
 
-  private async securityReview(run: PipelineRun): Promise<SecurityReviewResult> {
-    return {
-      score: 100,
-      vulnerabilities: [],
-      warnings: [],
-      recommendations: [],
-      passed: true,
-    };
+  private async runTests(_run: PipelineRun): Promise<TestResult> {
+    // Returning an all-zero TestResult reads as "0 failures" to every caller,
+    // which is indistinguishable from a green run. Refuse instead.
+    this.notImplemented("test", "a test runner bound to the project's toolchain");
   }
 
-  private async createPR(run: PipelineRun): Promise<{ prNumber: number; url: string }> {
-    const prNumber = Math.floor(Math.random() * 1000);
-    run.metadata.prNumber = prNumber;
-    return { prNumber, url: `https://github.com/example/repo/pull/${prNumber}` };
+  private async securityReview(_run: PipelineRun): Promise<SecurityReviewResult> {
+    this.notImplemented("security_review", "a real scanner (SAST/dependency audit) reporting findings");
   }
 
-  private async runCI(run: PipelineRun): Promise<{ passed: boolean; jobs: string[] }> {
-    return { passed: true, jobs: ["build", "test", "lint"] };
+  private async createPR(_run: PipelineRun): Promise<{ prNumber: number; url: string }> {
+    this.notImplemented("pr", "a hosted-repository provider able to open a pull request");
   }
 
-  private async deploy(run: PipelineRun): Promise<DeploymentResult> {
-    const result: DeploymentResult = {
-      environment: "staging",
-      version: run.metadata.commitSha ?? "latest",
-      status: "success",
-      deployedAt: new Date().toISOString(),
-      rollbackAvailable: true,
-    };
+  private async runCI(_run: PipelineRun): Promise<{ passed: boolean; jobs: string[] }> {
+    this.notImplemented("ci", "a CI provider reporting real job results");
+  }
 
-    await this.store.mutate(s => { s.deployments.push(result); });
-    return result;
+  private async deploy(_run: PipelineRun): Promise<DeploymentResult> {
+    this.notImplemented("deploy", "a deployment target with a verifiable rollout status");
   }
 
   // ─── Rollback ───

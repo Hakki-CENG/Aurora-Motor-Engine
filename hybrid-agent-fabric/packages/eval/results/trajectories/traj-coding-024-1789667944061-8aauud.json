@@ -1,0 +1,87 @@
+{
+  "id": "traj-coding-024-1789667944061-8aauud",
+  "taskId": "coding-024",
+  "tenantId": "eval",
+  "sessionId": "eval-coding-024",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:59:04.061Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "coding-024",
+        "category": "coding",
+        "instruction": "Create a workflow engine that: 1) Defines workflows as DAGs, 2) Supports sequential and parallel execution, 3) Has conditional branching, 4) Provides progress tracking, 5) Supports pause/resume."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:59:04.061Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944061",
+        "data": {
+          "taskDescription": "Create a workflow engine that: 1) Defines workflows as DAGs, 2) Supports sequential and parallel execution, 3) Has conditional branching, 4) Provides progress tracking, 5) Supports pause/resume.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T17:59:04.061Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Create a workflow engine that: 1) Defines workflows as DAGs, 2) Supports sequential and parallel execution, 3) Has conditional branching, 4) Provides progress tracking, 5) Supports pause/resume.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:59:04.063Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944061",
+        "data": {
+          "traceId": "run-1789667944061-0tiam7",
+          "outcome": "success",
+          "totalDurationMs": 1,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:59:04.063Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:59:04.061Z",
+  "completedAt": "2026-09-17T17:59:04.063Z",
+  "durationMs": 2,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task coding-024: success"
+}

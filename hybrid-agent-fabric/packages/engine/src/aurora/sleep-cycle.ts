@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { DurableJsonState } from "../util/aurora-state.js";
 
-interface SleepCycleResult { id: string; tenantId: string; kind: "light" | "deep" | "rem"; startedAt: string; endedAt: string; durationMs: number; memoriesConsolidated: number; patternsDiscovered: number; duplicatesRemoved: number; contradictionsResolved: number; skillsExtracted: number; hypothesesGenerated: number; insights: string[]; nextCycleRecommendation: string; }
+interface SleepCycleResult { id: string; tenantId: string; kind: "light" | "deep" | "rem"; startedAt: string; endedAt: string; durationMs: number; memoriesConsolidated: number; patternsDiscovered: number; duplicatesRemoved: number; contradictionsResolved: number | null; skillsExtracted: number | null; hypothesesGenerated: number; insights: string[]; nextCycleRecommendation: string; }
 interface SleepSchedule { tenantId: string; lightCycleMinutes: number; deepCycleMinutes: number; remCycleMinutes: number; lastLightAt: string; lastDeepAt: string; lastRemAt: string; enabled: boolean; }
 
 interface SleepStateShape { schemaVersion: number; cycles: SleepCycleResult[]; schedules: SleepSchedule[]; }
@@ -26,8 +26,16 @@ export class SleepCycleService {
   async runCycle(tenantId: string, kind: SleepCycleResult["kind"], deps: {
     consolidateMemory: () => Promise<{ compressed: number; duplicates: number }>;
     discoverPatterns: () => Promise<number>;
-    resolveContradictions: () => Promise<number>;
-    extractSkills: () => Promise<number>;
+    /**
+     * Omit when contradiction resolution is not wired.
+     *
+     * A supplied function returning 0 means "looked, found none". Omitting it
+     * reports `null` — "not attempted". Collapsing both into 0 let the cycle
+     * advertise work it never did.
+     */
+    resolveContradictions?: (() => Promise<number>) | undefined;
+    /** Omit when no trajectory source is wired. See `resolveContradictions`. */
+    extractSkills?: (() => Promise<number>) | undefined;
     generateHypotheses: () => Promise<string[]>;
   }): Promise<SleepCycleResult> {
     const startedAt = new Date().toISOString();
@@ -37,10 +45,17 @@ export class SleepCycleService {
     if (memResult.duplicates > 0) insights.push(`Removed ${memResult.duplicates} duplicates`);
     const patterns = await deps.discoverPatterns();
     if (patterns > 0) insights.push(`Discovered ${patterns} new patterns`);
-    const contradictions = await deps.resolveContradictions();
-    if (contradictions > 0) insights.push(`Resolved ${contradictions} contradictions`);
-    const skills = kind === "deep" || kind === "rem" ? await deps.extractSkills() : 0;
-    if (skills > 0) insights.push(`Extracted ${skills} skill candidates`);
+    const contradictions = deps.resolveContradictions ? await deps.resolveContradictions() : null;
+    if (contradictions !== null && contradictions > 0) {
+      insights.push(`Resolved ${contradictions} contradictions`);
+    }
+    const skillsAttempted = (kind === "deep" || kind === "rem") && deps.extractSkills !== undefined;
+    const skills = skillsAttempted ? await deps.extractSkills!() : null;
+    if (skills !== null && skills > 0) insights.push(`Extracted ${skills} skill candidates`);
+    // Name the gap rather than letting a silent 0 read as a clean result.
+    if (skills === null && (kind === "deep" || kind === "rem")) {
+      insights.push("Skill extraction not attempted: no trajectory source is wired");
+    }
     const hypotheses = kind === "rem" ? await deps.generateHypotheses() : [];
     if (hypotheses.length > 0) insights.push(`Generated ${hypotheses.length} hypotheses`);
     const endedAt = new Date().toISOString();

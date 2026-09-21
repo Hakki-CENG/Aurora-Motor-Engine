@@ -67,7 +67,7 @@ function constantTimeEqual(left: string, right: string): boolean {
 export class KernelClient {
   private process?: ChildProcessWithoutNullStreams;
   private readonly pending = new Map<string, PendingFrame>();
-  private readonly hostResponses = new Map<string, object>();
+  private readonly hostResponses = new Map<string, Promise<object>>();
   private ready?: Promise<void>;
   private closed = false;
   private activeExecution: { executionId: string; hostToken: string; hostRequests: number } | undefined;
@@ -187,9 +187,14 @@ export class KernelClient {
       return;
     }
     const key = this.hostResponseKey(metadata);
+    // The cache holds the in-flight promise, not just the settled response, so
+    // duplicate frames that arrive *while the capability handler is still
+    // running* are folded into the same invocation. Caching only after the
+    // await would let a kernel replay a frame fast enough to execute the
+    // side-effecting capability twice.
     const cached = this.hostResponses.get(key);
     if (cached) {
-      this.safeWrite(cached);
+      this.safeWrite(await cached);
       return;
     }
     active.hostRequests++;
@@ -197,23 +202,26 @@ export class KernelClient {
       this.safeWrite({ type: "host_response", requestId, executionId, kernelGeneration, ok: false, error: "host_request_limit_exceeded" });
       return;
     }
-    let response: object;
-    try {
-      const result = await this.options.hostRequest(String(frame.capability), frame.arguments ?? {}, metadata);
-      response = { type: "host_response", requestId, executionId, kernelGeneration, ok: true, result };
-    } catch (error) {
-      response = {
-        type: "host_response",
-        requestId,
-        executionId,
-        kernelGeneration,
-        ok: false,
-        error: error instanceof Error ? error.message.slice(0, 2000) : String(error).slice(0, 2000),
-      };
-    }
-    this.hostResponses.set(key, response);
+    // Never rejects: failures are converted into an `ok: false` response frame,
+    // so a cached entry can always be awaited safely.
+    const work = (async (): Promise<object> => {
+      try {
+        const result = await this.options.hostRequest(String(frame.capability), frame.arguments ?? {}, metadata);
+        return { type: "host_response", requestId, executionId, kernelGeneration, ok: true, result };
+      } catch (error) {
+        return {
+          type: "host_response",
+          requestId,
+          executionId,
+          kernelGeneration,
+          ok: false,
+          error: error instanceof Error ? error.message.slice(0, 2000) : String(error).slice(0, 2000),
+        };
+      }
+    })();
+    this.hostResponses.set(key, work);
     while (this.hostResponses.size > 2000) this.hostResponses.delete(this.hostResponses.keys().next().value!);
-    this.safeWrite(response);
+    this.safeWrite(await work);
   }
 
   private safeWrite(frame: unknown): void {

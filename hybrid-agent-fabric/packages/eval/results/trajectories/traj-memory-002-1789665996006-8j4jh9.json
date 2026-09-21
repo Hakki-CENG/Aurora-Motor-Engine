@@ -1,0 +1,71 @@
+{
+  "id": "traj-memory-002-1789665996006-8j4jh9",
+  "taskId": "memory-002",
+  "tenantId": "eval",
+  "sessionId": "eval-memory-002",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:26:36.006Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "memory-002",
+        "category": "memory",
+        "instruction": "Have a conversation about a project, then summarize the key points. Later, when asked about specific details, recall them accurately from the summary."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:26:36.006Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665996006",
+        "data": {
+          "taskDescription": "Have a conversation about a project, then summarize the key points. Later, when asked about specific details, recall them accurately from the summary.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:26:36.007Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665996006",
+        "data": {
+          "traceId": "run-1789665996006-cptcot",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 0,
+          "phaseResults": 0
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:26:36.007Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": []
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:26:36.006Z",
+  "completedAt": "2026-09-17T17:26:36.007Z",
+  "durationMs": 1,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task memory-002: success"
+}

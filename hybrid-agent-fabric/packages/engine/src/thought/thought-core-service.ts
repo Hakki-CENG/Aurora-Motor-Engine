@@ -1009,8 +1009,26 @@ export class ThoughtCoreService {
         }
       }
 
-      // Check if we should generate a hypothesis
-      if (thought.type === "problem" && thought.confidence < 0.7 && Math.random() < 0.1) {
+      // Check if we should generate a hypothesis.
+      //
+      // This used to be gated on `Math.random() < 0.1`, which made background
+      // thinking non-reproducible: the same state could or could not produce a
+      // hypothesis, so the behaviour could not be tested or explained. The rule
+      // is now deterministic — an unresolved, low-confidence problem that has
+      // accumulated related context and does not already have a hypothesis is
+      // exactly the case worth forming one about.
+      const currentState = await this.store.read();
+      const alreadyHypothesised = currentState.hypotheses.some(
+        (hypothesis) => hypothesis.tenantId === tenantId && hypothesis.thoughtId === thought.id,
+      );
+      // Re-read the thought: connections discovered above are not reflected in
+      // the stale copy we are iterating over.
+      const linked = currentState.thoughts.find(
+        (item) => item.tenantId === tenantId && item.id === thought.id,
+      );
+      const hasContext = (linked ?? thought).relatedThoughtIds.length > 0;
+
+      if (thought.type === "problem" && thought.confidence < 0.7 && hasContext && !alreadyHypothesised) {
         const hypothesisStatement = `Potential solution to: ${thought.title}`;
         try {
           await this.createHypothesis({

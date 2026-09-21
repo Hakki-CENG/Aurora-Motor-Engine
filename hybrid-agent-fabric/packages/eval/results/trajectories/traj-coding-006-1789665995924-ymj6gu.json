@@ -1,0 +1,89 @@
+{
+  "id": "traj-coding-006-1789665995924-ymj6gu",
+  "taskId": "coding-006",
+  "tenantId": "eval",
+  "sessionId": "eval-coding-006",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:26:35.924Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "coding-006",
+        "category": "coding",
+        "instruction": "The file src/binary-search.ts has a bug in the binary search implementation. Find and fix it.\n\n```typescript\nfunction binarySearch(arr: number[], target: number): number {\n  let left = 0;\n  let right "
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:26:35.924Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665995924",
+        "data": {
+          "taskDescription": "The file src/binary-search.ts has a bug in the binary search implementation. Find and fix it.\n\n```typescript\nfunction binarySearch(arr: number[], target: number): number {\n  let left = 0;\n  let right ",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T17:26:35.924Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "The file src/binary-search.ts has a bug in the binary search implementation. Find and fix it.\n\n```typescript\nfunction binarySearch(arr: number[], target: number): number {\n  let left = 0;\n  let right = arr.length;\n  while (left < right) {\n    const mid = (left + right) / 2;\n    if (arr[mid] === target) return mid;\n    if (arr[mid] < target) left = mid;\n    else right = mid;\n  }\n  return -1;\n}\n```",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:26:35.925Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665995924",
+        "data": {
+          "traceId": "run-1789665995924-ak4g3j",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 3,
+          "phaseResults": 3
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:26:35.925Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory",
+          "world-model",
+          "planner"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:26:35.924Z",
+  "completedAt": "2026-09-17T17:26:35.925Z",
+  "durationMs": 1,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task coding-006: success"
+}

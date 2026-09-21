@@ -400,7 +400,7 @@ export class DecisionService {
 
   // ═══ P2: Explainability ═══
 
-  
+
   // ═══ P3: Stats ═══
 
   async getStats(tenantId: string) {

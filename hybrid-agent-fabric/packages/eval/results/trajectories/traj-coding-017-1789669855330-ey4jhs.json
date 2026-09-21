@@ -1,0 +1,87 @@
+{
+  "id": "traj-coding-017-1789669855330-ey4jhs",
+  "taskId": "coding-017",
+  "tenantId": "eval",
+  "sessionId": "eval-coding-017",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T18:30:55.330Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "coding-017",
+        "category": "coding",
+        "instruction": "Create a typed event emitter that: 1) Uses TypeScript generics for type safety, 2) Supports on(), off(), emit(), once(), 3) Provides event history, 4) Supports wildcard listeners."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T18:30:55.330Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789669855330",
+        "data": {
+          "taskDescription": "Create a typed event emitter that: 1) Uses TypeScript generics for type safety, 2) Supports on(), off(), emit(), once(), 3) Provides event history, 4) Supports wildcard listeners.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T18:30:55.330Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Create a typed event emitter that: 1) Uses TypeScript generics for type safety, 2) Supports on(), off(), emit(), once(), 3) Provides event history, 4) Supports wildcard listeners.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T18:30:55.332Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789669855330",
+        "data": {
+          "traceId": "run-1789669855330-u36zxi",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T18:30:55.332Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T18:30:55.330Z",
+  "completedAt": "2026-09-17T18:30:55.332Z",
+  "durationMs": 2,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task coding-017: success"
+}

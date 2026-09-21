@@ -1,0 +1,89 @@
+{
+  "id": "traj-coding-023-1789667944041-er2a0a",
+  "taskId": "coding-023",
+  "tenantId": "eval",
+  "sessionId": "eval-coding-023",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:59:04.041Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "coding-023",
+        "category": "coding",
+        "instruction": "Create a plugin system that: 1) Supports loading plugins from files, 2) Has lifecycle hooks (init, destroy, error), 3) Provides plugin API, 4) Supports plugin dependencies, 5) Has sandboxing options."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:59:04.041Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944041",
+        "data": {
+          "taskDescription": "Create a plugin system that: 1) Supports loading plugins from files, 2) Has lifecycle hooks (init, destroy, error), 3) Provides plugin API, 4) Supports plugin dependencies, 5) Has sandboxing options.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T17:59:04.041Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Create a plugin system that: 1) Supports loading plugins from files, 2) Has lifecycle hooks (init, destroy, error), 3) Provides plugin API, 4) Supports plugin dependencies, 5) Has sandboxing options.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:59:04.042Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944041",
+        "data": {
+          "traceId": "run-1789667944041-k7srfn",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 3,
+          "phaseResults": 3
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:59:04.042Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory",
+          "world-model",
+          "planner"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:59:04.041Z",
+  "completedAt": "2026-09-17T17:59:04.042Z",
+  "durationMs": 1,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task coding-023: success"
+}

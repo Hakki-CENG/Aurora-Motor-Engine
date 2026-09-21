@@ -1,0 +1,71 @@
+{
+  "id": "traj-reasoning-005-1789665996022-az4982",
+  "taskId": "reasoning-005",
+  "tenantId": "eval",
+  "sessionId": "eval-reasoning-005",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:26:36.022Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "reasoning-005",
+        "category": "reasoning",
+        "instruction": "Given specific code examples, identify the common pattern and abstract it into a reusable utility. The abstraction should be general enough to handle new cases."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:26:36.022Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665996022",
+        "data": {
+          "taskDescription": "Given specific code examples, identify the common pattern and abstract it into a reusable utility. The abstraction should be general enough to handle new cases.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:26:36.023Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789665996022",
+        "data": {
+          "traceId": "run-1789665996022-w3ojid",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 0,
+          "phaseResults": 0
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:26:36.023Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": []
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:26:36.022Z",
+  "completedAt": "2026-09-17T17:26:36.023Z",
+  "durationMs": 1,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task reasoning-005: success"
+}

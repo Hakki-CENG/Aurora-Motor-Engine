@@ -8,6 +8,18 @@ interface DecisionTrace { id: string; tenantId: string; sessionId: string; goal:
 
 interface TelemetryStateShape { schemaVersion: number; traces: DecisionTrace[]; }
 
+/** Narrow an untyped stored record to a DecisionTrace, for `why()`. */
+function isDecisionTrace(value: unknown): value is DecisionTrace {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Partial<DecisionTrace>;
+  return (
+    typeof candidate.goal === "string" &&
+    typeof candidate.outcome === "string" &&
+    Array.isArray(candidate.spans) &&
+    Array.isArray(candidate.lessonsExtracted)
+  );
+}
+
 export class CognitiveTelemetryService {
   private store: DurableJsonState<TelemetryStateShape>;
   private activeSpans: Map<string, TelemetrySpan> = new Map();
@@ -84,6 +96,34 @@ entity: string; summary: string;
     const items: any[] = arrayKey ? ((s as any)[arrayKey] as any[]).filter((x: any) => x.tenantId === tenantId) : [];
     const entity = items.find((x: any) => x.id === entityId);
     if (!entity) throw new Error("Entity not found");
+
+    // Decision traces are the entity this service actually stores, so explain
+    // them properly instead of probing for `description`/`statement` fields a
+    // DecisionTrace does not have — that returned an empty summary and a
+    // single "Found entity" line, which is a lookup, not an explanation.
+    if (isDecisionTrace(entity)) {
+      const rationale: string[] = [
+        `Goal: ${entity.goal}`,
+        `Outcome: ${entity.outcome}${entity.outcomeDetail ? ` — ${entity.outcomeDetail}` : ""}`,
+        `Confidence moved ${entity.confidenceAtStart} → ${entity.confidenceAtEnd}`,
+        `${entity.spans.length} span(s), ${entity.decisionCount} decision(s), ${entity.strategySwitches} strategy switch(es)`,
+      ];
+      if (entity.modelsUsed.length > 0) rationale.push(`Models used: ${entity.modelsUsed.join(", ")}`);
+      if (entity.totalCostUsd > 0) {
+        rationale.push(`Cost: $${entity.totalCostUsd.toFixed(4)} over ${entity.totalTokensUsed} token(s)`);
+      }
+      for (const lesson of entity.lessonsExtracted) rationale.push(`Lesson: ${lesson}`);
+
+      return {
+        entity: entity.goal || entityId,
+        summary:
+          `${entity.outcome} after ${entity.totalDurationMs}ms` +
+          `${entity.outcomeDetail ? `: ${entity.outcomeDetail}` : ""}`,
+        rationale,
+        details: entity as unknown as Record<string, unknown>,
+      };
+    }
+
     const rationale: string[] = [`Found entity: ${entity.name ?? entity.title ?? entity.id ?? entityId}`];
     return { entity: entity.name ?? entity.title ?? entityId, summary: entity.description ?? entity.statement ?? "", rationale, details: entity };
   }

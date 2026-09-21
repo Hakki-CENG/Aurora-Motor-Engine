@@ -439,7 +439,7 @@ curl -s http://localhost:3000/health | jq .
 {
   "status": "ok",
   "engine": "hybrid-agent-fabric",
-  "version": "1.64.0",
+  "version": "1.65.0",
   "provider": [...],
   "sandbox": "local",
   "persistence": "file",

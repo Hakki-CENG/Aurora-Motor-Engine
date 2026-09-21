@@ -1,0 +1,87 @@
+{
+  "id": "traj-reasoning-004-1789667944092-w74rxo",
+  "taskId": "reasoning-004",
+  "tenantId": "eval",
+  "sessionId": "eval-reasoning-004",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T17:59:04.092Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "reasoning-004",
+        "category": "reasoning",
+        "instruction": "Given a codebase with a specific architecture, reason about what would happen if a key dependency was removed or changed. What would break? What alternatives exist?"
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T17:59:04.092Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944092",
+        "data": {
+          "taskDescription": "Given a codebase with a specific architecture, reason about what would happen if a key dependency was removed or changed. What would break? What alternatives exist?",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T17:59:04.092Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Given a codebase with a specific architecture, reason about what would happen if a key dependency was removed or changed. What would break? What alternatives exist?",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T17:59:04.093Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789667944092",
+        "data": {
+          "traceId": "run-1789667944092-nqse9e",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T17:59:04.093Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T17:59:04.092Z",
+  "completedAt": "2026-09-17T17:59:04.093Z",
+  "durationMs": 1,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task reasoning-004: success"
+}

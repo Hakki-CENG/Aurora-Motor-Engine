@@ -1,0 +1,87 @@
+{
+  "id": "traj-coding-012-1789669165319-8vxmkv",
+  "taskId": "coding-012",
+  "tenantId": "eval",
+  "sessionId": "eval-coding-012",
+  "events": [
+    {
+      "sequence": 0,
+      "kind": "eval.task.started",
+      "timestamp": "2026-09-17T18:19:25.319Z",
+      "source": "engine-eval",
+      "payload": {
+        "taskId": "coding-012",
+        "category": "coding",
+        "instruction": "Create a TypeScript utility that retries an async function with exponential backoff. Support configurable max retries, base delay, and max delay."
+      }
+    },
+    {
+      "sequence": 1,
+      "kind": "bus.task.received",
+      "timestamp": "2026-09-17T18:19:25.319Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789669165319",
+        "data": {
+          "taskDescription": "Create a TypeScript utility that retries an async function with exponential backoff. Support configurable max retries, base delay, and max delay.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 2,
+      "kind": "bus.memory.recalled",
+      "timestamp": "2026-09-17T18:19:25.319Z",
+      "source": "MemoryEngine",
+      "payload": {
+        "severity": "info",
+        "data": {
+          "query": "Create a TypeScript utility that retries an async function with exponential backoff. Support configurable max retries, base delay, and max delay.",
+          "tenantId": "eval"
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 3,
+      "kind": "bus.task.completed",
+      "timestamp": "2026-09-17T18:19:25.321Z",
+      "source": "HybridAgentEngine",
+      "payload": {
+        "severity": "info",
+        "traceId": "task-1789669165319",
+        "data": {
+          "traceId": "run-1789669165319-5ttzxb",
+          "outcome": "success",
+          "totalDurationMs": 0,
+          "subsystemsUsed": 1,
+          "phaseResults": 1
+        }
+      },
+      "success": true
+    },
+    {
+      "sequence": 4,
+      "kind": "eval.task.completed",
+      "timestamp": "2026-09-17T18:19:25.321Z",
+      "source": "engine-eval",
+      "payload": {
+        "outcome": "success",
+        "subsystems": [
+          "memory"
+        ]
+      },
+      "success": true
+    }
+  ],
+  "startedAt": "2026-09-17T18:19:25.319Z",
+  "completedAt": "2026-09-17T18:19:25.321Z",
+  "durationMs": 2,
+  "totalTokens": 0,
+  "totalCostUsd": 0,
+  "outcome": "success",
+  "tags": [],
+  "summary": "Task coding-012: success"
+}

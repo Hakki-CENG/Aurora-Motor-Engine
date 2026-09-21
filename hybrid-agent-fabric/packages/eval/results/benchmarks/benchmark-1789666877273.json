@@ -1,0 +1,230 @@
+{
+  "timestamp": "2026-09-17T17:41:17.273Z",
+  "overall": {
+    "totalTasks": 75,
+    "totalDurationMs": 1753,
+    "avgDurationMs": 23.373333333333335,
+    "medianDurationMs": 2,
+    "p95DurationMs": 4,
+    "p99DurationMs": 7,
+    "minDurationMs": 2,
+    "maxDurationMs": 7,
+    "stdDevMs": 20.800833316640635,
+    "throughput": 42.78379920136908
+  },
+  "byCategory": [
+    {
+      "category": "coding",
+      "stats": {
+        "totalTasks": 26,
+        "totalDurationMs": 71,
+        "avgDurationMs": 2.730769230769231,
+        "medianDurationMs": 3,
+        "p95DurationMs": 4,
+        "p99DurationMs": 7,
+        "minDurationMs": 2,
+        "maxDurationMs": 7,
+        "stdDevMs": 1.021224465180904,
+        "throughput": 366.19718309859155
+      },
+      "taskCount": 26,
+      "avgQuality": 1
+    },
+    {
+      "category": "memory",
+      "stats": {
+        "totalTasks": 6,
+        "totalDurationMs": 15,
+        "avgDurationMs": 2.5,
+        "medianDurationMs": 3,
+        "p95DurationMs": 3,
+        "p99DurationMs": 3,
+        "minDurationMs": 2,
+        "maxDurationMs": 3,
+        "stdDevMs": 0.5,
+        "throughput": 400
+      },
+      "taskCount": 6,
+      "avgQuality": 1
+    },
+    {
+      "category": "planning",
+      "stats": {
+        "totalTasks": 6,
+        "totalDurationMs": 13,
+        "avgDurationMs": 2.1666666666666665,
+        "medianDurationMs": 2,
+        "p95DurationMs": 3,
+        "p99DurationMs": 3,
+        "minDurationMs": 2,
+        "maxDurationMs": 3,
+        "stdDevMs": 0.3726779962499649,
+        "throughput": 461.53846153846155
+      },
+      "taskCount": 6,
+      "avgQuality": 1
+    },
+    {
+      "category": "reasoning",
+      "stats": {
+        "totalTasks": 6,
+        "totalDurationMs": 14,
+        "avgDurationMs": 2.3333333333333335,
+        "medianDurationMs": 2,
+        "p95DurationMs": 3,
+        "p99DurationMs": 3,
+        "minDurationMs": 2,
+        "maxDurationMs": 3,
+        "stdDevMs": 0.4714045207910317,
+        "throughput": 428.57142857142856
+      },
+      "taskCount": 6,
+      "avgQuality": 1
+    },
+    {
+      "category": "recovery",
+      "stats": {
+        "totalTasks": 6,
+        "totalDurationMs": 13,
+        "avgDurationMs": 2.1666666666666665,
+        "medianDurationMs": 2,
+        "p95DurationMs": 3,
+        "p99DurationMs": 3,
+        "minDurationMs": 2,
+        "maxDurationMs": 3,
+        "stdDevMs": 0.3726779962499649,
+        "throughput": 461.53846153846155
+      },
+      "taskCount": 6,
+      "avgQuality": 1
+    },
+    {
+      "category": "security",
+      "stats": {
+        "totalTasks": 6,
+        "totalDurationMs": 15,
+        "avgDurationMs": 2.5,
+        "medianDurationMs": 3,
+        "p95DurationMs": 3,
+        "p99DurationMs": 3,
+        "minDurationMs": 2,
+        "maxDurationMs": 3,
+        "stdDevMs": 0.5,
+        "throughput": 400
+      },
+      "taskCount": 6,
+      "avgQuality": 1
+    },
+    {
+      "category": "capability_acquisition",
+      "stats": {
+        "totalTasks": 2,
+        "totalDurationMs": 5,
+        "avgDurationMs": 2.5,
+        "medianDurationMs": 3,
+        "p95DurationMs": 3,
+        "p99DurationMs": 3,
+        "minDurationMs": 2,
+        "maxDurationMs": 3,
+        "stdDevMs": 0.5,
+        "throughput": 400
+      },
+      "taskCount": 2,
+      "avgQuality": 1
+    },
+    {
+      "category": "long_horizon",
+      "stats": {
+        "totalTasks": 2,
+        "totalDurationMs": 5,
+        "avgDurationMs": 2.5,
+        "medianDurationMs": 3,
+        "p95DurationMs": 3,
+        "p99DurationMs": 3,
+        "minDurationMs": 2,
+        "maxDurationMs": 3,
+        "stdDevMs": 0.5,
+        "throughput": 400
+      },
+      "taskCount": 2,
+      "avgQuality": 1
+    },
+    {
+      "category": "multimodal",
+      "stats": {
+        "totalTasks": 2,
+        "totalDurationMs": 6,
+        "avgDurationMs": 3,
+        "medianDurationMs": 3,
+        "p95DurationMs": 3,
+        "p99DurationMs": 3,
+        "minDurationMs": 3,
+        "maxDurationMs": 3,
+        "stdDevMs": 0,
+        "throughput": 333.3333333333333
+      },
+      "taskCount": 2,
+      "avgQuality": 1
+    },
+    {
+      "category": "research",
+      "stats": {
+        "totalTasks": 3,
+        "totalDurationMs": 9,
+        "avgDurationMs": 3,
+        "medianDurationMs": 3,
+        "p95DurationMs": 4,
+        "p99DurationMs": 4,
+        "minDurationMs": 2,
+        "maxDurationMs": 4,
+        "stdDevMs": 0.816496580927726,
+        "throughput": 333.3333333333333
+      },
+      "taskCount": 3,
+      "avgQuality": 1
+    },
+    {
+      "category": "tool_use",
+      "stats": {
+        "totalTasks": 10,
+        "totalDurationMs": 28,
+        "avgDurationMs": 2.8,
+        "medianDurationMs": 3,
+        "p95DurationMs": 4,
+        "p99DurationMs": 4,
+        "minDurationMs": 2,
+        "maxDurationMs": 4,
+        "stdDevMs": 0.6,
+        "throughput": 357.14285714285717
+      },
+      "taskCount": 10,
+      "avgQuality": 1
+    }
+  ],
+  "byDifficulty": [
+    {
+      "difficulty": 3,
+      "label": "Medium",
+      "stats": {
+        "totalTasks": 75,
+        "totalDurationMs": 194,
+        "avgDurationMs": 2.5866666666666664,
+        "medianDurationMs": 2,
+        "p95DurationMs": 4,
+        "p99DurationMs": 7,
+        "minDurationMs": 2,
+        "maxDurationMs": 7,
+        "stdDevMs": 0.7675646914466271,
+        "throughput": 386.59793814432993
+      },
+      "taskCount": 75,
+      "avgQuality": 1
+    }
+  ],
+  "bottlenecks": [],
+  "recommendations": [],
+  "trend": {
+    "direction": "improving",
+    "details": "Execution time improved by 19%"
+  }
+}

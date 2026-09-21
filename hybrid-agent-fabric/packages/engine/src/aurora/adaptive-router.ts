@@ -165,12 +165,48 @@ routeName: string; target: string; confidence: number;
     const s = await this.store.read();
     const r = s.decisions.find((d: any) => d.tenantId === tenantId && d.id === routeId);
     if (!r) throw new Error("Aurora route not found");
-    const successRate = r.success ? 1 : 0;
-    const rationale: string[] = [`Route selected with strategy: ${r.strategy}`, `Latency: ${r.latencyMs}ms`];
-    if (!r.success) rationale.push("WARNING: Last use was a failure");
-    const alternatives = s.decisions.filter((d: any) => d.tenantId === tenantId && d.id !== routeId).slice(-5).map((d: any) => d.id);
+
+    // An explanation of a routing decision has to name the route that was
+    // chosen. This previously reported `routeName: r.id` (a UUID) and
+    // `target: r.strategy`, so the selected path appeared nowhere in the
+    // output, and `alternativeRoutes` listed the ids of unrelated decisions
+    // instead of the paths that lost.
+    const rationale: string[] = [
+      `Selected ${r.selectedPath} using the ${r.strategy} strategy`,
+    ];
+
+    // `success` defaults to false until recordOutcome() runs. Reporting an
+    // unrecorded decision as a failure is the skipped-is-not-success mistake
+    // in miniature, so distinguish "not yet measured" from "measured bad".
+    const outcomeRecorded = r.latencyMs > 0 || r.success;
+    if (!outcomeRecorded) {
+      rationale.push("Outcome not recorded yet — no performance evidence for this decision");
+    } else {
+      rationale.push(`Latency: ${r.latencyMs}ms`);
+      if (!r.success) rationale.push("WARNING: Last use was a failure");
+    }
+
+    for (const alt of r.alternatives) {
+      rationale.push(`Rejected ${alt.path} (score ${alt.score.toFixed(3)})${alt.reason ? `: ${alt.reason}` : ""}`);
+    }
+
     const riskFactors: string[] = [];
     if (r.latencyMs > 5000) riskFactors.push("High latency");
-    return { routeName: r.id, target: r.strategy, confidence: r.success ? 0.8 : 0.3, rationale, recentPerformance: { successes: r.success ? 1 : 0, failures: r.success ? 0 : 1, avgLatencyMs: r.latencyMs }, alternativeRoutes: alternatives, riskFactors };
+    if (!outcomeRecorded) riskFactors.push("Unverified outcome");
+
+    return {
+      routeName: r.selectedPath,
+      target: r.selectedPath,
+      // Confidence must not claim 0.8 for a decision nobody has measured.
+      confidence: !outcomeRecorded ? 0.3 : r.success ? 0.8 : 0.3,
+      rationale,
+      recentPerformance: {
+        successes: r.success ? 1 : 0,
+        failures: outcomeRecorded && !r.success ? 1 : 0,
+        avgLatencyMs: r.latencyMs,
+      },
+      alternativeRoutes: r.alternatives.map((alt: { path: string }) => alt.path),
+      riskFactors,
+    };
   }
 }

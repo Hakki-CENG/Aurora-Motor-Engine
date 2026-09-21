@@ -1,0 +1,33 @@
+{
+  "timestamp": "2026-09-17T18:31:20.613Z",
+  "config": {
+    "maxRetries": 3,
+    "retryDelayMs": 5000,
+    "circuitBreaker": {
+      "enabled": true,
+      "failureThreshold": 5,
+      "resetTimeoutMs": 300000
+    },
+    "strategies": {
+      "retryOnTimeout": true,
+      "retryOnError": true,
+      "reduceOnBudgetExceeded": true,
+      "skipFailingCategories": false
+    }
+  },
+  "circuitBreaker": {
+    "state": "closed",
+    "failures": 0,
+    "lastFailure": null,
+    "lastSuccess": null,
+    "nextRetry": null
+  },
+  "recentAttempts": [],
+  "recommendations": [],
+  "stats": {
+    "totalAttempts": 0,
+    "successfulRecoveries": 0,
+    "failedRecoveries": 0,
+    "successRate": 0
+  }
+}
